@@ -64,6 +64,7 @@ int write_file(char* input_string, int fd) {
     return 0;
 }
 
+/*
 int get_data(int fd) {
 	pH_disk_profile p;
 	
@@ -86,6 +87,7 @@ int get_data(int fd) {
 int set_data(int fd) {
 	// Not implemented - I might need to discard this function
 }
+*/
 
 int main(){
 	int ret, fd;
@@ -103,7 +105,7 @@ int main(){
 	// Send this process's PID to the device
 	char pid_as_string[8];
 	int this_pid = getpid();
-	sprintf(pid_as_string, "%ld", getpid());
+	sprintf(pid_as_string, "%d", getpid());
 	printf("The PID of this process is %s\n", pid_as_string);
 
 	printf("Writing PID to kernel module...\n");
@@ -114,12 +116,13 @@ int main(){
 	}
 	
 	// Allocate memory for bin_receive
-	bin_receive = malloc(sizeof(void*));
+	bin_receive = malloc(sizeof(pH_disk_profile));
 	if (!bin_receive) {
 		printf("Unable to allocate memory for receive\n");
 		return errno;
 	}
 
+	/*
 	// Send bin_receive to the device
 	printf("Writing bin_receive to the kernel module...\n");
 	ret = write(fd, bin_receive, sizeof(bin_receive));
@@ -127,6 +130,7 @@ int main(){
 		perror("Failed to write bin_receive to the device");
 		return errno;
 	}
+	*/
 
 	bool continueLoop = TRUE;
 
@@ -144,20 +148,20 @@ int main(){
 		printf("The received message is: [%s]\n", receive);
 
 		if (strcmp(receive, "quit") == 0) break;
-		else if (receive[0] == 'r') {
+		else if (receive[0] == 'r') { // r stands for read
 			read_file(&receive[1], fd);
 		}
-		else if (receive[0] == 'w') {
+		else if (receive[0] == 'w') { // w stands for write
 			write_file(&receive[1], fd);
 		}
 		else if (receive[0] == 'p') {
 			//read_proc_file(&receive[1]);
 		}
-		else if (receive[0] == 't') { // Perform binary read operation
+		else if (receive[0] == 't') { // Perform binary read operation (t stands for transfer)
 			printf("Performing binary read...\n");
 			ret = read(fd, bin_receive, sizeof(bin_receive));
 			if (ret < 0 || bin_receive == NULL) {
-				printf("Failed to read the message from the device.%d%d%d\n", ret < 0, receive == NULL, strlen(receive) < 1);
+				printf("Failed to read the message from the device.%d%d\n", ret < 0, bin_receive == NULL);
 				perror("Failed to read the message from the device");
 				//close(fd);
 				return errno;
@@ -167,11 +171,13 @@ int main(){
 			printf("bin_receive = %p\n", bin_receive);
 			printf("sizeof(bin_receive) = %ld\n", sizeof(bin_receive));
 			
-			pH_disk_profile* disk_profile = malloc(sizeof(pH_disk_profile*));
+			/*
+			pH_disk_profile* disk_profile = malloc(sizeof(pH_disk_profile));
 			if (!disk_profile) {
 				printf("Failed to allocate memory for disk_profile.\n");
 				return -1;
 			}
+			*/
 			
 			disk_profile = (pH_disk_profile*) bin_receive;
 			printf("disk_profile->normal = %d\n", disk_profile->normal);
