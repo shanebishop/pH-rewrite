@@ -251,7 +251,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	printk(KERN_INFO "%s: Done conversion", DEVICE_NAME);
 
 	printk(KERN_INFO "%s: Copying to user...", DEVICE_NAME);
-	int error_count = copy_to_user(bin_receive_ptr, disk_profile, sizeof(pH_disk_profile*));
+	error_count = copy_to_user(bin_receive_ptr, disk_profile, sizeof(pH_disk_profile*));
 	if (error_count==0){           // success!
 	  printk(KERN_INFO "%s: Successfully performed binary write to user space app\n", DEVICE_NAME);
 	  return 0; // clear the position to the start and return 0
