@@ -168,9 +168,6 @@ int main(){
 			}
 			printf("Successsfully performed binary read on device.\n");
 			
-			printf("bin_receive = %p\n", bin_receive);
-			printf("sizeof(bin_receive) = %ld\n", sizeof(bin_receive));
-			
 			/*
 			pH_disk_profile* disk_profile = malloc(sizeof(pH_disk_profile));
 			if (!disk_profile) {
