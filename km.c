@@ -34,12 +34,12 @@ typedef struct pH_seq {
 } pH_seq;
 
 typedef struct pH_profile_data {
-	int sequences;			// # sequences that have been inserted NOT the number of lookahead pairs
+	int sequences;					// # sequences that have been inserted NOT the number of lookahead pairs
 	unsigned long last_mod_count;	// # syscalls since last modification
-	unsigned long train_count;	// # syscalls seen during training
+	unsigned long train_count;		// # syscalls seen during training
 	void *pages[PH_MAX_PAGES];
-	int current_page;		// pages[current_page] contains free space
-	int count_page;			// How many arrays have been allocated in the current page
+	int current_page;				// pages[current_page] contains free space
+	int count_page;					// How many arrays have been allocated in the current page
 	pH_seqflags *entry[PH_NUM_SYSCALLS];
 } pH_profile_data;
 
@@ -51,12 +51,12 @@ struct pH_profile {
 	int identifier;
 	
 	// Anil's old fields
-	int normal;		// Is test profile normal?
-	int frozen;		// Is train profile frozen (potential normal)?
-	time_t normal_time;	// When will forzen become true normal?
+	int normal;		     // Is test profile normal?
+	int frozen;		     // Is train profile frozen (potential normal)?
+	time_t normal_time;	 // When will forzen become true normal?
 	int length;
-	unsigned long count;	// Number of calls seen by this profile
-	int anomalies;		// NOT LFC - decide if normal should be reset
+	unsigned long count; // Number of calls seen by this profile
+	int anomalies;		 // NOT LFC - decide if normal should be reset
 	pH_profile_data train, test;
 	char *filename;
 	atomic_t refcount;
@@ -216,7 +216,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 
 	if (!binary_read) {
 		printk(KERN_INFO "%s: In !binary_read", DEVICE_NAME);
-		//size_of_message = strlen(output_string);
+		size_of_message = strlen(output_string);
 
 		error_count = copy_to_user(buffer, output_string, size_of_message);
 
@@ -473,7 +473,7 @@ int process_syscall(long syscall) {
 	    }
 
 		// Allocate space for the profile
-		profile = kmalloc(sizeof(pH_profile), GFP_KERNEL);
+		profile = vmalloc(sizeof(pH_profile));
 
 		// Initialize the profile
 		//profile->hlist = ;
@@ -515,14 +515,14 @@ int process_syscall(long syscall) {
         current_profile = profile;
 	}
 	
-	//if (syscalls_this_write >= SYSCALLS_PER_WRITE) {
+	if (syscalls_this_write >= SYSCALLS_PER_WRITE) {
 		binary_read = TRUE;
 		strcpy(output_string, "t");
 		int ret = send_signal(SIGCONT);
 		if (ret < 0) return ret;
 		done_waiting_for_user = FALSE;
 		printk(KERN_INFO "Ready for binary_read");
-	//}
+	}
 	
 	/*
 	// Prepare output_string
@@ -779,7 +779,7 @@ static int __init ebbchar_init(void){
 	syscalls_this_write = 0;
 	
 	// Allocate memory for current_profile
-	current_profile = kmalloc(sizeof(pH_profile), GFP_KERNEL);
+	current_profile = vmalloc(sizeof(pH_profile));
 	if (current_profile == NULL) {
 		printk(KERN_INFO "%s: Unable to allocate memory for current_profile", DEVICE_NAME);
 		return -ENOMEM;
@@ -793,32 +793,32 @@ static int __init ebbchar_init(void){
 	}
 
 	// Try to dynamically allocate a major number for the device
-   majorNumber = register_chrdev(0, DEVICE_NAME, &fops);
-   if (majorNumber<0){
-      printk(KERN_ALERT "%s: Failed to register a major number\n", DEVICE_NAME);
-      return majorNumber;
-   }
-   //printk(KERN_INFO "EBBChar: registered correctly with major number %d\n", majorNumber);
+	majorNumber = register_chrdev(0, DEVICE_NAME, &fops);
+	if (majorNumber<0){
+	  printk(KERN_ALERT "%s: Failed to register a major number\n", DEVICE_NAME);
+	  return majorNumber;
+	}
+	//printk(KERN_INFO "EBBChar: registered correctly with major number %d\n", majorNumber);
 
-   // Register the device class
-   ebbcharClass = class_create(THIS_MODULE, CLASS_NAME);
-   if (IS_ERR(ebbcharClass)){           // Check for error and clean up if there is
-      unregister_chrdev(majorNumber, DEVICE_NAME);
-      printk(KERN_ALERT "%s: Failed to register device class\n", DEVICE_NAME);
-      return PTR_ERR(ebbcharClass);     // Correct way to return an error on a pointer
-   }
-   //printk(KERN_INFO "EBBChar: device class registered correctly\n");
+	// Register the device class
+	ebbcharClass = class_create(THIS_MODULE, CLASS_NAME);
+	if (IS_ERR(ebbcharClass)){           // Check for error and clean up if there is
+	  unregister_chrdev(majorNumber, DEVICE_NAME);
+	  printk(KERN_ALERT "%s: Failed to register device class\n", DEVICE_NAME);
+	  return PTR_ERR(ebbcharClass);     // Correct way to return an error on a pointer
+	}
+	//printk(KERN_INFO "EBBChar: device class registered correctly\n");
 
-   // Register the device driver
-   ebbcharDevice = device_create(ebbcharClass, NULL, MKDEV(majorNumber, 0), NULL, DEVICE_NAME);
-   if (IS_ERR(ebbcharDevice)){          // Clean up if there is an error
-      class_destroy(ebbcharClass);      // Repeated code but the alternative is goto statements
-      unregister_chrdev(majorNumber, DEVICE_NAME);
-      printk(KERN_ALERT "%s: Failed to create the device\n", DEVICE_NAME);
-      return PTR_ERR(ebbcharDevice);
-   }
-   //printk(KERN_INFO "EBBChar: device class created correctly\n"); // Made it! device was initialized
-   mutex_init(&ebbchar_mutex);          // Initialize the mutex dynamically
+	// Register the device driver
+	ebbcharDevice = device_create(ebbcharClass, NULL, MKDEV(majorNumber, 0), NULL, DEVICE_NAME);
+	if (IS_ERR(ebbcharDevice)){          // Clean up if there is an error
+	  class_destroy(ebbcharClass);      // Repeated code but the alternative is goto statements
+	  unregister_chrdev(majorNumber, DEVICE_NAME);
+	  printk(KERN_ALERT "%s: Failed to create the device\n", DEVICE_NAME);
+	  return PTR_ERR(ebbcharDevice);
+	}
+	//printk(KERN_INFO "EBBChar: device class created correctly\n"); // Made it! device was initialized
+	mutex_init(&ebbchar_mutex);          // Initialize the mutex dynamically
 
 	// Iterates over all of the system calls
 	for (i = 0; i < num_syscalls; i++) {
@@ -849,9 +849,9 @@ static void __exit ebbchar_exit(void){
 	// Deallocate all previously allocated memory - don't forget to do this for hashtables!
 	if (output_string != NULL) kfree(output_string);
 	printk(KERN_INFO "Freed output_string");
-	if (current_profile != NULL) kfree(current_profile);
+	if (current_profile != NULL) vfree(current_profile);
 	printk(KERN_INFO "Freed current_profile");
-	//if (bin_receive_ptr != NULL) kfree(bin_receive_ptr); // For some reason this causes an error?
+	//if (bin_receive_ptr != NULL) vfree(bin_receive_ptr); // For some reason this causes an error?
 	//printk(KERN_INFO "Freed bin_receive_ptr");
    
     if (send_signal(SIGTERM) < 0) {
