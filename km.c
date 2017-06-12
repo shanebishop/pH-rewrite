@@ -14,7 +14,8 @@ Notes:
 
 #include <asm/unistd.h>      // For system call numbers
 #include <linux/hashtable.h> // For hashtables
-#include <linux/slab.h>      // For memory allocation and deallocation
+#include <linux/slab.h>      // For kmalloc and kfree
+#include <linux/vmalloc.h>   // For vmalloc
 #include <linux/ioctl.h>     // For ioctls
 
 #include "system_call_prototypes.h"
@@ -373,7 +374,7 @@ static struct file_operations fops =
    .open = dev_open,
    .read = dev_read,
    .write = dev_write,
-   .unlocked_ioctl = dev_ioctl,
+   //.unlocked_ioctl = dev_ioctl,
    .release = dev_release,
 };
 
