@@ -217,6 +217,10 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	if (!binary_read) {
 		printk(KERN_INFO "%s: In !binary_read", DEVICE_NAME);
 		size_of_message = strlen(output_string);
+		if (sycalls_this_write >= SYSCALLS_PER_WRITE) {
+			binary_read = TRUE;
+			printk(KERN_INFO "Ready for binary read");
+		}
 
 		error_count = copy_to_user(buffer, output_string, size_of_message);
 
@@ -516,7 +520,7 @@ int process_syscall(long syscall) {
 	}
 	
 	if (syscalls_this_write >= SYSCALLS_PER_WRITE) {
-		binary_read = TRUE;
+		//binary_read = TRUE;
 		strcpy(output_string, "t");
 		int ret = send_signal(SIGCONT);
 		if (ret < 0) return ret;
