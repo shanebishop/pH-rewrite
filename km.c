@@ -33,12 +33,12 @@ typedef struct pH_seq {
 } pH_seq;
 
 typedef struct pH_profile_data {
-	int sequences;					// # sequences that have been inserted NOT the number of lookahead pairs
+	int sequences;			// # sequences that have been inserted NOT the number of lookahead pairs
 	unsigned long last_mod_count;	// # syscalls since last modification
-	unsigned long train_count;		// # syscalls seen during training
+	unsigned long train_count;	// # syscalls seen during training
 	void *pages[PH_MAX_PAGES];
-	int current_page;				// pages[current_page] contains free space
-	int count_page;					// How many arrays have been allocated in the current page
+	int current_page;		// pages[current_page] contains free space
+	int count_page;			// How many arrays have been allocated in the current page
 	pH_seqflags *entry[PH_NUM_SYSCALLS];
 } pH_profile_data;
 
@@ -50,12 +50,12 @@ struct pH_profile {
 	int identifier;
 	
 	// Anil's old fields
-	int normal;				// Is test profile normal?
-	int frozen;				// Is train profile frozen (potential normal)?
-	time_t normal_time;		// When will forzen become true normal?
+	int normal;		// Is test profile normal?
+	int frozen;		// Is train profile frozen (potential normal)?
+	time_t normal_time;	// When will forzen become true normal?
 	int length;
 	unsigned long count;	// Number of calls seen by this profile
-	int anomalies;			// NOT LFC - decide if normal should be reset
+	int anomalies;		// NOT LFC - decide if normal should be reset
 	pH_profile_data train, test;
 	char *filename;
 	atomic_t refcount;
@@ -152,6 +152,7 @@ static int dev_open(struct inode *inodep, struct file *filep){
    return 0;
 }
 
+/*
 static ssize_t dev_ioctl(struct file* f, unsigned int cmd, unsigned long arg) {
 	return -1; // Temporarily treat this as an error - fix this
 	
@@ -197,6 +198,7 @@ static ssize_t dev_ioctl(struct file* f, unsigned int cmd, unsigned long arg) {
 	
 	return 0; // Only return 0 here, otherwise return something else on not success
 }
+*/
 
 static int dev_release(struct inode *inodep, struct file *filep){
    mutex_unlock(&ebbchar_mutex); // release the mutex (i.e., lock goes up)
@@ -205,11 +207,14 @@ static int dev_release(struct inode *inodep, struct file *filep){
 }
 
 static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
+	pH_profile* current_profile;
+	pH_disk_profile* disk_profile;
+	int error_count = 0;
+	
 	printk(KERN_INFO "%s: In dev_read", DEVICE_NAME);
 
 	if (!binary_read) {
 		printk(KERN_INFO "%s: In !binary_read", DEVICE_NAME);
-		int error_count = 0;
 		//size_of_message = strlen(output_string);
 
 		error_count = copy_to_user(buffer, output_string, size_of_message);
@@ -223,40 +228,43 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 		  return -EFAULT;      // Failed - return a bad address message
 		}
 	}
+	
+	printk(KERN_INFO "%s: In binary_read", DEVICE_NAME);
+	
+	bin_receive_ptr = (void*) buffer;
+
+	current_profile = vmalloc(sizeof(pH_profile));
+	if (current_profile == NULL) {
+		printk(KERN_INFO "%s: Unable to allocate memory for current_profile", DEVICE_NAME);
+		return -ENOMEM;
+	}
+
+	disk_profile = vmalloc(sizeof(pH_disk_profile));
+	if (!disk_profile) {
+		printk(KERN_INFO "%s: Unable to allocate memory for disk profile", DEVICE_NAME);
+		vfree(current_profile);
+		return -ENOMEM;
+	}
+
+	pH_profile_mem2disk(current_profile, disk_profile);
+	printk(KERN_INFO "%s: Done conversion", DEVICE_NAME);
+
+	printk(KERN_INFO "%s: Copying to user...", DEVICE_NAME);
+	int error_count = copy_to_user(bin_receive_ptr, disk_profile, sizeof(pH_disk_profile*));
+	if (error_count==0){           // success!
+	  printk(KERN_INFO "%s: Successfully performed binary write to user space app\n", DEVICE_NAME);
+	  return 0; // clear the position to the start and return 0
+	}
 	else {
-		printk(KERN_INFO "%s: In binary_read", DEVICE_NAME);
-
-		if (!current_profile) {
-			printk(KERN_INFO "%s: current_profile has not been initialized", DEVICE_NAME);
-			return -1;
-		}
-		printk(KERN_INFO "%s: I believe current_profile has been initialized", DEVICE_NAME);
-		// It probably hasn't been actually
-		
-		pH_disk_profile* disk_profile = kmalloc(sizeof(pH_disk_profile*), GFP_KERNEL);
-		if (!disk_profile) {
-			printk(KERN_INFO "%s: Unable to allocate memory for disk profile", DEVICE_NAME);
-			return -ENOMEM;
-		}
-		printk(KERN_INFO "%s: Successfully allocated memory for disk profile", DEVICE_NAME);
-		
-		pH_profile_mem2disk(current_profile, disk_profile);
-		printk(KERN_INFO "%s: Done conversion", DEVICE_NAME);
-
-		printk(KERN_INFO "%s: Copying to user...", DEVICE_NAME);
-		int error_count = copy_to_user(bin_receive_ptr, disk_profile, sizeof(pH_disk_profile*));
-		if (error_count==0){           // success!
-		  printk(KERN_INFO "%s: Successfully performed binary write to user space app\n", DEVICE_NAME);
-		  return 0; // clear the position to the start and return 0
-		}
-		else {
-		  printk(KERN_INFO "%s: Failed to send %d characters to the user\n", DEVICE_NAME, error_count);
-		  return -EFAULT;      // Failed - return a bad address message
-		}
+	  printk(KERN_INFO "%s: Failed to send %d characters to the user\n", DEVICE_NAME, error_count);
+	  return -EFAULT;      // Failed - return a bad address message
 	}
 }
 
 static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t *offset){
+	const char* buffer;
+	int ret;
+	
 	printk(KERN_INFO "%s: In dev_write", DEVICE_NAME);
 	
 	binary_read = FALSE;
@@ -264,8 +272,9 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 	if (numberOpens > 0) {
 		printk(KERN_INFO "%s: In numberOpens > 0", DEVICE_NAME);
 		
-		if (have_userspace_pid && !have_bin_receive_ptr) {
+		if (have_userspace_pid) {
 			printk(KERN_INFO "%s: In !have_bin_receive_ptr", DEVICE_NAME);
+			/*
 			bin_receive_ptr = kmalloc(sizeof(const void*), GFP_KERNEL);
 			if (!bin_receive_ptr) {
 				printk(KERN_INFO "%s: Unable to allocate memory for bin_receive_ptr", DEVICE_NAME);
@@ -275,12 +284,11 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			//printk(KERN_INFO "Performed cast operation successfully");
 			have_bin_receive_ptr = TRUE;
 			//printk(KERN_INFO "Set have_bin_receive_ptr to true successfully");
+			*/
 			
-			/*
 			// Send SIGSTOP signal to the userspace app
 			int ret = send_signal(SIGSTOP);
 			if (ret < 0) return ret;
-			*/
 			
 			// We are done waiting for the user now
 			done_waiting_for_user = TRUE;
@@ -288,8 +296,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			return 0;
 		}
 		
-		const char* buffer;
-		buffer = kmalloc(sizeof(const char*), GFP_KERNEL);
+		buffer = kmalloc(sizeof(char) * 254, GFP_KERNEL);
 		if (!buffer) {
 			printk(KERN_INFO "%s: Unable to allocate memory for dev_write buffer", DEVICE_NAME);
 			return -ENOMEM;
@@ -324,10 +331,10 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			kstrtol(message, 10, &userspace_pid);
 			have_userspace_pid = TRUE;
 
-			binary_read = TRUE;
-			strcpy(output_string, "t");
-			//int ret = send_signal(SIGCONT);
-			//if (ret < 0) return ret;
+			//binary_read = TRUE;
+			//strcpy(output_string, "t");
+			ret = send_signal(SIGSTOP);
+			if (ret < 0) return ret;
 			//done_waiting_for_user = FALSE;
 			done_waiting_for_user = TRUE;
 			printk(KERN_INFO "Ready for binary_read");
@@ -937,8 +944,8 @@ void pH_profile_mem2disk(pH_profile *profile, pH_disk_profile *disk_profile)
         strcpy(disk_profile->filename, "");
         printk(KERN_INFO "%s: Made it through first block of pH_profile_mem2disk", DEVICE_NAME);
 
-        pH_profile_data_mem2disk(&(profile->train), &(disk_profile->train));
-        pH_profile_data_mem2disk(&(profile->test), &(disk_profile->test));
+        //pH_profile_data_mem2disk(&(profile->train), &(disk_profile->train));
+        //pH_profile_data_mem2disk(&(profile->test), &(disk_profile->test));
         
         printk(KERN_INFO "%s: Made it to the end of pH_profile_mem2disk function", DEVICE_NAME);
 }
