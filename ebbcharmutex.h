@@ -17,6 +17,8 @@
 #define PH_LOCALITY_WIN 128
 #define PH_FILE_MAGIC_LEN 20
 #define PH_LOG_ACTION 3   /* actions pH takes (delays) */
+#define PH_EMPTY_SYSCALL 255  /* note: this value is used as the */
+                              /* "no system call" marker in sequences */
 
 static int    majorNumber;                  // Store the device number - determined automatically
 static char   message[256] = {0};           // Memory for the string that is passed from userspace
