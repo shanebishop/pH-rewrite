@@ -16,7 +16,6 @@ Notes:
 #include <linux/hashtable.h> // For hashtables
 #include <linux/slab.h>      // For kmalloc and kfree
 #include <linux/vmalloc.h>   // For vmalloc
-#include <linux/ioctl.h>     // For ioctls
 
 #include "system_call_prototypes.h"
 #include "ebbcharmutex.h"       
@@ -53,7 +52,7 @@ struct pH_profile {
 	// Anil's old fields
 	int normal;		     // Is test profile normal?
 	int frozen;		     // Is train profile frozen (potential normal)?
-	time_t normal_time;	 // When will forzen become true normal?
+	time_t normal_time;	 // When will frozen become true normal?
 	int length;
 	unsigned long count; // Number of calls seen by this profile
 	int anomalies;		 // NOT LFC - decide if normal should be reset
@@ -93,6 +92,21 @@ struct hash_struct {
 	int identifier;
 };
 
+struct executable {
+	struct hlist_node hlist; // Must be first field
+	char* absolute_path;
+};
+
+typedef struct pH_task_struct {
+	struct hlist_node hlist; // Must be first field
+	long process_id;
+	pH_locality alf;
+	pH_seq* seq;
+	int delay;
+	unsigned long count;
+	pH_profile* profile; // Pointer to appropriate profile
+};
+
 const char *PH_FILE_MAGIC="pH profile 0.18\n";
 
 /* this was atomic, but now we need a long - so, we could make
@@ -120,22 +134,31 @@ int pH_suspend_execve_time = 3600 * 24 * 2;  /* time to suspend execve's */
 int pH_normal_wait = 7 * 24 * 3600;/* seconds before putting normal to work */
 
 // My own global declarations
-#define num_syscalls 11                    // Holds current temp number of syscalls (not to be confused with PH_NUM_SYSCALLS)
-struct jprobe jprobes_array[num_syscalls]; // Array of jprobes
+#define num_syscalls 11
 #define num_kretprobes 1
-struct kretprobe kretprobes_array[num_kretprobes]; // Array of kretprobes
-DECLARE_HASHTABLE(proc_hashtable, 8);      // Declare hashtable
-long userspace_pid;                        // The PID of the userspace process
-char* output_string;
 #define SIGNAL_PRIVILEGE 1
-bool done_waiting_for_user = FALSE;
-bool have_userspace_pid    = FALSE;
 #define SYSCALLS_PER_WRITE 10
+
+// Commands for user space code
+#define READ_ASCII 'r'
+#define WRITE_ASCII 'w'
+#define ADD_BINARY 'b'
+#define FIND_A_BINARY 'f'
+
+struct jprobe jprobes_array[num_syscalls]; // Array of jprobes
+struct kretprobe kretprobes_array[num_kretprobes]; // Array of kretprobes
+DECLARE_HASHTABLE(profile_hashtable, 8); // Declare process hashtable
+DECLARE_HASHTABLE(proc_hashtable, 8);
+long userspace_pid; // The PID of the userspace process
+char* output_string;
 int syscalls_this_write;
 pH_profile* current_profile;
-bool have_bin_receive_ptr = FALSE;
-const void* bin_receive_ptr;
-bool binary_read = FALSE;
+void* bin_receive_ptr;
+bool done_waiting_for_user = FALSE;
+bool have_userspace_pid    = FALSE;
+bool have_bin_receive_ptr  = FALSE;
+bool binary_read           = FALSE;
+bool user_process_has_been_loaded = FALSE;
 
 // Function prototypes required for dev_* functions
 void pH_profile_mem2disk(pH_profile*, pH_disk_profile*);
