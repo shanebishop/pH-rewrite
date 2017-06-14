@@ -557,16 +557,16 @@ int process_syscall(long syscall) {
 	syscalls_this_write++;
 	printk(KERN_INFO "%s: Syscall was received. %d", DEVICE_NAME, syscalls_this_write);
 	
-	profile = vmalloc(sizeof(pH_profile));
-	if (!profile) {
-		printk(KERN_INFO "%s: Unable to allocate memory for profile in process_syscall", DEVICE_NAME);
-		return -ENOMEM;
-	}
-	
-	profile = retrieve_pH_profile_by_pid(current->pid);
+	profile = retrieve_pH_profile_by_pid(current->pid);	
 	
 	if (!profile || profile == NULL) {
-		ret = new_profile(profile, "test"); // The module consistently crashes when this call is made
+		profile = (pH_profile*) vmalloc(sizeof(pH_profile));
+		if (!profile) {
+			printk(KERN_INFO "%s: Unable to allocate memory for profile in process_syscall", DEVICE_NAME);
+			return -ENOMEM;
+		}
+		
+		ret = new_profile(profile, "test");
 		if (ret == -1) return ret;
 		
 		if (!profile || profile == NULL) {
