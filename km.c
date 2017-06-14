@@ -684,6 +684,7 @@ static long jdo_execve(struct filename *filename,
 static long jsys_execve(const char __user *filename,
 	const char __user *const __user *__argv,
 	const char __user *const __user *__envp) {
+	pH_profile* profile;
 	pH_task_struct* this_process = kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
 	
 	// Initialize this process - check with Anil to see if these are the right values to initialize it to
@@ -692,12 +693,32 @@ static long jsys_execve(const char __user *filename,
 	this_process->seq = NULL;
 	this_process->delay = 0;
 	this_process->count = 0;
-	this_process->profile = vmalloc(sizeof(pH_profile);
-	if (!(this_process->profile)) {
+	
+	profile = vmalloc(sizeof(pH_profile));
+	if (!profile) {
 		printk(KERN_ALERT "%s: Unable to allocate memory for a new profile in jsys_execve", DEVICE_NAME);
 	}
+	new_profile(profile, filename);
+	this_process->profile = profile;
 	
 	hash_add(proc_hashtable, &this_process->hlist, current->pid);
+	
+	struct pH_profile* obj;
+	int bkt;
+	int count = 0;
+	
+	if (!hash_empty(profile_hashtable) {
+		printk(KERN_INFO "%s: Printing hashamps...", DEVICE_NAME);
+		hash_for_each(profile_hashtable, bkt, obj, hlist) {
+			printk(KERN_INFO "%It is possible to print here");
+			//printk(KERN_INFO "%s: Output: %s\t%d", DEVICE_NAME, obj->filename, obj->identifier);
+			count++;
+		}
+		printk(KERN_INFO "%s: Done printing %d", DEVICE_NAME, count);
+	}
+	else {
+		printk(KERN_INFO "%s: profile_hashtable is empty - cannot print", DEVICE_NAME);
+	}
 									
 	process_syscall(59);
 	
