@@ -163,7 +163,7 @@ bool user_process_has_been_loaded = FALSE;
 // Function prototypes required for dev_* functions
 void pH_profile_mem2disk(pH_profile*, pH_disk_profile*);
 int send_signal(int);
-pH_profile* retrieve_pH_profile(int);
+//pH_profile* retrieve_pH_profile(int);
 
 static int dev_open(struct inode *inodep, struct file *filep){
    //printk(KERN_INFO "%s: dev_open called", DEVICE_NAME);
@@ -240,7 +240,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	if (!binary_read) {
 		printk(KERN_INFO "%s: In !binary_read", DEVICE_NAME);
 		size_of_message = strlen(output_string);
-		if (sycalls_this_write >= SYSCALLS_PER_WRITE) {
+		if (strcmp(output_string, "t") {
 			binary_read = TRUE;
 			printk(KERN_INFO "Ready for binary read");
 		}
@@ -405,7 +405,18 @@ static struct file_operations fops =
    .release = dev_release,
 };
 
-pH_profile* retrieve_pH_profile(int key) {
+pH_task_struct* retrieve_process(int process_id) {
+	pH_task_struct* pH_task_struct;
+	
+	hash_for_each_possible(proc_hashtable, pH_task_struct, hlist, process_id) {
+		if (pH_task_struct->process_id == process_id) {
+			return pH_task_struct;
+		}
+	
+	return NULL;
+}
+			
+pH_profile* retrieve_pH_profile_by_pid(int key) {
 	pH_profile* pH_profile;
 	
 	hash_for_each_possible(proc_hashtable, pH_profile, hlist, key) {
@@ -436,15 +447,18 @@ struct task_struct* get_userspace_task_struct(void) {
 
 // Sends a signal to the userspace app
 int send_signal(int signal_to_send) {
+	int ret;
+	struct task_struct* t;
+	
 	// Retrieve the usersapce task_struct
-	struct task_struct* t = get_userspace_task_struct();
+	t = get_userspace_task_struct();
 	if (t == NULL) {
 		printk(KERN_INFO "%s: No such PID", DEVICE_NAME);
 		return -ENODEV;
 	}
 	
 	// Send the signal
-	int ret = send_sig(signal_to_send, t, SIGNAL_PRIVILEGE);
+	ret = send_sig(signal_to_send, t, SIGNAL_PRIVILEGE);
 	if (ret < 0) {
 		printk(KERN_INFO "%s: Unable to send signal", DEVICE_NAME);
 		return ret;
@@ -474,73 +488,149 @@ int send_signal(int signal_to_send) {
 	return 0;
 }
 
+inline void pH_refcount_init(pH_profile*, int);
+	
+int new_profile(pH_profile* profile, char* filename);
+	int i;
+	
+	profile->normal = 0;  // Module consistently crashes when this line is reached
+	profile->frozen = 0;
+	profile->normal_time = 0;
+	profile->anomalies = 0;
+	profile->length = pH_default_looklen;
+	profile->count = 0;
+	//init_MUTEX(&(profile->lock));
+
+	profile->train.sequences = 0;
+	profile->train.last_mod_count = 0;
+	profile->train.train_count = 0;
+	profile->train.current_page = 0;
+	profile->train.count_page = 0;
+	
+	for (i=0; i<PH_NUM_SYSCALLS; i++) {
+			profile->train.entry[i] = NULL;
+	}
+
+	for (i=0; i<PH_MAX_PAGES; i++) {
+			profile->train.pages[i] = NULL;
+	}
+
+	profile->test = profile->train;
+
+	profile->next = NULL;
+	pH_refcount_init(profile, 0);
+	profile->filename = filename;
+
+	//pH_open_seq_logfile(profile);
+
+	profile->next = NULL;
+	
+	// Add this new profile to the hashtable
+	hash_add(profile_hashtable, &profile->hlist, current->pid);
+	
+	return 0;
+}
+	
 void pH_profile_mem2disk(pH_profile*, pH_disk_profile*);
+int pH_test_seq(pH_seq*, pH_profile_data*);
+inline void pH_add_anomaly_count(pH_task_struct*, int val);
+void pH_start_normal(pH_profile*);
+inline void pH_delay_task(int, pH_task_struct*);
+inline void pH_reset_ALF(pH_task_struct*);
+inline void pH_reset_train(pH_profile*);
+inline int pH_LFC(pH_task_struct*);
+inline void pH_process_normal(pH_profile*, pH_seq*, pH_task_struct*, long syscall);
+inline void pH_refcount_inc(pH_profile*);
 
 // Process system calls
 int process_syscall(long syscall) {
-	int i;
+	int i, ret, LFC;
+	pH_profile* profile;
+	pH_task_struct* process;
 	
 	// If still waiting for the userpace process, return
 	if (!done_waiting_for_user) return -1;
 	
+	// For now drop pH_monitoring() call - I will need to use a different implementation of this function
+	if (!(/*pH_monitoring(current) &&*/ pH_aremonitoring)) return 0;
+	
 	syscalls_this_write++;
 	printk(KERN_INFO "%s: Syscall was received. %d", DEVICE_NAME, syscalls_this_write);
 	
-	struct pH_profile *profile;
-	
-	profile = retrieve_pH_profile(current->pid);
-	
-	if (profile != NULL) {
-	    pH_seq* seq = &profile->seq;
+	profile = vmalloc(sizeof(pH_profile));
+	if (!profile) {
+		printk(KERN_INFO "%s: Unable to allocate memory for profile in process_syscall", DEVICE_NAME);
+		return -ENOMEM;
 	}
-	else {
-	    if (message == NULL || message[0] == '\0') {
-	        printk(KERN_INFO "%s: Message was null", DEVICE_NAME);
-	        return -1;
-	    }
-
-		// Allocate space for the profile
-		profile = vmalloc(sizeof(pH_profile));
-
-		// Initialize the profile
-		//profile->hlist = ;
-	    //profile->identifier = ;
-
-        profile->normal = 0;  /* we just started - not normal yet! */
-        profile->frozen = 0;
-        profile->normal_time = 0;
-        profile->anomalies = 0;
-        profile->length = pH_default_looklen;
-        profile->count = 0;
-        //init_MUTEX(&(profile->lock));
-        
-        profile->train.sequences = 0;
-        profile->train.last_mod_count = 0;
-        profile->train.train_count = 0;
-        profile->train.current_page = 0;
-        profile->train.count_page = 0;
-        
-        for (i=0; i<PH_NUM_SYSCALLS; i++) {
-                profile->train.entry[i] = NULL;
-        }
-
-        for (i=0; i<PH_MAX_PAGES; i++) {
-                profile->train.pages[i] = NULL;
-        }
-
-        profile->test = profile->train;
-        profile->next = NULL;
-        //pH_refcount_init(profile, 0);
-        //profile->filename = filename; // Make sure to fix this line
-        
-        //pH_open_seq_logfile(profile);
-
-        profile->next = NULL;
-        
-        // Add this new profile to the hashtable
-        hash_add(proc_hashtable, &profile->hlist, current->pid);
-        current_profile = profile;
+	
+	profile = retrieve_pH_profile_by_pid(current->pid);
+	
+	if (!profile || profile == NULL) {
+		ret = new_profile(profile, "test"); // The module consistently crashes when this call is made
+		if (ret == -1) return ret;
+		
+		if (!profile || profile == NULL) {
+			printk(KERN_INFO "%s: new_profile did not return a profile successfully", DEVICE_NAME);
+			return -1;
+		}
 	}
+	
+	process = kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
+	if (!process) {
+		printk(KERN_INFO "%s: Unable to allocate memory for new process in process_syscall()", DEVICE_NAME);
+		return -ENOMEM;
+	}
+	
+	process = retrieve_process(current->pid);
+	if (process == NULL) { // Used to be process != NULL for some reason
+		// Ignore this syscall
+		kfree(process);
+		return 0;
+	}
+	
+	if ((process->seq) == NULL) {
+		ph_seq* temp = (pH_seq*) vmalloc(sizeof(pH_seq));
+		process->seq = temp;
+		INIT_LIST_HEAD(&temp->seqList);
+	}
+	
+	process->seq->length = profile->length;
+	process->seq->last = profile->length - 1;
+	
+	// FIXME: Move length to profiles!
+	
+	for (i = 0; i < PH_MAX_SEQLEN; i++) {
+		process->seq->data[i] = PH_EMPTY_SYSCALL;
+	}
+	
+	pH_refcount_inc(profile);
+	
+	process->profile = profile;
+	
+	pH_profile_data* test = &(profile->test);
+	
+	//s->count++;
+	pH_append_call(process->seq, syscall);
+	
+	profile_count++;
+	//pH_train(s);
+	// xtime is no longer in modern linux kernels; I will need to come up with a workaround for this
+	if (profile->frozen /*&& (xtime.tv_sec > profile->normal_time*/) {
+		pH_start_normal(profile);
+	}
+	
+	pH_process_normal(profile, process->seq, process, syscall);
+	
+	LFC = pH_LFC(process);
+	if (LFC > pH_tolerize_limit) {
+		pH_reset_train(profile);
+		// To stop anom_limit from kicking in...
+		profile->anomalies = 0;
+	}
+	
+	pH_delay_task(LFC, process);
+	
+	kfree(process);
 	
 	if (syscalls_this_write >= SYSCALLS_PER_WRITE) {
 		//binary_read = TRUE;
@@ -594,23 +684,22 @@ static long jdo_execve(struct filename *filename,
 static long jsys_execve(const char __user *filename,
 	const char __user *const __user *__argv,
 	const char __user *const __user *__envp) {
-	//pr_info("JProbes Example: filename = %s\n", filename);
-	//pr_info("New execve system call");
-
+	pH_task_struct* this_process = kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
+	
+	// Initialize this process - check with Anil to see if these are the right values to initialize it to
+	this_process->process_id = current->pid;
+	pH_reset_ALF(this_process);
+	this_process->seq = NULL;
+	this_process->delay = 0;
+	this_process->count = 0;
+	this_process->profile = vmalloc(sizeof(pH_profile);
+	if (!(this_process->profile)) {
+		printk(KERN_ALERT "%s: Unable to allocate memory for a new profile in jsys_execve", DEVICE_NAME);
+	}
+	
+	hash_add(proc_hashtable, &this_process->hlist, current->pid);
+									
 	process_syscall(59);
-	
-	/*
-	// Prepare output_string
-	strcpy(output_string, "w");
-	strcat(output_string, filename);
-	
-	// Send SIGCONT signal
-	int ret = send_signal(SIGCONT);
-	if (ret < 0) return ret;
-	
-	// We are no waiting for the userspace program
-	done_waiting_for_user = FALSE;
-	*/
 	
 	jprobe_return();
 	return 0;
@@ -762,14 +851,25 @@ struct my_kretprobe_data {
 
 static int fork_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
-	//int retval = regs_return_value(regs);
-	//struct my_data *data = (struct my_data *)ri->data;
+	int retval;
+	//struct my_data* data;
 	//s64 delta;
 	ktime_t now;
-
+	pH_task_struct* process;
+	
+	retval = regs_return_value(regs);
+	data = (struct my_data *)ri->data;
+	
 	now = ktime_get();
 	//delta = ktime_to_ns(ktime_sub(now, data->entry_stamp));
 	//printk(KERN_INFO "%s: _do_fork returned %d", DEVICE_NAME, retval);
+	
+	process = kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
+	if (!process) {
+		printk(KERN_ALERT "%s: Unable to allocate memory for process in fork_handler", DEVICE_NAME);
+	}
+	hash_add(proc_hashtable, &process->hlist, retval);
+	
 	return 0;
 }
 
@@ -781,7 +881,7 @@ static struct kretprobe fork_kretprobe = {
 
 
 static int __init ebbchar_init(void){
-   int ret, i;
+	int ret, i;
 	
 	pr_info("%s: Initiating %s", DEVICE_NAME, DEVICE_NAME);
 	
@@ -801,6 +901,7 @@ static int __init ebbchar_init(void){
 	// Initialize kretprobes_array
 	kretprobes_array[0] = fork_kretprobe;
 	
+	hash_init(profile_hashtable);
 	hash_init(proc_hashtable);
 	
 	syscalls_this_write = 0;
@@ -816,6 +917,12 @@ static int __init ebbchar_init(void){
 	output_string = kmalloc(sizeof(char) * 254, GFP_KERNEL);
 	if (output_string == NULL) {
 		printk(KERN_INFO "%s: Unable to allocate memory for output_string", DEVICE_NAME);
+		return -ENOMEM;
+	}
+	
+	bin_receive_ptr = vmalloc(sizeof(pH_disk_profile));
+	if (!bin_receive_ptr) {
+		printk(KERN_INFO "%s: Unable to allocate memory for bin_receive_ptr", DEVICE_NAME);
 		return -ENOMEM;
 	}
 
@@ -1048,43 +1155,6 @@ void pH_open_seq_logfile(pH_profile *profile)
         free_page((unsigned long) seq_filename);
 }
 
-// Called by pH_read_profile, which is called by pH_execve
-void pH_add_new_profile(pH_profile *profile, char *filename)
-{
-        int i;
-
-        profile->normal = 0;  /* we just started - not normal yet! */
-        profile->frozen = 0;
-        profile->normal_time = 0;
-        profile->anomalies = 0;
-        profile->length = pH_default_looklen;
-        profile->count = 0;
-        //init_MUTEX(&(profile->lock));
-        
-        profile->train.sequences = 0;
-        profile->train.last_mod_count = 0;
-        profile->train.train_count = 0;
-        profile->train.current_page = 0;
-        profile->train.count_page = 0;
-        for (i=0; i<PH_NUM_SYSCALLS; i++) {
-                profile->train.entry[i] = NULL;
-        }
-
-        for (i=0; i<PH_MAX_PAGES; i++) {
-                profile->train.pages[i] = NULL;
-        }
-
-        profile->test = profile->train;
-        profile->next = NULL;
-        pH_refcount_init(profile, 0);
-        profile->filename = filename;
-        
-        pH_open_seq_logfile(profile);
-
-        profile->next = pH_profile_list;
-        pH_profile_list = profile;
-}
-
 inline struct syscall_pair pH_append_call(pH_seq *s, int new_value)
 {
         struct syscall_pair pair;
@@ -1127,6 +1197,203 @@ inline void pH_train(pH_task_state *s)
         train->last_mod_count = 0;
 }
 
+int pH_test_seq(pH_seq *s, pH_profile_data *data)
+{
+        int i, cur_call, prev_call, cur_idx;
+        u8 *seqdata = s->data;
+        int seqlen = s->length;
+        int mismatches = 0;
+        
+        cur_idx = s->last;
+        cur_call = seqdata[cur_idx];
 
+        if (data->entry[cur_call] == NULL)
+                return (seqlen - 1);
+
+        for (i = 1; i < seqlen; i++) {
+                prev_call = seqdata[(cur_idx + seqlen - i) % seqlen];
+                if ((data->entry[cur_call][prev_call] &
+                     (1 << (i - 1))) == 0) {
+                        mismatches++;
+                }
+        }
+
+        return mismatches;
+}
+									
+inline void pH_reset_ALF(pH_task_struct *s)
+{
+        int i;
+
+        for (i=0; i<PH_LOCALITY_WIN; i++) {
+                s->alf.win[i]=0;
+        }
+        s->alf.total = 0;
+        s->alf.max = 0;
+        s->alf.first = PH_LOCALITY_WIN - 1;
+
+        /* if there are no anomalies, we don't delay, so zero it now */
+        s->delay = 0;
+}
+									
+void pH_stop_normal(pH_task_struct *s)
+{
+        s->profile->normal = 0;
+        pH_reset_ALF(s);
+}
+									
+inline void pH_add_anomaly_count(pH_task_struct *s, int val)
+{
+        int i = (s->alf.first + 1) % PH_LOCALITY_WIN;
+
+        if (val > 0) {
+                s->profile->anomalies++;
+                if (s->alf.win[i] == 0) {
+                       s->alf.win[i] = 1;
+                        s->alf.total++;
+                        if (s->alf.total > s->alf.max)
+                                s->alf.max = s->alf.total;
+                }
+        } else if (s->alf.win[i] > 0) {
+                s->alf.win[i] = 0;
+                s->alf.total--;
+        }
+        s->alf.first = i;
+}
+									
+int pH_copy_train_to_test(pH_profile *profile)
+{
+        pH_profile_data *train = &(profile->train);
+        pH_profile_data *test = &(profile->test);
+        int i;
+
+        test->sequences = train->sequences;
+        test->last_mod_count = train->last_mod_count;
+        test->train_count = train->train_count;
+
+        test->current_page = 0;
+        test->count_page = 0;
+
+        for (i = 0; i < PH_NUM_SYSCALLS; i++) {
+                if (train->entry[i] == NULL)
+                        test->entry[i] = NULL;
+                else {
+                        if (pH_add_seq_storage(test, i))
+                                return -1;
+                        memcpy(test->entry[i], train->entry[i],
+                               PH_NUM_SYSCALLS);
+                }
+        }
+        
+        return 0;
+}
+									
+void pH_start_normal(pH_profile* profile)
+{
+        //pH_profile *profile = s->profile;
+        pH_profile_data *train = &(profile->train);
+        pH_profile_data *test = &(profile->test);
+        
+        //pH_reset_ALF(s);
+        
+        if (pH_copy_train_to_test(profile))
+                return;
+
+        profile->anomalies = 0;
+        profile->normal = 1;
+        profile->frozen = 0;
+        train->last_mod_count = 0;
+        train->train_count = 0;
+}
+
+inline void pH_process_normal(pH_profile* profile, pH_seq* seq, pH_task_struct* s, long syscall)
+{
+        int anomalies;
+        pH_profile_data *test = &(profile->test);
+
+        if (profile->normal) {
+                anomalies = pH_test_seq(seq, test);
+                if (anomalies && profile->anomalies > pH_anomaly_limit) {
+                                pH_stop_normal(s);
+                        }
+                }
+        } else {
+                anomalies = 0;
+        }
+
+        pH_add_anomaly_count(s, anomalies);
+}
+									
+void pH_do_delay(unsigned long delay, pH_task_struct* p)
+{
+        /* maybe we shouldn`t allow interrupts here? */
+
+    p->delay = delay;
+        
+	while ((p->delaydelay > 0) && (pH_delay_factor > 0)) {
+                current->state = TASK_INTERRUPTIBLE;
+                schedule_timeout(pH_delay_factor);
+                (p->delaydelay)--;
+        }
+
+	if (p->delay < 0)
+			p->delay = 0;
+}
+									
+inline void pH_delay_task(int delay_exp, pH_task_struct* p)
+{
+        if ((pH_delay_factor > 0) && (delay_exp > 0)) {
+                unsigned long delay, eff_delay;
+                const int max_delay_exp = sizeof(delay) * 8 - 2;
+
+                if (delay_exp > max_delay_exp)
+                        delay_exp = max_delay_exp;
+                delay = 1 << delay_exp;
+                eff_delay = delay * pH_delay_factor;
+                action("Delaying %d at %lu for %lu jiffies", 
+                       current->pid, s->count, eff_delay);
+                pH_do_delay(delay, p);
+        }
+}
+									
+void pH_free_profile_data(pH_profile_data *data)
+{
+        int i;
+
+        data->current_page = 0;
+        data->count_page = 0;
+
+        for (i=0; i<PH_NUM_SYSCALLS; i++)
+                data->entry[i] = NULL;
+
+        for (i = 0; i <PH_MAX_PAGES; i++) {
+                if (data->pages[i]) {
+                        free_page((unsigned long) data->pages[i]);
+                        data->pages[i] = NULL;
+                }
+        }
+}
+									
+void pH_reset_profile_data(pH_profile_data *data)
+{
+        data->last_mod_count = 0;
+        data->train_count = 0;
+        data->sequences = 0;
+        
+        pH_free_profile_data(data);
+}
+									
+inline void pH_reset_train(pH_profile* profile)
+{
+        pH_profile_data *train = &(profile->train);
+        
+        pH_reset_profile_data(train);
+}
+									
+inline void pH_refcount_inc(pH_profile *profile)
+{
+        atomic_inc(&(profile->refcount));
+}
+									
 module_init(ebbchar_init);
 module_exit(ebbchar_exit);
