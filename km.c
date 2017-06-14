@@ -240,7 +240,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	if (!binary_read) {
 		printk(KERN_INFO "%s: In !binary_read", DEVICE_NAME);
 		size_of_message = strlen(output_string);
-		if (strcmp(output_string, "t") {
+		if (*output_string == 't') {
 			binary_read = TRUE;
 			printk(KERN_INFO "Ready for binary read");
 		}
