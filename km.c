@@ -445,6 +445,26 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	
 	return NULL;
 }
+	
+int remove_process_from_hashtables(int process_id) {
+	pH_task_struct* obj, temp;
+	
+	temp = (pH_task_struct*) kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
+	if (!temp) {
+		printk(KERN_INFO "%s: Unable to allocate memory for temp in remove_process_from_hashtables", DEVICE_NAME);
+		return -ENOMEM;
+	}
+	
+	hash_for_each_possible_safe(proc_hashtable, obj, temp, hlist, process_id) {
+		if (obj->process_id == process_id) {
+			hash_del(&obj->hlist);
+		}
+	}
+	
+	//kfree(temp);
+	
+	return 0;
+}
 
 inline struct syscall_pair pH_append_call(pH_seq *s, int new_value);
 
