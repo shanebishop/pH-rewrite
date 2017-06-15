@@ -437,7 +437,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	
 	hash_for_each(profile_hashtable, bkt, profile, hlist) {
 		temp = (pH_profile*) profile;
-		printk(KERN_INFO "%s: temp->filename = %s", DEVICE_NAME, temp->filename); // Consistently causes system crash
+		printk(KERN_INFO "%s: temp->filename = %s", DEVICE_NAME, temp->filename);
 		if (strcmp(temp->filename, filename) == 0) {
 			return temp;
 		}
@@ -759,8 +759,10 @@ static long jsys_execve(const char __user *filename,
 		hash_for_each(proc_hashtable, bkt, obj, hlist) {
 			//printk(KERN_INFO "%It is possible to print here");
 			pH_task_struct* temp = (pH_task_struct*) obj;
-			if (hash_hashed(&temp->hlist) && temp->process_id > 0 && temp->profile != NULL && *(temp->profile->filename) == '/' && isalnum(*((temp->profile->filename)+1))) {
+			if (hash_hashed(&temp->hlist) && temp->process_id > 0 /*&& temp->profile != NULL && *(temp->profile->filename) == '/' && isalnum(*((temp->profile->filename)+1))*/) {
 				pH_profile* my_profile = (pH_profile*) temp->profile;
+				
+				// Module consistenly crashes system on this line - seems to not like my_profile->filename
 				printk(KERN_INFO "%s: Output: %d %s", DEVICE_NAME, temp->process_id, my_profile->filename);
 				
 				/*
