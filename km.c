@@ -754,7 +754,7 @@ static long jsys_execve(const char __user *filename,
 	int bkt;
 	int count = 0;
 	
-	if (!hash_empty(proc_hashtable) {
+	if (!hash_empty(proc_hashtable)) {
 		printk(KERN_INFO "%s: Printing hashamps...", DEVICE_NAME);
 		hash_for_each(proc_hashtable, bkt, obj, hlist) {
 			//printk(KERN_INFO "%It is possible to print here");
@@ -773,6 +773,7 @@ static long jsys_execve(const char __user *filename,
 				*/
 				
 				count++;
+			}
 		}
 		printk(KERN_INFO "%s: Done printing %d", DEVICE_NAME, count);
 	}
