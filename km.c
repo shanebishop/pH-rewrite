@@ -428,6 +428,23 @@ pH_profile* retrieve_pH_profile_by_pid(int key) {
 	
 	return NULL;
 }
+	
+pH_profile* retrieve_pH_profile_by_filename(char* filename) {
+	pH_profile* profile, temp;
+	int bkt;
+	
+	if (hash_empty(profile_hashtable)) return NULL;
+	
+	hash_for_each(profile_hashtable, bkt, profile, hlist) {
+		temp = (pH_profile*) profile;
+		printk(KERN_INFO "%s: temp->filename = %s", DEVICE_NAME, temp->filename); // Consistently causes system crash
+		if (strcmp(temp->filename, filename) == 0) {
+			return temp;
+		}
+	}
+	
+	return NULL;
+}
 
 inline struct syscall_pair pH_append_call(pH_seq *s, int new_value);
 
@@ -494,7 +511,7 @@ inline void pH_refcount_init(pH_profile*, int);
 int new_profile(pH_profile* profile, char* filename);
 	int i;
 	
-	profile->normal = 0;  // Module consistently crashes when this line is reached
+	profile->normal = 0;
 	profile->frozen = 0;
 	profile->normal_time = 0;
 	profile->anomalies = 0;
@@ -720,11 +737,15 @@ static long jsys_execve(const char __user *filename,
 	this_process->delay = 0;
 	this_process->count = 0;
 	
-	profile = vmalloc(sizeof(pH_profile));
+	profile = retrieve_pH_profile_by_filename(path_to_binary);
+	
 	if (!profile) {
-		printk(KERN_ALERT "%s: Unable to allocate memory for a new profile in jsys_execve", DEVICE_NAME);
+		profile = vmalloc(sizeof(pH_profile));
+		if (!profile) {
+			printk(KERN_ALERT "%s: Unable to allocate memory for a new profile in jsys_execve", DEVICE_NAME);
+		}
+		new_profile(profile, path_to_binary);
 	}
-	new_profile(profile, path_to_binary);
 	this_process->profile = profile;
 	
 	hash_add(proc_hashtable, &this_process->hlist, current->pid);
@@ -741,6 +762,14 @@ static long jsys_execve(const char __user *filename,
 			if (hash_hashed(&temp->hlist) && temp->process_id > 0 && temp->profile != NULL && *(temp->profile->filename) == '/' && isalnum(*((temp->profile->filename)+1))) {
 				pH_profile* my_profile = (pH_profile*) temp->profile;
 				printk(KERN_INFO "%s: Output: %d %s", DEVICE_NAME, temp->process_id, my_profile->filename);
+				
+				/*
+				// Print sequence
+				for (i = 0; i < temp->profile->seq.length; i++) {
+					printk(KERN_INFO "%s: Syscall %d: %d", DEVICE_NAME, i, temp->profile->seq.data[i];
+				}
+				*/
+				
 				count++;
 		}
 		printk(KERN_INFO "%s: Done printing %d", DEVICE_NAME, count);
