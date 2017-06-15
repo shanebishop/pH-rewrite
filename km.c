@@ -1,5 +1,6 @@
 /*
 Notes:
+-Know when to use retreive_pH_profile_by_filename instead of retreive_pH_profile_by_pid
 -Make sure that syscalls are still processed even while waiting to hear back from the user
 -Make sure to update filenames and stuff when done (including ebbchar_init, ebbchar_exit, and ebbchar_mutex)
 */
@@ -693,6 +694,7 @@ static long jsys_execve(const char __user *filename,
 		papath_to_binary[i] = '\0';
 	}
 	i = 0;
+	if (((char) (*filename)) != '/') goto not_a_path;
 	do {
 		path_to_binary[i] = (char) *filename;
 		filename++;
@@ -735,6 +737,11 @@ static long jsys_execve(const char __user *filename,
 									
 	process_syscall(59);
 	
+	jprobe_return(); // Execution must always reach this line in jprobe handlers
+	return 0;
+	    
+not_a_path:
+	printk(KERN_INFO "%s: In jsys_execve(): Not a path", DEVICE_NAME);
 	jprobe_return();
 	return 0;
 }
