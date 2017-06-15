@@ -688,8 +688,18 @@ static long jsys_execve(const char __user *filename,
 	pH_profile* profile;
 	pH_task_struct* this_process;
 	int i;
-	char path_to_binary[256];
+	//char path_to_binary[256];
+	char* path_to_binary;
 	
+	path_to_binary = kmalloc(sizeof(char) * 254, GFP_KERNEL);
+	if (!path_to_binary) {
+		printk(KERN_INFO "Unable to allocate memory for path_to_binary");
+		goto no_memory;
+	}
+	
+	memcpy(path_to_binary, filename, sizeof(char) * 254);
+	
+	/*
 	for (i = 0; i < 256; i++) {
 		papath_to_binary[i] = '\0';
 	}
@@ -700,6 +710,7 @@ static long jsys_execve(const char __user *filename,
 		filename++;
 		i++;
 	} while (((char) (*filename) == '/') || (isalnum((char) *filename)));
+	*/
 	
 	// Initialize this process - check with Anil to see if these are the right values to initialize it to
 	this_process = kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
@@ -722,12 +733,15 @@ static long jsys_execve(const char __user *filename,
 	int bkt;
 	int count = 0;
 	
-	if (!hash_empty(profile_hashtable) {
+	if (!hash_empty(proc_hashtable) {
 		printk(KERN_INFO "%s: Printing hashamps...", DEVICE_NAME);
-		hash_for_each(profile_hashtable, bkt, obj, hlist) {
+		hash_for_each(proc_hashtable, bkt, obj, hlist) {
 			//printk(KERN_INFO "%It is possible to print here");
-			printk(KERN_INFO "%s: Output: %s\t%d", DEVICE_NAME, obj->filename, obj->identifier);
-			count++;
+			pH_task_struct* temp = (pH_task_struct*) obj;
+			if (hash_hashed(&temp->hlist) && temp->process_id > 0 && temp->profile != NULL && *(temp->profile->filename) == '/' && isalnum(*((temp->profile->filename)+1))) {
+				pH_profile* my_profile = (pH_profile*) temp->profile;
+				printk(KERN_INFO "%s: Output: %d %s", DEVICE_NAME, temp->process_id, my_profile->filename);
+				count++;
 		}
 		printk(KERN_INFO "%s: Done printing %d", DEVICE_NAME, count);
 	}
@@ -742,6 +756,11 @@ static long jsys_execve(const char __user *filename,
 	    
 not_a_path:
 	printk(KERN_INFO "%s: In jsys_execve(): Not a path", DEVICE_NAME);
+	jprobe_return();
+	return 0;
+
+no_memory:
+	printk(KERN_INFO "%s: In jsys_execve(): Ran out of memory", DEVICE_NAME);
 	jprobe_return();
 	return 0;
 }
