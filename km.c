@@ -17,6 +17,7 @@ Notes:
 #include <linux/hashtable.h> // For hashtables
 #include <linux/slab.h>      // For kmalloc and kfree
 #include <linux/vmalloc.h>   // For vmalloc
+#include <linux/ctype.h>     // For types
 
 #include "system_call_prototypes.h"
 #include "ebbcharmutex.h"       
@@ -27,9 +28,9 @@ MODULE_DESCRIPTION("Kernel module for pH");
 MODULE_VERSION("0.1");                
 
 typedef struct pH_seq {
-        int last;
+        int last; // seq is a circular array; this is its end
         int length;
-        u8 data[PH_MAX_SEQLEN];
+        u8 data[PH_MAX_SEQLEN]; // Current sequence being filled or processed - initialized to PH_EMPTY_SYSCALL initially
 	struct list_head seqList;
 } pH_seq;
 
@@ -73,13 +74,15 @@ typedef struct pH_locality {
 	int max;
 } pH_locality;
 
+/*
 typedef struct pH_task_state {
 	pH_locality alf;
 	pH_seq *seq;
 	int delay;
 	unsigned long count;
-	pH_profile *profile;     /* pointer to appropriate profile */
+	pH_profile *profile;     // pointer to appropriate profile
 } pH_task_state;
+*/
 
 // My own structs
 struct syscall_pair {
@@ -135,7 +138,7 @@ int pH_suspend_execve_time = 3600 * 24 * 2;  /* time to suspend execve's */
 int pH_normal_wait = 7 * 24 * 3600;/* seconds before putting normal to work */
 
 // My own global declarations
-#define num_syscalls 11
+#define num_syscalls 12
 #define num_kretprobes 1
 #define SIGNAL_PRIVILEGE 1
 #define SYSCALLS_PER_WRITE 10
@@ -146,15 +149,16 @@ int pH_normal_wait = 7 * 24 * 3600;/* seconds before putting normal to work */
 #define ADD_BINARY 'b'
 #define FIND_A_BINARY 'f'
 
-struct jprobe jprobes_array[num_syscalls]; // Array of jprobes
+struct jprobe jprobes_array[num_syscalls];         // Array of jprobes
 struct kretprobe kretprobes_array[num_kretprobes]; // Array of kretprobes
-DECLARE_HASHTABLE(profile_hashtable, 8); // Declare process hashtable
-DECLARE_HASHTABLE(proc_hashtable, 8);
-long userspace_pid; // The PID of the userspace process
-char* output_string;
-int syscalls_this_write;
-pH_profile* current_profile;
-void* bin_receive_ptr;
+DECLARE_HASHTABLE(profile_hashtable, 8);           // Declare profile hashtable
+DECLARE_HASHTABLE(proc_hashtable, 8);              // Declare process hashtable
+long userspace_pid;                                // The PID of the userspace process
+const char TRANSFER_OPERATION[2] = {'t', '\0'};    // Constant for transfer operation
+char* output_string;                               // The string that will be sent to the userspace code
+int syscalls_this_write;                           // Number of syscalls that have been encountered since last write to userspace
+pH_profile* current_profile;                       // The current pH_profile
+void* bin_receive_ptr;                             // The pointer for binary writes
 bool done_waiting_for_user = FALSE;
 bool have_userspace_pid    = FALSE;
 bool have_bin_receive_ptr  = FALSE;
@@ -177,54 +181,6 @@ static int dev_open(struct inode *inodep, struct file *filep){
    return 0;
 }
 
-/*
-static ssize_t dev_ioctl(struct file* f, unsigned int cmd, unsigned long arg) {
-	return -1; // Temporarily treat this as an error - fix this
-	
-	int rc;
-	struct pH_profile *profile;
-	pH_disk_profile* disk_profile = NULL;
-	
-	printk(KERN_INFO "%s: In dev_ioctl", DEVICE_NAME);
-	
-	if (syscalls_this_write < SYSCALLS_PER_WRITE) {
-		printk(KERN_INFO "%s: Not enough syscalls processed yet", DEVICE_NAME);
-		return -1;
-	}
-	
-	syscalls_this_write = 0;
-	
-	profile = retrieve_pH_profile(current->pid);
-	disk_profile = (pH_disk_profile*) kmalloc(sizeof(pH_disk_profile), GFP_KERNEL); // Use vmalloc?
-	if (!disk_profile) {
-		printk(KERN_INFO "%s: Unable to allocate memory for disk_profile in process_syscall", DEVICE_NAME);
-		return -ENOMEM;
-	}
-	
-	pH_profile_mem2disk(profile, disk_profile);
-	
-	switch (cmd) {
-		case SEND_DATA:
-			printk(KERN_INFO "%s: Retrieving data from user space code", DEVICE_NAME);
-			rc = copy_from_user(disk_profile, (void*) arg, sizeof(disk_profile));
-			//return -1; // Temporarily treat this as an error - fix this
-			break;
-		case RETRIEVE_DATA:
-			printk(KERN_INFO "%s: Sending data to user space code", DEVICE_NAME);
-			return -1; // Temporarily treat this as an error - fix this
-			break;
-		default:
-			printk(KERN_INFO "%s: An unknown error occurred in dev_ioctl", DEVICE_NAME);
-			return -1;
-			break;
-	}
-	
-	// Is there anything else I need to do in this function?
-	
-	return 0; // Only return 0 here, otherwise return something else on not success
-}
-*/
-
 static int dev_release(struct inode *inodep, struct file *filep){
    mutex_unlock(&ebbchar_mutex); // release the mutex (i.e., lock goes up)
    //printk(KERN_INFO "%s: Device successfully closed\n", DEVICE_NAME);
@@ -235,58 +191,60 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	pH_profile* current_profile;
 	pH_disk_profile* disk_profile;
 	int error_count = 0;
-	
-	printk(KERN_INFO "%s: In dev_read", DEVICE_NAME);
 
 	if (!binary_read) {
-		printk(KERN_INFO "%s: In !binary_read", DEVICE_NAME);
+		// Determine number of bytes to send to userspace
 		size_of_message = strlen(output_string);
+		
+		// If we are asking to perform a binary transfer, set binary_read to TRUE
 		if (*output_string == 't') {
 			binary_read = TRUE;
-			printk(KERN_INFO "Ready for binary read");
 		}
 
+		// Copy the data to the user
 		error_count = copy_to_user(buffer, output_string, size_of_message);
-
 		if (error_count==0){          // success!
-		  //printk(KERN_INFO "%s: Sent %s (%d characters) to the user\n", DEVICE_NAME, output_string, size_of_message);
-		  return (size_of_message=0); // clear the position to the start and return 0
+			//printk(KERN_INFO "%s: Sent %s (%d characters) to the user\n", DEVICE_NAME, output_string, size_of_message);
+			return (size_of_message=0); // clear the position to the start and return 0
 		}
 		else {
-		  printk(KERN_INFO "%s: Failed to send %d characters to the user\n", DEVICE_NAME, error_count);
-		  return -EFAULT;      // Failed - return a bad address message
+			printk(KERN_INFO "%s: Failed to send %d characters to the user\n", DEVICE_NAME, error_count);
+			return -EFAULT;      // Failed - return a bad address message
 		}
 	}
 	
-	printk(KERN_INFO "%s: In binary_read", DEVICE_NAME);
-	
+	// Cast buffer to void* and copy its value to bin_receive_ptr
 	bin_receive_ptr = (void*) buffer;
 
-	current_profile = vmalloc(sizeof(pH_profile));
+	// Allocate space for current_profile
+	current_profile = (pH_profile*) vmalloc(sizeof(pH_profile));
 	if (current_profile == NULL) {
 		printk(KERN_INFO "%s: Unable to allocate memory for current_profile", DEVICE_NAME);
 		return -ENOMEM;
 	}
 
-	disk_profile = vmalloc(sizeof(pH_disk_profile));
+	// Allocate space for disk_profile
+	disk_profile = (pH_disk_profile*) vmalloc(sizeof(pH_disk_profile));
 	if (!disk_profile) {
 		printk(KERN_INFO "%s: Unable to allocate memory for disk profile", DEVICE_NAME);
 		vfree(current_profile);
 		return -ENOMEM;
 	}
 
+	// Convert to disk profile
 	pH_profile_mem2disk(current_profile, disk_profile);
-	printk(KERN_INFO "%s: Done conversion", DEVICE_NAME);
+	vfree(current_profile);
 
-	printk(KERN_INFO "%s: Copying to user...", DEVICE_NAME);
+	// Copy data to userspace
 	error_count = copy_to_user(bin_receive_ptr, disk_profile, sizeof(pH_disk_profile*));
+	vfree(disk_profile);
 	if (error_count==0){           // success!
-	  printk(KERN_INFO "%s: Successfully performed binary write to user space app\n", DEVICE_NAME);
-	  return 0; // clear the position to the start and return 0
+		printk(KERN_INFO "%s: Successfully performed binary write to user space app\n", DEVICE_NAME);
+		return 0; // clear the position to the start and return 0
 	}
 	else {
-	  printk(KERN_INFO "%s: Failed to send %d characters to the user\n", DEVICE_NAME, error_count);
-	  return -EFAULT;      // Failed - return a bad address message
+		printk(KERN_INFO "%s: Failed to send %d characters to the user\n", DEVICE_NAME, error_count);
+		return -EFAULT;      // Failed - return a bad address message
 	}
 }
 
@@ -294,27 +252,12 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 	const char* buffer;
 	int ret;
 	
-	printk(KERN_INFO "%s: In dev_write", DEVICE_NAME);
-	
+	user_process_has_been_loaded = TRUE;	
 	binary_read = FALSE;
 	
 	if (numberOpens > 0) {
-		printk(KERN_INFO "%s: In numberOpens > 0", DEVICE_NAME);
-		
-		if (have_userspace_pid) {
-			printk(KERN_INFO "%s: In !have_bin_receive_ptr", DEVICE_NAME);
-			/*
-			bin_receive_ptr = kmalloc(sizeof(const void*), GFP_KERNEL);
-			if (!bin_receive_ptr) {
-				printk(KERN_INFO "%s: Unable to allocate memory for bin_receive_ptr", DEVICE_NAME);
-				return -ENOMEM;
-			}
-			bin_receive_ptr = (const void*) buf;
-			//printk(KERN_INFO "Performed cast operation successfully");
-			have_bin_receive_ptr = TRUE;
-			//printk(KERN_INFO "Set have_bin_receive_ptr to true successfully");
-			*/
-			
+		// If we have the PID of the userspace process, suspend the process
+		if (have_userspace_pid) {		
 			// Send SIGSTOP signal to the userspace app
 			int ret = send_signal(SIGSTOP);
 			if (ret < 0) return ret;
@@ -322,69 +265,39 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			// We are done waiting for the user now
 			done_waiting_for_user = TRUE;
 			
-			return 0;
+			return 0; // Depending on the situation, we may want to process what the user sent us before returning
 		}
 		
+		// Allocate space for buffer
 		buffer = kmalloc(sizeof(char) * 254, GFP_KERNEL);
 		if (!buffer) {
 			printk(KERN_INFO "%s: Unable to allocate memory for dev_write buffer", DEVICE_NAME);
 			return -ENOMEM;
 		}
+		
 		buffer = (const char*) buf;
-		//printk(KERN_INFO "Performed cast successfully");
-		
-		//sprintf(message, "%s", buffer, len);   // appending received string with its length
 		strcpy(message, buffer);
-		//printk(KERN_INFO "Copied from buffer to message");
 		//kfree(buffer); // Freeing this causes an error for some reason?
-		//printk(KERN_INFO "Freed buffer");
-		size_of_message = strlen(message);     // store the length of the stored message
-		//printk(KERN_INFO "Did string manipulation successfully");
+		size_of_message = strlen(message); // Store the length of the stored message
 		
+		// If we failed to receive a message, kill the userspace app and return -1
 		if (message == NULL || size_of_message < 1) {
-            printk(KERN_INFO "%s: Failed to read the message from userspace.%d%d\n", DEVICE_NAME, message == NULL, size_of_message < 1);
-            
-            if (send_signal(SIGTERM) < 0) send_signal(SIGKILL);
-            
-            printk(KERN_INFO "Userspace process killed");
-            
-            return -1;
-        }
-	
-		//printk(KERN_INFO "%s: Received %s (%zu characters) from the user\n", DEVICE_NAME, message, len);
+		    printk(KERN_INFO "%s: Failed to read the message from userspace.%d%d\n", DEVICE_NAME, message == NULL, size_of_message < 1);
+
+		    if (send_signal(SIGTERM) < 0) send_signal(SIGKILL);
+
+		    printk(KERN_INFO "Userspace process killed");
+
+		    return -1;
+		}
 		
 		// If you do not have the userspace pid, then you must be getting it right now
 		if (!have_userspace_pid) {
-			//printk(KERN_INFO "%s: In !have_userspace_pid", DEVICE_NAME);
-			
+			// Convert the string message to a long and store it in userspace_pid
 			kstrtol(message, 10, &userspace_pid);
 			have_userspace_pid = TRUE;
-
-			//binary_read = TRUE;
-			//strcpy(output_string, "t");
-			ret = send_signal(SIGSTOP);
-			if (ret < 0) return ret;
-			//done_waiting_for_user = FALSE;
-			done_waiting_for_user = TRUE;
-			printk(KERN_INFO "Ready for binary_read");
-
-			return 0;
+			printk(KERN_INFO "%s: Received %ld PID from userspace", DEVICE_NAME, userspace_pid);
 		}
-		/*
-		else {
-			// Allocate space for the profile
-			pH_profile* profile = kmalloc(sizeof(pH_profile), GFP_KERNEL);
-			new_profile(profile);
-			
-			// Add this new profile to the hashtable
-			//hash_add(proc_hashtable, &profile->hlist, current->pid);
-			current_profile = profile;
-		   
-			//binary_read = TRUE;
-			strcpy(output_string, "t");
-			//printk(KERN_INFO "Ready for binary_read");
-		}
-		*/
 		
 		// Send SIGSTOP signal to the userspace app
 		int ret = send_signal(SIGSTOP);
@@ -399,13 +312,13 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 
 static struct file_operations fops =
 {
-   .open = dev_open,
-   .read = dev_read,
-   .write = dev_write,
-   //.unlocked_ioctl = dev_ioctl,
-   .release = dev_release,
+	.open = dev_open,
+	.read = dev_read,
+	.write = dev_write,
+	.release = dev_release,
 };
 
+// Returns a pH_task_struct using process_id as a key
 pH_task_struct* retrieve_process(int process_id) {
 	pH_task_struct* pH_task_struct;
 	
@@ -417,6 +330,7 @@ pH_task_struct* retrieve_process(int process_id) {
 	return NULL;
 }
 			
+// Returns a pH_profile using a process ID as a key
 pH_profile* retrieve_pH_profile_by_pid(int key) {
 	pH_profile* pH_profile;
 	
@@ -428,7 +342,8 @@ pH_profile* retrieve_pH_profile_by_pid(int key) {
 	
 	return NULL;
 }
-	
+
+// Returns a pH_profile using a filename string as the lookup
 pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	pH_profile* profile, temp;
 	int bkt;
@@ -446,6 +361,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	return NULL;
 }
 	
+// Removes process with process_id from hashtables
 int remove_process_from_hashtables(int process_id) {
 	pH_task_struct* obj, temp;
 	
@@ -465,8 +381,6 @@ int remove_process_from_hashtables(int process_id) {
 	
 	return 0;
 }
-
-inline struct syscall_pair pH_append_call(pH_seq *s, int new_value);
 
 // Returns true if a message was received from the user, false otherwise
 bool message_received(void) {
@@ -528,8 +442,12 @@ int send_signal(int signal_to_send) {
 
 inline void pH_refcount_init(pH_profile*, int);
 	
+// Makes a new pH_profile and stores it in profile
+// profile must be allocated before this function is called
 int new_profile(pH_profile* profile, char* filename);
 	int i;
+	
+	profile->identifier = current->pid;
 	
 	profile->normal = 0;
 	profile->frozen = 0;
@@ -569,6 +487,8 @@ int new_profile(pH_profile* profile, char* filename);
 	return 0;
 }
 	
+// Function prototypes for process_syscall()
+inline struct syscall_pair pH_append_call(pH_seq *s, int new_value);
 void pH_profile_mem2disk(pH_profile*, pH_disk_profile*);
 int pH_test_seq(pH_seq*, pH_profile_data*);
 inline void pH_add_anomaly_count(pH_task_struct*, int val);
@@ -592,12 +512,13 @@ int process_syscall(long syscall) {
 	// For now drop pH_monitoring() call - I will need to use a different implementation of this function
 	if (!(/*pH_monitoring(current) &&*/ pH_aremonitoring)) return 0;
 	
-	syscalls_this_write++;
-	printk(KERN_INFO "%s: Syscall was received. %d", DEVICE_NAME, syscalls_this_write);
-	
+	// Retrieve the appropriate profile
 	profile = retrieve_pH_profile_by_pid(current->pid);	
 	
 	if (!profile || profile == NULL) {
+		printk(KERN_INFO "%s: There should already be a profile - there must have been an error somewhere before this was called", DEVICE_NAME);
+		
+		/*
 		profile = (pH_profile*) vmalloc(sizeof(pH_profile));
 		if (!profile) {
 			printk(KERN_INFO "%s: Unable to allocate memory for profile in process_syscall", DEVICE_NAME);
@@ -611,19 +532,7 @@ int process_syscall(long syscall) {
 			printk(KERN_INFO "%s: new_profile did not return a profile successfully", DEVICE_NAME);
 			return -1;
 		}
-	}
-	
-	process = kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
-	if (!process) {
-		printk(KERN_INFO "%s: Unable to allocate memory for new process in process_syscall()", DEVICE_NAME);
-		return -ENOMEM;
-	}
-	
-	process = retrieve_process(current->pid);
-	if (process == NULL) { // Used to be process != NULL for some reason
-		// Ignore this syscall
-		kfree(process);
-		return 0;
+		*/
 	}
 	
 	if ((process->seq) == NULL) {
@@ -668,33 +577,18 @@ int process_syscall(long syscall) {
 	
 	pH_delay_task(LFC, process);
 	
-	kfree(process);
+	//kfree(process);
+	
+	syscalls_this_write++;
+	pr_info("%s: Syscall was received. %d", DEVICE_NAME, syscalls_this_write);
 	
 	if (syscalls_this_write >= SYSCALLS_PER_WRITE) {
-		//binary_read = TRUE;
-		strcpy(output_string, "t");
+		syscalls_this_write = 0; // Perhaps I need to do this reset somewhere else
+		strcpy(output_string, TRANSFER_OPERATION);
 		int ret = send_signal(SIGCONT);
 		if (ret < 0) return ret;
 		done_waiting_for_user = FALSE;
-		printk(KERN_INFO "Ready for binary_read");
 	}
-	
-	/*
-	// Prepare output_string
-	strcpy(output_string, "w");
-	char syscall_num_as_string[256];
-	sprintf(syscall_num_as_string, "%d", syscall);
-	strcat(output_string, syscall_num_as_string);
-	
-	// Send SIGCONT signal
-	int ret = send_signal(SIGCONT);
-	if (ret < 0) return ret;
-	
-	// We are now waiting for the userspace program
-	done_waiting_for_user = FALSE;
-	*/
-	
-	//pr_info("JProbe Example: Syscall seems to have been processed correctly.\n");
 	
 	return 0;
 }
@@ -719,9 +613,11 @@ static long jdo_execve(struct filename *filename,
 }
 
 // Proxy routine for sys_execve
+// First look for profile in profiles in memory, then on disk, and then make a new one
 static long jsys_execve(const char __user *filename,
 	const char __user *const __user *__argv,
-	const char __user *const __user *__envp) {
+	const char __user *const __user *__envp)
+{
 	pH_profile* profile;
 	pH_task_struct* this_process;
 	int i;
@@ -820,14 +716,14 @@ no_memory:
 // Proxy routine for fork
 static long jsys_fork(void) {
 	//pr_info("JProbes Example: Fork system call was probed");
-	jprobe_return();
+	jprobe_return(57);
 	return 0;
 }
 
 // Proxy routine for read
 static long jsys_read(unsigned int fd, char __user *buf, size_t count) {
 	//pr_info("JProbes Example: Read system call was probed");
-	jprobe_return();
+	jprobe_return(0);
 	return 0;
 }
 
@@ -835,7 +731,7 @@ static long jsys_read(unsigned int fd, char __user *buf, size_t count) {
 static long jsys_write(unsigned int fd, const char __user *buf,
 	size_t count) {
 	//pr_info("JProbes Example: Write system call was probed");
-	jprobe_return();
+	jprobe_return(1);
 	return 0;
 }
 
@@ -843,14 +739,14 @@ static long jsys_write(unsigned int fd, const char __user *buf,
 static long jsys_open(const char __user *filename,
 	int flags, umode_t mode) {
 	//pr_info("JProbes Example: Open system call was probed");
-	jprobe_return();
+	jprobe_return(2);
 	return 0;				
 }
 
 // Proxy routine for close
 static long jsys_close(unsigned int fd) {
 	//pr_info("JProbes Example: Close system call was probed");
-	jprobe_return();
+	jprobe_return(3);
 	return 0;
 }
 
@@ -858,7 +754,7 @@ static long jsys_close(unsigned int fd) {
 static long jsys_lseek(unsigned int fd, off_t offset,
 	unsigned int whence) {
 	//pr_info("JProbes Example: lseek system call was probed");
-	jprobe_return();
+	jprobe_return(8);
 	return 0;
 } 
 
@@ -874,6 +770,15 @@ static long jsys_llseek(unsigned int fd, unsigned long offset_high,
 // Proxy routine for getpid
 static long jsys_getpid(void) {
 	//pr_info("JProbes Example: getpid system call was probed");
+	jprobe_return(39);
+	return 0;
+}
+
+static long jsys_exit(int error_code) {
+	remove_process_from_hashtables(current->pid);
+	
+	//process_syscall(); // Don't know the syscall number - need to look it up
+	
 	jprobe_return();
 	return 0;
 }
@@ -956,6 +861,13 @@ static struct jprobe sys_getpid_jprobe = {
 	},
 };
 
+static struct jprobe sys_exit_jprobe = {
+	.entry = jsys_exit,
+	.kp = {
+		.symbol_name = "sys_exit",
+	},
+};
+
 // Struct required for all kretprobe structs
 struct my_kretprobe_data {
 	ktime_t entry_stamp;
@@ -981,6 +893,7 @@ static int fork_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
 		printk(KERN_ALERT "%s: Unable to allocate memory for process in fork_handler", DEVICE_NAME);
 	}
 	hash_add(proc_hashtable, &process->hlist, retval);
+	//kfree(process);
 	
 	return 0;
 }
@@ -1009,10 +922,12 @@ static int __init ebbchar_init(void){
 	jprobes_array[8] = sys_lseek_jprobe;
 	jprobes_array[9] = sys_llseek_jprobe;
 	jprobes_array[10] = sys_getpid_jprobe;
+	jprobes_array[11] = sys_exit_jprobe;
 	
 	// Initialize kretprobes_array
 	kretprobes_array[0] = fork_kretprobe;
 	
+	// Initialize hashtables
 	hash_init(profile_hashtable);
 	hash_init(proc_hashtable);
 	
@@ -1032,6 +947,7 @@ static int __init ebbchar_init(void){
 		return -ENOMEM;
 	}
 	
+	// Allcoate memory for bin_receive_ptr
 	bin_receive_ptr = vmalloc(sizeof(pH_disk_profile));
 	if (!bin_receive_ptr) {
 		printk(KERN_INFO "%s: Unable to allocate memory for bin_receive_ptr", DEVICE_NAME);
@@ -1095,20 +1011,22 @@ static void __exit ebbchar_exit(void){
 	// Deallocate all previously allocated memory - don't forget to do this for hashtables!
 	if (output_string != NULL) kfree(output_string);
 	printk(KERN_INFO "Freed output_string");
-	if (current_profile != NULL) vfree(current_profile);
-	printk(KERN_INFO "Freed current_profile");
+	//if (current_profile != NULL) vfree(current_profile);
+	//printk(KERN_INFO "Freed current_profile");
 	//if (bin_receive_ptr != NULL) vfree(bin_receive_ptr); // For some reason this causes an error?
 	//printk(KERN_INFO "Freed bin_receive_ptr");
    
-    if (send_signal(SIGTERM) < 0) {
-    	send_signal(SIGKILL); // If this signal fails, that's too bad - we still need to exit
-    }
+	if (send_signal(SIGTERM) < 0) {
+		send_signal(SIGKILL); // If this signal fails, that's too bad - we still need to exit
+	}
    
+	// Unregister the jprobes
 	for (i = 0; i < num_syscalls; i++) {
 		unregister_jprobe(&jprobes_array[i]);
 		//pr_info("jprobe at %p unregistered\n", jprobes_array[i].kp.addr);
 	}
 	
+	// Unregister the kretprobes
 	for (i = 0; i < num_kretprobes; i++) {
 		unregister_kretprobe(&kretprobes_array[i]);
 	
@@ -1116,12 +1034,13 @@ static void __exit ebbchar_exit(void){
 		printk(KERN_INFO "%s: Missed probing %d instances of %s\n", DEVICE_NAME, kretprobes_array[i].nmissed, kretprobes_array[i].kp.symbol_name);
 	}
 	
+	// Additional cleanup
 	mutex_destroy(&ebbchar_mutex);                       // destroy the dynamically-allocated mutex
-    device_destroy(ebbcharClass, MKDEV(majorNumber, 0)); // remove the device
-    class_unregister(ebbcharClass);                      // unregister the device class
-    class_destroy(ebbcharClass);                         // remove the device class
-    unregister_chrdev(majorNumber, DEVICE_NAME);         // unregister the major number
-    printk(KERN_INFO "%s: Goodbye from the LKM!\n", DEVICE_NAME);
+	device_destroy(ebbcharClass, MKDEV(majorNumber, 0)); // remove the device
+	class_unregister(ebbcharClass);                      // unregister the device class
+	class_destroy(ebbcharClass);                         // remove the device class
+	unregister_chrdev(majorNumber, DEVICE_NAME);         // unregister the major number
+	printk(KERN_INFO "%s: Goodbye from the LKM!\n", DEVICE_NAME);
 }
 
 int pH_add_seq_storage(pH_profile_data *data, int val)
@@ -1159,9 +1078,8 @@ void pH_profile_data_mem2disk(pH_profile_data *mem, pH_disk_profile_data *disk)
         disk->sequences = mem->sequences;
         disk->last_mod_count = mem->last_mod_count;
         disk->train_count = mem->train_count;
-        printk(KERN_INFO "%s: Successfully completed first block of code in pH_profile_data_mem2disk", DEVICE_NAME);
 
-		/*
+	/*
         for (i = 0; i < PH_NUM_SYSCALLS; i++) {
                 if (mem->entry[i] == NULL) {
                         disk->empty[i] = 1;
@@ -1174,8 +1092,6 @@ void pH_profile_data_mem2disk(pH_profile_data *mem, pH_disk_profile_data *disk)
                 }
         }
         */
-        
-        printk(KERN_INFO "%s: Successfully reached end of pH_profile_data_mem2disk function", DEVICE_NAME);
 }
 
 void pH_profile_mem2disk(pH_profile *profile, pH_disk_profile *disk_profile)
@@ -1189,12 +1105,9 @@ void pH_profile_mem2disk(pH_profile *profile, pH_disk_profile *disk_profile)
         disk_profile->count = profile->count;
         disk_profile->anomalies = profile->anomalies;
         strcpy(disk_profile->filename, "");
-        printk(KERN_INFO "%s: Made it through first block of pH_profile_mem2disk", DEVICE_NAME);
 
         //pH_profile_data_mem2disk(&(profile->train), &(disk_profile->train));
         //pH_profile_data_mem2disk(&(profile->test), &(disk_profile->test));
-        
-        printk(KERN_INFO "%s: Made it to the end of pH_profile_mem2disk function", DEVICE_NAME);
 }
 
 int pH_profile_data_disk2mem(pH_disk_profile_data *disk, pH_profile_data *mem)
