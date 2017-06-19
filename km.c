@@ -1,6 +1,7 @@
 /*
 Notes:
 -Know when to use retreive_pH_profile_by_filename instead of retreive_pH_profile_by_pid
+-When retrieving the PID of a process, use pid_vnr(task_tgid(tsk));, where tsk is the task_struct of the particular process
 -Make sure that syscalls are still processed even while waiting to hear back from the user
 -Make sure to update filenames and stuff when done (including ebbchar_init, ebbchar_exit, and ebbchar_mutex)
 */
@@ -18,6 +19,7 @@ Notes:
 #include <linux/slab.h>      // For kmalloc and kfree
 #include <linux/vmalloc.h>   // For vmalloc
 #include <linux/ctype.h>     // For types
+#include <linux/random.h>    // For randomness
 
 #include "system_call_prototypes.h"
 #include "ebbcharmutex.h"       
@@ -103,6 +105,7 @@ struct executable {
 
 typedef struct pH_task_struct {
 	struct hlist_node hlist; // Must be first field
+	struct pH_task_struct* next; // For linked lists
 	long process_id;
 	pH_locality alf;
 	pH_seq* seq;
@@ -164,6 +167,7 @@ bool have_userspace_pid    = FALSE;
 bool have_bin_receive_ptr  = FALSE;
 bool binary_read           = FALSE;
 bool user_process_has_been_loaded = FALSE;
+pH_task_struct* llist_start = NULL;
 
 // Function prototypes required for dev_* functions
 void pH_profile_mem2disk(pH_profile*, pH_disk_profile*);
@@ -371,11 +375,14 @@ int remove_process_from_hashtables(int process_id) {
 		return -ENOMEM;
 	}
 	
+	/*
+	// This loop here currently does not work isnce the hashtable is corrupted somehow
 	hash_for_each_possible_safe(proc_hashtable, obj, temp, hlist, process_id) {
 		if (obj->process_id == process_id) {
 			hash_del(&obj->hlist);
 		}
 	}
+	*/
 	
 	//kfree(temp);
 	
@@ -447,7 +454,7 @@ inline void pH_refcount_init(pH_profile*, int);
 int new_profile(pH_profile* profile, char* filename);
 	int i;
 	
-	profile->identifier = current->pid;
+	profile->identifier = pid_vnr(task_tgid(tsk));
 	
 	profile->normal = 0;
 	profile->frozen = 0;
@@ -482,7 +489,7 @@ int new_profile(pH_profile* profile, char* filename);
 	profile->next = NULL;
 	
 	// Add this new profile to the hashtable
-	hash_add(profile_hashtable, &profile->hlist, current->pid);
+	hash_add(profile_hashtable, &profile->hlist, pid_vnr(task_tgid(tsk)));
 	
 	return 0;
 }
@@ -513,7 +520,7 @@ int process_syscall(long syscall) {
 	if (!(/*pH_monitoring(current) &&*/ pH_aremonitoring)) return 0;
 	
 	// Retrieve the appropriate profile
-	profile = retrieve_pH_profile_by_pid(current->pid);	
+	profile = retrieve_pH_profile_by_pid(pid_vnr(task_tgid(tsk)));	
 	
 	if (!profile || profile == NULL) {
 		printk(KERN_INFO "%s: There should already be a profile - there must have been an error somewhere before this was called", DEVICE_NAME);
@@ -612,6 +619,21 @@ static long jdo_execve(struct filename *filename,
 	return 0;
 }
 
+void print_llist(void) {
+	pH_task_struct* iterator = llist_start;
+	
+	if (llist_start == NULL) {
+		printk(KERN_INFO "%s: Linked list is empty", DEVICE_NAME);
+		return;
+	}
+	
+	printk(KERN_INFO "%s: Printing linked list...", DEVICE_NAME);
+	do {
+		printk(KERN_INFO "%s: Output: %d %d %s", DEVICE_NAME, iterator->process_id, iterator->profile->normal, iterator->profile->filename);
+		iterator = iterator->next;
+	} while (iterator);
+}
+
 // Proxy routine for sys_execve
 // First look for profile in profiles in memory, then on disk, and then make a new one
 static long jsys_execve(const char __user *filename,
@@ -624,13 +646,15 @@ static long jsys_execve(const char __user *filename,
 	//char path_to_binary[256];
 	char* path_to_binary;
 	
-	path_to_binary = kmalloc(sizeof(char) * 254, GFP_KERNEL);
+	// Allocate space for path_to_binary
+	path_to_binary = kmalloc(sizeof(char) * 4000, GFP_KERNEL);
 	if (!path_to_binary) {
 		printk(KERN_INFO "Unable to allocate memory for path_to_binary");
 		goto no_memory;
 	}
 	
-	memcpy(path_to_binary, filename, sizeof(char) * 254);
+	// Copy memory from userspace to kernel land
+	memcpy(path_to_binary, filename, sizeof(char) * 4000);
 	
 	/*
 	for (i = 0; i < 256; i++) {
@@ -647,14 +671,16 @@ static long jsys_execve(const char __user *filename,
 	
 	// Initialize this process - check with Anil to see if these are the right values to initialize it to
 	this_process = kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
-	this_process->process_id = current->pid;
+	this_process->process_id = pid_vnr(task_tgid(current));
 	pH_reset_ALF(this_process);
 	this_process->seq = NULL;
 	this_process->delay = 0;
 	this_process->count = 0;
 	
+	// Retrieve the corresponding profile
 	profile = retrieve_pH_profile_by_filename(path_to_binary);
 	
+	// If there is no corresponding profile, make a new one
 	if (!profile) {
 		profile = vmalloc(sizeof(pH_profile));
 		if (!profile) {
@@ -662,9 +688,22 @@ static long jsys_execve(const char __user *filename,
 		}
 		new_profile(profile, path_to_binary);
 	}
+	
+	// Set profile->normal to a random integer value for testing purposes
+	int random_num;
+	get_random_bytes(&random_num, 1);
+	random_num = abs(random_num % 100);
+	profile->normal = random_num;
+	printk(KERN_INFO "%s: profile->normal = %d", DEVICE_NAME, random_num);
+	
 	this_process->profile = profile;
 	
-	hash_add(proc_hashtable, &this_process->hlist, current->pid);
+	// Add this_process to the linked list and print the list
+	add_to_list(this_process);
+	print_llist();
+	
+	/*
+	hash_add(proc_hashtable, &this_process->hlist, pid_vnr(task_tgid(tsk)));
 	
 	struct pH_profile* obj;
 	int bkt;
@@ -675,18 +714,18 @@ static long jsys_execve(const char __user *filename,
 		hash_for_each(proc_hashtable, bkt, obj, hlist) {
 			//printk(KERN_INFO "%It is possible to print here");
 			pH_task_struct* temp = (pH_task_struct*) obj;
-			if (hash_hashed(&temp->hlist) && temp->process_id > 0 /*&& temp->profile != NULL && *(temp->profile->filename) == '/' && isalnum(*((temp->profile->filename)+1))*/) {
+			if (hash_hashed(&temp->hlist) && temp->process_id > 0 && temp->profile != NULL && *(temp->profile->filename) == '/' && isalnum(*((temp->profile->filename)+1))) {
 				pH_profile* my_profile = (pH_profile*) temp->profile;
 				
 				// Module consistenly crashes system on this line - seems to not like my_profile->filename
 				printk(KERN_INFO "%s: Output: %d %s", DEVICE_NAME, temp->process_id, my_profile->filename);
 				
-				/*
+				
 				// Print sequence
 				for (i = 0; i < temp->profile->seq.length; i++) {
 					printk(KERN_INFO "%s: Syscall %d: %d", DEVICE_NAME, i, temp->profile->seq.data[i];
 				}
-				*/
+				
 				
 				count++;
 			}
@@ -696,6 +735,7 @@ static long jsys_execve(const char __user *filename,
 	else {
 		printk(KERN_INFO "%s: profile_hashtable is empty - cannot print", DEVICE_NAME);
 	}
+	*/
 									
 	process_syscall(59);
 	
@@ -775,7 +815,7 @@ static long jsys_getpid(void) {
 }
 
 static long jsys_exit(int error_code) {
-	remove_process_from_hashtables(current->pid);
+	remove_process_from_hashtables(pid_vnr(task_gid(current)));
 	
 	//process_syscall(); // Don't know the syscall number - need to look it up
 	
@@ -882,7 +922,7 @@ static int fork_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
 	pH_task_struct* process;
 	
 	retval = regs_return_value(regs);
-	data = (struct my_data *)ri->data;
+	//data = (struct my_data *)ri->data;
 	
 	now = ktime_get();
 	//delta = ktime_to_ns(ktime_sub(now, data->entry_stamp));
@@ -1016,6 +1056,7 @@ static void __exit ebbchar_exit(void){
 	//if (bin_receive_ptr != NULL) vfree(bin_receive_ptr); // For some reason this causes an error?
 	//printk(KERN_INFO "Freed bin_receive_ptr");
    
+	// Try to kill the userspace app
 	if (send_signal(SIGTERM) < 0) {
 		send_signal(SIGKILL); // If this signal fails, that's too bad - we still need to exit
 	}
@@ -1079,7 +1120,7 @@ void pH_profile_data_mem2disk(pH_profile_data *mem, pH_disk_profile_data *disk)
         disk->last_mod_count = mem->last_mod_count;
         disk->train_count = mem->train_count;
 
-	/*
+		/*
         for (i = 0; i < PH_NUM_SYSCALLS; i++) {
                 if (mem->entry[i] == NULL) {
                         disk->empty[i] = 1;
@@ -1376,7 +1417,7 @@ inline void pH_delay_task(int delay_exp, pH_task_struct* p)
                 delay = 1 << delay_exp;
                 eff_delay = delay * pH_delay_factor;
                 action("Delaying %d at %lu for %lu jiffies", 
-                       current->pid, s->count, eff_delay);
+                       pid_vnr(task_tgid(tsk)), s->count, eff_delay);
                 pH_do_delay(delay, p);
         }
 }
