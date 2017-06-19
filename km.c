@@ -21,10 +21,10 @@ Notes:
 #include <linux/ctype.h>     // For types
 #include <linux/random.h>    // For randomness
 
-#include "system_call_prototypes.h"
+//#include "system_call_prototypes.h" // Currently doing without system_call_prototypes.h
 #include "ebbcharmutex.h"       
 
-MODULE_LICENSE("GPL");           
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Shane Bishop");
 MODULE_DESCRIPTION("Kernel module for pH");  
 MODULE_VERSION("0.1");                
@@ -162,12 +162,13 @@ char* output_string;                               // The string that will be se
 int syscalls_this_write;                           // Number of syscalls that have been encountered since last write to userspace
 pH_profile* current_profile;                       // The current pH_profile
 void* bin_receive_ptr;                             // The pointer for binary writes
+pH_task_struct* llist_start = NULL;                // The start of the linked list of pH_task_structs
+ktime_t start_time;                                // The time at which the module was loaded
 bool done_waiting_for_user = FALSE;
 bool have_userspace_pid    = FALSE;
 bool have_bin_receive_ptr  = FALSE;
 bool binary_read           = FALSE;
 bool user_process_has_been_loaded = FALSE;
-pH_task_struct* llist_start = NULL;
 
 // Function prototypes required for dev_* functions
 void pH_profile_mem2disk(pH_profile*, pH_disk_profile*);
@@ -365,6 +366,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	return NULL;
 }
 	
+/*
 // Removes process with process_id from hashtables
 int remove_process_from_hashtables(int process_id) {
 	pH_task_struct* obj, temp;
@@ -375,19 +377,20 @@ int remove_process_from_hashtables(int process_id) {
 		return -ENOMEM;
 	}
 	
-	/*
+	
 	// This loop here currently does not work isnce the hashtable is corrupted somehow
 	hash_for_each_possible_safe(proc_hashtable, obj, temp, hlist, process_id) {
 		if (obj->process_id == process_id) {
 			hash_del(&obj->hlist);
 		}
 	}
-	*/
+	
 	
 	//kfree(temp);
 	
 	return 0;
 }
+*/
 
 // Returns true if a message was received from the user, false otherwise
 bool message_received(void) {
@@ -485,8 +488,6 @@ int new_profile(pH_profile* profile, char* filename);
 	profile->filename = filename;
 
 	//pH_open_seq_logfile(profile);
-
-	profile->next = NULL;
 	
 	// Add this new profile to the hashtable
 	hash_add(profile_hashtable, &profile->hlist, pid_vnr(task_tgid(tsk)));
@@ -494,6 +495,22 @@ int new_profile(pH_profile* profile, char* filename);
 	return 0;
 }
 	
+pH_task_struct* llist_retrieve_process(int process_id) {
+	pH_task_struct* iterator = llist_start;
+	
+	if (!llist_start || llist_start = NULL) {
+		printk(KERN_INFO "%s: Linked list is empty", DEVICE_NAME);
+		return NULL;
+	}
+	
+	do {
+		if (iterator->process_id == process_id) return iterator;
+		iterator = iterator->next;
+	} while (iterator);
+	
+	return NULL;
+}
+
 // Function prototypes for process_syscall()
 inline struct syscall_pair pH_append_call(pH_seq *s, int new_value);
 void pH_profile_mem2disk(pH_profile*, pH_disk_profile*);
@@ -516,30 +533,25 @@ int process_syscall(long syscall) {
 	// If still waiting for the userpace process, return
 	if (!done_waiting_for_user) return -1;
 	
-	// For now drop pH_monitoring() call - I will need to use a different implementation of this function
-	if (!(/*pH_monitoring(current) &&*/ pH_aremonitoring)) return 0;
+	// If pH_aremonitoring is FALSE, exit this function
+	if (!pH_aremonitoring) return 0;
 	
-	// Retrieve the appropriate profile
-	profile = retrieve_pH_profile_by_pid(pid_vnr(task_tgid(tsk)));	
+	process = llist_retrieve_process(pid_vrn(task_tgid(current)));
+	if (process == NULL) {
+		// Ignore this syscall
+		printk(KERN_INFO "%s: This process is being ignored", DEVICE_NAME);
+		return 0;
+	}
+	
+	profile = process->profile;	// Store process->profile in profile for shorter reference
 	
 	if (!profile || profile == NULL) {
-		printk(KERN_INFO "%s: There should already be a profile - there must have been an error somewhere before this was called", DEVICE_NAME);
-		
-		/*
-		profile = (pH_profile*) vmalloc(sizeof(pH_profile));
-		if (!profile) {
-			printk(KERN_INFO "%s: Unable to allocate memory for profile in process_syscall", DEVICE_NAME);
-			return -ENOMEM;
-		}
-		
-		ret = new_profile(profile, "test");
-		if (ret == -1) return ret;
-		
-		if (!profile || profile == NULL) {
-			printk(KERN_INFO "%s: new_profile did not return a profile successfully", DEVICE_NAME);
-			return -1;
-		}
-		*/
+		printk(KERN_INFO "%s: pH_task_struct corrupted: No profile.", DEVICE_NAME);
+		return -1;
+	}
+	
+	if (stcmp(profile->filename, "./a.out") == 0 || stcmp(profile->filename, "/home/shane/Documents/pH-rewrite/a.out") == 0) {
+		printk(KERN_INFO "%s: My test program was noticed", DEVICE_NAME);
 	}
 	
 	if ((process->seq) == NULL) {
@@ -548,6 +560,7 @@ int process_syscall(long syscall) {
 		INIT_LIST_HEAD(&temp->seqList);
 	}
 	
+	/* // I believe this code should only be in pH_start_monitoring
 	process->seq->length = profile->length;
 	process->seq->last = profile->length - 1;
 	
@@ -562,6 +575,7 @@ int process_syscall(long syscall) {
 	process->profile = profile;
 	
 	pH_profile_data* test = &(profile->test);
+	*/
 	
 	//s->count++;
 	pH_append_call(process->seq, syscall);
@@ -619,6 +633,21 @@ static long jdo_execve(struct filename *filename,
 	return 0;
 }
 
+void add_to_llist(pH_task_struct* t) {
+	if (llist_start == NULL) {
+		llist_start = t;
+		t->next = NULL;
+	}
+	else {
+		pH_task_struct* iterator = llist_start;
+		
+		while (iterator->next) iterator = iterator->next;
+		
+		iterator->next = t;
+		t->next = NULL;
+	}
+}
+
 void print_llist(void) {
 	pH_task_struct* iterator = llist_start;
 	
@@ -643,7 +672,6 @@ static long jsys_execve(const char __user *filename,
 	pH_profile* profile;
 	pH_task_struct* this_process;
 	int i;
-	//char path_to_binary[256];
 	char* path_to_binary;
 	
 	// Allocate space for path_to_binary
@@ -655,19 +683,6 @@ static long jsys_execve(const char __user *filename,
 	
 	// Copy memory from userspace to kernel land
 	memcpy(path_to_binary, filename, sizeof(char) * 4000);
-	
-	/*
-	for (i = 0; i < 256; i++) {
-		papath_to_binary[i] = '\0';
-	}
-	i = 0;
-	if (((char) (*filename)) != '/') goto not_a_path;
-	do {
-		path_to_binary[i] = (char) *filename;
-		filename++;
-		i++;
-	} while (((char) (*filename) == '/') || (isalnum((char) *filename)));
-	*/
 	
 	// Initialize this process - check with Anil to see if these are the right values to initialize it to
 	this_process = kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
@@ -685,16 +700,19 @@ static long jsys_execve(const char __user *filename,
 		profile = vmalloc(sizeof(pH_profile));
 		if (!profile) {
 			printk(KERN_ALERT "%s: Unable to allocate memory for a new profile in jsys_execve", DEVICE_NAME);
+			goto no_memory;
 		}
 		new_profile(profile, path_to_binary);
 	}
 	
+	/*
 	// Set profile->normal to a random integer value for testing purposes
 	int random_num;
 	get_random_bytes(&random_num, 1);
 	random_num = abs(random_num % 100);
 	profile->normal = random_num;
 	printk(KERN_INFO "%s: profile->normal = %d", DEVICE_NAME, random_num);
+	*/
 	
 	this_process->profile = profile;
 	
@@ -1042,6 +1060,8 @@ static int __init ebbchar_init(void){
 		}
 	}
 	
+	start_time = ktime_get();
+	
 	return 0;
 }
 
@@ -1224,8 +1244,8 @@ void pH_open_seq_logfile(pH_profile *profile)
 inline struct syscall_pair pH_append_call(pH_seq *s, int new_value)
 {
         struct syscall_pair pair;
-        pair.first_syscall = s->data[s->last];
-        pair.second_syscall = new_value;
+        //pair.first_syscall = s->data[s->last];
+        //pair.second_syscall = new_value;
         
         s->last = (s->last + 1) % (s->length);
         s->data[s->last] = new_value;
