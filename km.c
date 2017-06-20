@@ -141,7 +141,7 @@ int pH_suspend_execve_time = 3600 * 24 * 2;  /* time to suspend execve's */
 int pH_normal_wait = 7 * 24 * 3600;/* seconds before putting normal to work */
 
 // My own global declarations
-#define num_syscalls 12
+//define num_syscalls 12 // Holds current temp number of syscalls (not to be confused with PH_NUM_SYSCALLS)
 #define num_kretprobes 1
 #define SIGNAL_PRIVILEGE 1
 #define SYSCALLS_PER_WRITE 10
@@ -530,8 +530,10 @@ int process_syscall(long syscall) {
 	pH_profile* profile;
 	pH_task_struct* process;
 	
+	done_waiting_for_user = TRUE; // Temp line for debugging - remove this
+	
 	// If still waiting for the userpace process, return
-	if (!done_waiting_for_user) return -1;
+	if (!done_waiting_for_user) return 0;
 	
 	// If pH_aremonitoring is FALSE, exit this function
 	if (!pH_aremonitoring) return 0;
@@ -539,7 +541,7 @@ int process_syscall(long syscall) {
 	process = llist_retrieve_process(pid_vrn(task_tgid(current)));
 	if (process == NULL) {
 		// Ignore this syscall
-		printk(KERN_INFO "%s: This process is being ignored", DEVICE_NAME);
+		//printk(KERN_INFO "%s: This process is being ignored", DEVICE_NAME);
 		return 0;
 	}
 	
@@ -550,9 +552,13 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	
-	if (stcmp(profile->filename, "./a.out") == 0 || stcmp(profile->filename, "/home/shane/Documents/pH-rewrite/a.out") == 0) {
+	if (strcmp(profile->filename, "/bin/ls") != 0) return 0; // Temporarily only process ls
+	
+	/*
+	if (strcmp(profile->filename, "./a.out") == 0 || strcmp(profile->filename, "/home/shane/Documents/pH-rewrite/a.out") == 0) {
 		printk(KERN_INFO "%s: My test program was noticed", DEVICE_NAME);
 	}
+	*/
 	
 	if ((process->seq) == NULL) {
 		ph_seq* temp = (pH_seq*) vmalloc(sizeof(pH_seq));
@@ -596,10 +602,13 @@ int process_syscall(long syscall) {
 		profile->anomalies = 0;
 	}
 	
-	pH_delay_task(LFC, process);
+	print_llist(); // Print the linked list
+	
+	//pH_delay_task(LFC, process); // Commented out for testing purposes while I test monitoring
 	
 	//kfree(process);
 	
+	/* // Commented out for testing purposes while I test monitoring
 	syscalls_this_write++;
 	pr_info("%s: Syscall was received. %d", DEVICE_NAME, syscalls_this_write);
 	
@@ -610,6 +619,7 @@ int process_syscall(long syscall) {
 		if (ret < 0) return ret;
 		done_waiting_for_user = FALSE;
 	}
+	*/
 	
 	return 0;
 }
@@ -649,20 +659,28 @@ void add_to_llist(pH_task_struct* t) {
 }
 
 void print_llist(void) {
+	int i;
 	pH_task_struct* iterator = llist_start;
 	
 	if (llist_start == NULL) {
-		printk(KERN_INFO "%s: Linked list is empty", DEVICE_NAME);
+		//printk(KERN_INFO "%s: Linked list is empty", DEVICE_NAME);
 		return;
 	}
 	
 	printk(KERN_INFO "%s: Printing linked list...", DEVICE_NAME);
 	do {
 		printk(KERN_INFO "%s: Output: %d %d %s", DEVICE_NAME, iterator->process_id, iterator->profile->normal, iterator->profile->filename);
+		
+		for (i = 0; i < PH_NUM_SYSCALLS && iterator->profile->train.entry[i] != NULL; i++) {
+			pr_info("%s: %d: %d", DEVICE_NAME, i, iterator->profile->train.entry[i]);
+		}
+		
 		iterator = iterator->next;
 	} while (iterator);
 }
 
+void pH_start_monitoring(pH_task_struct*, pH_profile*);
+	
 // Proxy routine for sys_execve
 // First look for profile in profiles in memory, then on disk, and then make a new one
 static long jsys_execve(const char __user *filename,
@@ -683,6 +701,11 @@ static long jsys_execve(const char __user *filename,
 	
 	// Copy memory from userspace to kernel land
 	memcpy(path_to_binary, filename, sizeof(char) * 4000);
+	
+	// Ignore all other binaries
+	if (strcmp(path_to_binary, "/bin/ls") != 0) {
+		goto ignore_binary;
+	}
 	
 	// Initialize this process - check with Anil to see if these are the right values to initialize it to
 	this_process = kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
@@ -718,7 +741,7 @@ static long jsys_execve(const char __user *filename,
 	
 	// Add this_process to the linked list and print the list
 	add_to_list(this_process);
-	print_llist();
+	//print_llist();
 	
 	/*
 	hash_add(proc_hashtable, &this_process->hlist, pid_vnr(task_tgid(tsk)));
@@ -767,6 +790,11 @@ not_a_path:
 
 no_memory:
 	printk(KERN_INFO "%s: In jsys_execve(): Ran out of memory", DEVICE_NAME);
+	jprobe_return();
+	return 0;
+
+ignore_binary:
+	pr_info("%s: In jsys_execve(): Ignoring binary", DEVICE_NAME);
 	jprobe_return();
 	return 0;
 }
@@ -858,6 +886,7 @@ static struct jprobe do_execve_jprobe = {
 	},
 };
 
+/*
 static struct jprobe sys_execve_jprobe = {
 	.entry = jsys_execve,
 	.kp = {
@@ -927,6 +956,7 @@ static struct jprobe sys_exit_jprobe = {
 		.symbol_name = "sys_exit",
 	},
 };
+*/
 
 // Struct required for all kretprobe structs
 struct my_kretprobe_data {
@@ -969,6 +999,10 @@ static int __init ebbchar_init(void){
 	int ret, i;
 	
 	pr_info("%s: Initiating %s", DEVICE_NAME, DEVICE_NAME);
+	
+	pH_aremonitoring = 1;
+	
+	pH_delay_factor = 3;
 	
 	/*
 	// Initialize jprobes_array
