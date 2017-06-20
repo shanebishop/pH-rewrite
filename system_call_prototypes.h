@@ -434,8 +434,8 @@ static long jsys_accept4(int sockfd, struct sockaddr __user *addr, int __user *a
 static long jsys_getsockname(int sockfd, struct sockaddr __user *addr, int __user *addrlen) { process_syscall(234); jprobe_return(); return 0; }
 static long jsys_getpeername(int sockfd, struct sockaddr __user *addr, int __user *addrlen) { process_syscall(235); jprobe_return(); return 0; }
 static long jsys_send(int sockfd, void __user *buf, size_t len, unsigned flags) { process_syscall(236); jprobe_return(); return 0; }
-static long jsys_sendto(int sockfd, void __user *buf, size_t len, unsigned flags,
-				struct sockaddr __user *dest_addr, int addrlen);
+//static long jsys_sendto(int sockfd, void __user *buf, size_t len, unsigned flags,
+//				struct sockaddr __user *dest_addr, int addrlen);
 long sys_sendmsg(int fd, struct user_msghdr __user *msg, unsigned flags) { process_syscall(237); jprobe_return(); return 0; }
 static long jsys_sendmsg(int fd, struct user_msghdr __user *msg, unsigned flags) { process_syscall(238); jprobe_return(); return 0; }
 static long jsys_sendmmsg(int fd, struct mmsghdr __user *msg,
@@ -671,10 +671,11 @@ static long jsys_clone(unsigned long ul1, unsigned long ul2, int __user *i1,
 	       int __user *i2, unsigned long ul3) { process_syscall(360); jprobe_return(); return 0; }
 #endif
 #endif
-
-//static long jsys_execve(const char __user *filename,
-//		const char __user *const __user *argv,
-//		const char __user *const __user *envp) { process_syscall(361); jprobe_return(); return 0; }
+/*
+static long jsys_execve(const char __user *filename,
+		const char __user *const __user *argv,
+		const char __user *const __user *envp) { process_syscall(361); jprobe_return(); return 0; }
+*/
 
 static long jsys_perf_event_open(
 		struct perf_event_attr __user *attr_uptr,
@@ -728,11 +729,11 @@ static long jsys_pkey_mprotect(unsigned long start, size_t len,
 				  unsigned long prot, int pkey) { process_syscall(379); jprobe_return(); return 0; }
 static long jsys_pkey_alloc(unsigned long flags, unsigned long init_val) { process_syscall(380); jprobe_return(); return 0; }
 static long jsys_pkey_free(int pkey) { process_syscall(381); jprobe_return(); return 0; }
-static long jsys_statx(int dfd, const char __user *path, unsigned flags,
-			  unsigned mask, struct statx __user *buffer) { process_syscall(382); jprobe_return(); return 0; }
+static long jsys_statx(int dfd, const char __user *path, unsigned flags, unsigned mask, struct statx __user *buffer) { process_syscall(382); jprobe_return(); return 0; }
 
 // JProbe handlers
 struct jprobe jprobes_array[] = {
+	/*
 	{
 		.entry = jsys32_quotactl,
 		.kp = {
@@ -753,21 +754,25 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_stime",
 		},
 	},
-
+	*/
+	
+	/*
 	{
 		.entry = jsys_gettimeofday,
 		.kp = {
 			.symbol_name = "sys_gettimeofday",
 		},
 	},
-
+	
+	
 	{
 		.entry = jsys_settimeofday,
 		.kp = {
 			.symbol_name = "sys_settimeofday",
 		},
 	},
-
+	
+	/*
 	{
 		.entry = jsys_adjtimex,
 		.kp = {
@@ -1026,6 +1031,7 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_setitimer",
 		},
 	},
+	*/
 
 	{
 		.entry = jsys_timer_create,
@@ -1033,7 +1039,8 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_timer_create",
 		},
 	},
-
+	
+	/*
 	{
 		.entry = jsys_timer_gettime,
 		.kp = {
@@ -1096,7 +1103,8 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_clock_nanosleep",
 		},
 	},
-
+	
+	/*
 	{
 		.entry = jsys_nice,
 		.kp = {
@@ -1208,6 +1216,7 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_shutdown",
 		},
 	},
+	*/
 
 	{
 		.entry = jsys_reboot,
@@ -1215,7 +1224,8 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_reboot",
 		},
 	},
-
+	
+	/*
 	{
 		.entry = jsys_restart_syscall,
 		.kp = {
@@ -1244,13 +1254,16 @@ struct jprobe jprobes_array[] = {
 		},
 	},
 
+	/*
 	{
 		.entry = jsys_exit_group,
 		.kp = {
 			.symbol_name = "sys_exit_group",
 		},
 	},
+	*/
 
+	/*
 	{
 		.entry = jsys_wait4,
 		.kp = {
@@ -1279,6 +1292,7 @@ struct jprobe jprobes_array[] = {
 		},
 	},
 
+	/*
 	{
 		.entry = jsys_futex,
 		.kp = {
@@ -1307,6 +1321,7 @@ struct jprobe jprobes_array[] = {
 		},
 	},
 
+
 	{
 		.entry = jsys_sigsuspend,
 		.kp = {
@@ -1314,29 +1329,39 @@ struct jprobe jprobes_array[] = {
 		},
 	},
 
+
+
 	{
 		.entry = jsys_rt_sigsuspend,
 		.kp = {
 			.symbol_name = "sys_rt_sigsuspend",
 		},
 	},
+	*/
 
 	/*
+#ifdef CONFIG_OLD_SIGACTION
 	{
 		.entry = jsys_sigaction,
 		.kp = {
 			.symbol_name = "sys_sigaction",
 		},
 	},
+#endif
 	*/
 
+	/*
+#ifndef CONFIG_ODD_RT_SIGACTION
 	{
 		.entry = jsys_rt_sigaction,
 		.kp = {
 			.symbol_name = "sys_rt_sigaction",
 		},
 	},
+#endif
+	*/
 
+	/*
 	{
 		.entry = jsys_rt_sigprocmask,
 		.kp = {
@@ -1448,7 +1473,9 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_bdflush",
 		},
 	},
+	*/
 
+	/*
 	{
 		.entry = jsys_mount,
 		.kp = {
@@ -1484,6 +1511,7 @@ struct jprobe jprobes_array[] = {
 		},
 	},
 
+	/*
 	{
 		.entry = jsys_stat,
 		.kp = {
@@ -1562,6 +1590,7 @@ struct jprobe jprobes_array[] = {
 	},
 
 	/*
+#if defined (__ARCH_WANT_STAT64) || defined (__ARCH_WANT_COMPAT_STAT64)
 	{
 		.entry = jsys_stat64,
 		.kp = {
@@ -1589,7 +1618,8 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_fstatat64",
 		},
 	},
-
+#endif
+#if BITS_PER_LONG == 32
 	{
 		.entry = jsys_truncate64,
 		.kp = {
@@ -1603,8 +1633,10 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_ftruncate64",
 		},
 	},
+#endif
 	*/
-
+	
+	/*
 	{
 		.entry = jsys_setxattr,
 		.kp = {
@@ -1807,7 +1839,9 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_mknod",
 		},
 	},
+	*/
 
+	/*
 	{
 		.entry = jsys_link,
 		.kp = {
@@ -1858,14 +1892,17 @@ struct jprobe jprobes_array[] = {
 	},
 
 	/*
+#if BITS_PER_LONG == 32
 	{
 		.entry = jsys_fcntl64,
 		.kp = {
 			.symbol_name = "sys_fcntl64",
 		},
 	},
+#endif
 	*/
-
+	
+	/*
 	{
 		.entry = jsys_pipe,
 		.kp = {
@@ -2033,7 +2070,9 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_fchown",
 		},
 	},
-
+	
+	/*
+#ifdef CONFIG_HAVE_UID16
 	{
 		.entry = jsys_chown16,
 		.kp = {
@@ -2166,7 +2205,10 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_getegid16",
 		},
 	},
+#endif
+	*/
 
+	/*
 	{
 		.entry = jsys_utime,
 		.kp = {
@@ -2180,6 +2222,7 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_utimes",
 		},
 	},
+	*/
 
 	{
 		.entry = jsys_lseek,
@@ -2194,7 +2237,8 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_llseek",
 		},
 	},
-
+	
+	/*
 	{
 		.entry = jsys_read,
 		.kp = {
@@ -2278,7 +2322,9 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_getcwd",
 		},
 	},
+	*/
 
+	/*
 	{
 		.entry = jsys_mkdir,
 		.kp = {
@@ -2307,12 +2353,14 @@ struct jprobe jprobes_array[] = {
 		},
 	},
 
+	/*
 	{
 		.entry = jsys_lookup_dcookie,
 		.kp = {
 			.symbol_name = "sys_lookup_dcookie",
 		},
 	},
+	*/
 
 	{
 		.entry = jsys_quotactl,
@@ -2321,6 +2369,7 @@ struct jprobe jprobes_array[] = {
 		},
 	},
 
+	/*
 	{
 		.entry = jsys_getdents,
 		.kp = {
@@ -2398,13 +2447,16 @@ struct jprobe jprobes_array[] = {
 		},
 	},
 
+	/*
 	{
 		.entry = jsys_sendto,
 		.kp = {
 			.symbol_name = "sys_sendto",
 		},
 	},
+	*/
 
+	/*
 	{
 		.entry = jsys_sendmsg,
 		.kp = {
@@ -2474,7 +2526,9 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_listen",
 		},
 	},
-
+	*/
+	
+	/*
 	{
 		.entry = jsys_poll,
 		.kp = {
@@ -2482,6 +2536,7 @@ struct jprobe jprobes_array[] = {
 		},
 	},
 
+	/*
 	{
 		.entry = jsys_select,
 		.kp = {
@@ -2580,13 +2635,18 @@ struct jprobe jprobes_array[] = {
 		},
 	},
 
+	/*
+#if defined(COMPAT_RLIM_OLD_INFINITY) || !(defined(CONFIG_IA64))
 	{
 		.entry = jsys_old_getrlimit,
 		.kp = {
 			.symbol_name = "sys_old_getrlimit",
 		},
 	},
+#endif
+	*/
 
+	/*
 	{
 		.entry = jsys_setrlimit,
 		.kp = {
@@ -3230,7 +3290,9 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_syncfs",
 		},
 	},
+	*/
 
+	/*
 	{
 		.entry = jsys_fork,
 		.kp = {
@@ -3251,28 +3313,17 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_clone",
 		},
 	},
-
-	{
-		.entry = jsys_clone,
-		.kp = {
-			.symbol_name = "sys_clone",
-		},
-	},
-
-	{
-		.entry = jsys_clone,
-		.kp = {
-			.symbol_name = "sys_clone",
-		},
-	},
-
+	
+	/*
 	{
 		.entry = jsys_execve,
 		.kp = {
 			.symbol_name = "sys_execve",
 		},
 	},
-
+	*/
+	
+	/*
 	{
 		.entry = jsys_perf_event_open,
 		.kp = {
@@ -3412,13 +3463,16 @@ struct jprobe jprobes_array[] = {
 			.symbol_name = "sys_pkey_free",
 		},
 	},
-
+	*/
+	
+	/*
 	{
 		.entry = jsys_statx,
 		.kp = {
 			.symbol_name = "sys_statx",
 		},
 	}
+	*/
 };
 
 #define num_syscalls (sizeof(jprobes_array) / sizeof(jprobes_array[0]))
