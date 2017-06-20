@@ -771,6 +771,7 @@ no_memory:
 	return 0;
 }
 
+/*
 // Proxy routine for fork
 static long jsys_fork(void) {
 	//pr_info("JProbes Example: Fork system call was probed");
@@ -840,6 +841,7 @@ static long jsys_exit(int error_code) {
 	jprobe_return();
 	return 0;
 }
+*/
 
 // JProbe structs for system calls
 static struct jprobe open_exec_jprobe = {
@@ -968,6 +970,7 @@ static int __init ebbchar_init(void){
 	
 	pr_info("%s: Initiating %s", DEVICE_NAME, DEVICE_NAME);
 	
+	/*
 	// Initialize jprobes_array
 	jprobes_array[0] = open_exec_jprobe;
 	jprobes_array[1] = do_execve_jprobe;
@@ -981,6 +984,7 @@ static int __init ebbchar_init(void){
 	jprobes_array[9] = sys_llseek_jprobe;
 	jprobes_array[10] = sys_getpid_jprobe;
 	jprobes_array[11] = sys_exit_jprobe;
+	*/
 	
 	// Initialize kretprobes_array
 	kretprobes_array[0] = fork_kretprobe;
@@ -991,12 +995,14 @@ static int __init ebbchar_init(void){
 	
 	syscalls_this_write = 0;
 	
+	/*
 	// Allocate memory for current_profile
 	current_profile = vmalloc(sizeof(pH_profile));
 	if (current_profile == NULL) {
 		printk(KERN_INFO "%s: Unable to allocate memory for current_profile", DEVICE_NAME);
 		return -ENOMEM;
 	}
+	*/
 
 	// Allocate memory for output_string
 	output_string = kmalloc(sizeof(char) * 254, GFP_KERNEL);
