@@ -132,17 +132,6 @@ struct syscall_pair {
 	unsigned long second_syscall;
 };
 
-struct hash_struct {
-	struct hlist_node hlist;
-	int entry;
-	int identifier;
-};
-
-struct executable {
-	struct hlist_node hlist; // Must be first field
-	char* absolute_path;
-};
-
 typedef struct my_syscall {
 	struct my_syscall* next;
 	unsigned long syscall_num;
@@ -201,8 +190,6 @@ int pH_normal_wait = 7 * 24 * 3600;/* seconds before putting normal to work */
 //struct jprobe jprobes_array[num_syscalls]; // Array of jprobes
 struct kretprobe kretprobes_array[num_kretprobes]; // Array of kretprobes
 DECLARE_HASHTABLE(profile_hashtable, 8); // Declare profile hashtable
-//DECLARE_HASHTABLE(exec_hashtable, 8);  // Declare executable hashtable
-DECLARE_HASHTABLE(proc_hashtable, 8);    // Declare process hashtable
 long userspace_pid;                      // The PID of the userspace process
 const char TRANSFER_OPERATION[2] = {'t', '\0'}; // Constant for transfer operation
 char* output_string;                     // The string that will be sent to the userspace code
@@ -230,32 +217,6 @@ static struct file_operations fops =
 	.release = dev_release,
 };
 
-// Returns a pH_task_struct using process_id as a key
-pH_task_struct* retrieve_process(int process_id) {
-	pH_task_struct* pH_task_struct;
-	
-	hash_for_each_possible(proc_hashtable, pH_task_struct, hlist, process_id) {
-		if (pH_task_struct->process_id == process_id) {
-			return pH_task_struct;
-		}
-	}
-	
-	return NULL;
-}
-
-// Returns a pH_profile using a process ID as a key
-pH_profile* retrieve_pH_profile_by_pid(int key) {
-	pH_profile* pH_profile;
-	
-	hash_for_each_possible(profile_hashtable, pH_profile, hlist, key) {
-		if (pH_profile->identifier == key) {
-			return pH_profile;
-		}
-	}
-	
-	return NULL;
-}
-
 // Returns a pH_profile using a filename string as the lookup
 pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	pH_profile* profile;
@@ -274,21 +235,6 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	return NULL;
 }
 
-// Returns true if a message was received from the user, false otherwise
-bool message_received(void) {
-    if (message == NULL || message[0] == '\0') {
-        return FALSE;
-    } else return TRUE;
-}
-
-// Returns the task_struct of the userspace app
-struct task_struct* get_userspace_task_struct(void) {
-	if (message_received()) {
-		return pid_task(find_pid_ns(userspace_pid, &init_pid_ns), PIDTYPE_PID);
-	}
-	return NULL;
-}
-
 inline void pH_refcount_init(pH_profile *, int);
 
 // Makes a new pH_profile and stores it in profile
@@ -298,7 +244,7 @@ int new_profile(pH_profile* profile, char* filename) {
 
 	profile->identifier = pid_vnr(task_tgid(current));
 
-    profile->normal = 0;  /* we just started - not normal yet! */
+    profile->normal = 0;  // We just started - not normal yet!
     profile->frozen = 0;
     profile->normal_time = 0;
     profile->anomalies = 0;
@@ -377,7 +323,7 @@ int process_syscall(long syscall) {
 	if (!done_waiting_for_user) { /*printk(KERN_INFO "Waiting for user");*/ return 0; }
 	
 	// If pH_aremonitoring is FALSE, exit this function
-	if (!pH_aremonitoring) { printk(KERN_INFO "Not monitoring"); return 0; }
+	if (!pH_aremonitoring) { pr_err("%s: Not monitoring\n", DEVICE_NAME); return 0; }
 	
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	if (process == NULL) {
@@ -388,20 +334,28 @@ int process_syscall(long syscall) {
 	profile = process->profile; // Store process->profile in profile for shorter reference
 	
 	if (!profile || profile == NULL) {
-		printk(KERN_INFO "%s: pH_task_struct corrupted: No profile.", DEVICE_NAME);
+		pr_err("%s: pH_task_struct corrupted: No profile.\n", DEVICE_NAME);
 		return -1;
 	}
-
-	if (strcmp(profile->filename, "/bin/ls") != 0) return 0;
+	pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
 	if ((process->seq) == NULL) {
 		pH_seq* temp = (pH_seq*) vmalloc(sizeof(pH_seq));
+		if (!temp) {
+			pr_err("%s: Unable to allocate memory for temp in process_syscall\n", DEVICE_NAME);
+			return -ENOMEM;
+		}
+		
 		process->seq = temp;
 		INIT_LIST_HEAD(&temp->seqList);
 	}
 	
+	process->seq->length = profile->length;
+	process->seq->last = profile->length - 1;
+	
 	process->count++;
     pH_append_call(process->seq, syscall);
+	pr_err("%s: Successfully appended call\n", DEVICE_NAME);
 	
 	profile->count++;
 	
@@ -410,8 +364,10 @@ int process_syscall(long syscall) {
     if (profile->frozen /*&& (xtime.tv_sec > profile->normal_time)*/) {
 		pH_start_normal(process);
     }
+	pr_err("%s: Trained process\n", DEVICE_NAME);
 
-    pH_process_normal(profile, process->seq, process, syscall);
+    pH_process_normal(profile, process->seq, procss, syscall);
+	pr_err("%s: Processed as normal\n", DEVICE_NAME);
 
     LFC = pH_LFC(process);
     if (LFC > pH_tolerize_limit) {
@@ -422,12 +378,13 @@ int process_syscall(long syscall) {
     
     my_syscall* new_syscall = kmalloc(sizeof(my_syscall), GFP_KERNEL);
     if (!new_syscall) {
-    	pr_err("%s: Unable to allocate memory for new_syscall", DEVICE_NAME);
+    	pr_err("%s: Unable to allocate memory for new_syscall\n", DEVICE_NAME);
     	return -ENOMEM;
     }
     
     new_syscall->syscall_num = syscall;
     add_to_my_syscall_llist(process, new_syscall);
+	pr_err("%s: Successfully added new_syscall to the llist\n", DEVICE_NAME);
     
     //print_llist(); // Uncomment to print llists
 	
@@ -473,9 +430,9 @@ void print_llist(void) {
 		return;
 	}
 	
-	printk(KERN_INFO "Printing linked list...");
+	pr_err("%s: Printing linked list...\n", DEVICE_NAME);
 	do {
-		printk(KERN_INFO "%s: Output: %ld %s", DEVICE_NAME, iterator->process_id, iterator->profile->filename);
+		pr_err("%s: Output: %ld %s\n", DEVICE_NAME, iterator->process_id, iterator->profile->filename);
 		
 		/* // Uncomment to print llist of system calls for this process		
 		syscall_iterator = iterator->syscall_llist;
@@ -503,39 +460,53 @@ static long jsys_execve(const char __user *filename,
 	pH_task_struct* this_process;
 	char* path_to_binary;
 	
+	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
+	
 	// Allocate space for path_to_binary
-	path_to_binary = kmalloc(sizeof(char) * 4000, GFP_KERNEL);
+	path_to_binary = kmalloc(sizeof(char) * (strlen(filename) + 1), GFP_KERNEL);
 	if (!path_to_binary) {
-		printk(KERN_INFO "Unable to allocate memory for path_to_binary");
+		pr_err("%s: Unable to allocate memory for path_to_binary\n", DEVICE_NAME);
 		goto no_memory;
 	}
+	pr_err("%s: Successfully allocated memory for path_to_binary\n", DEVICE_NAME);
 	
 	// Copy memory from userspace to kernel land
-	memcpy(path_to_binary, filename, sizeof(char) * 4000);
+	memcpy(path_to_binary, filename, sizeof(char) * (strlen(filename) + 1));
+	pr_err("%s: Successfully copied memory from userspace to kernel land\n", DEVICE_NAME);
+	
+	// Allocate memory for this process
+	this_process = (pH_task_struct*) kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
+	if (!this_process) {
+		pr_err("%s: Unable to allocate memory for this_process\n", DEVICE_NAME);
+		goto no_memory;
+	}
+	pr_err("%s: Successfully allocated memory for this_process\n", DEVICE_NAME);
 	
 	// Intialize this_process - check with Anil to see if these are the right values to initialize it to
-	this_process = (pH_task_struct*) kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
 	this_process->process_id = pid_vnr(task_tgid(current));
 	pH_reset_ALF(this_process);
 	this_process->seq = NULL;
 	this_process->syscall_llist = NULL;
 	this_process->delay = 0;
 	this_process->count = 0;
+	pr_err("%s: Initialized process\n", DEVICE_NAME);
 	
 	// Retrieve the corresponding profile
 	profile = retrieve_pH_profile_by_filename(path_to_binary);
+	pr_err("%s: Attempted to retrieve profile\n", DEVICE_NAME);
 	
 	// If there is no corresponding profile, make a new one
 	if (!profile || profile == NULL) {
 		profile = (pH_profile*) vmalloc(sizeof(pH_profile));
 		if (!profile) {
-			pr_alert("%s: Unable to allocate memory for profile in process_syscall", DEVICE_NAME);
+			pr_err("%s: Unable to allocate memory for profile in process_syscall\n", DEVICE_NAME);
 			goto no_memory;
 		}
 		new_profile(profile, path_to_binary);
+		pr_err("%s: Made new profile\n", DEVICE_NAME);
 		
 		if (!profile || profile == NULL) {
-			pr_alert("Somehow the profile is still NULL");
+			pr_err("%s: Somehow the profile is still NULL\n", DEVICE_NAME);
 		}
 		else {
 			pH_start_monitoring(this_process, profile);
@@ -545,10 +516,11 @@ static long jsys_execve(const char __user *filename,
 		kfree(path_to_binary);
 	}
 	
-	this_process->profile = profile;
+	this_process->profile = (pH_profile*) profile;
 	
 	// Add this_process to the linked list
 	add_to_llist(this_process);
+	pr_err("%s: Added this_process to linked list\n", DEVICE_NAME);
 
 	process_syscall(59);
 	
@@ -556,17 +528,17 @@ static long jsys_execve(const char __user *filename,
 	return 0;
 
 not_a_path:
-	pr_info("%s: In jsys_execve(): Not a path", DEVICE_NAME);
+	pr_info("%s: In jsys_execve(): Not a path\n", DEVICE_NAME);
 	jprobe_return();
 	return 0;
 	
 no_memory:
-	pr_info("%s: In jsys_execve(): Ran out of memory", DEVICE_NAME);
+	pr_info("%s: In jsys_execve(): Ran out of memory\n", DEVICE_NAME);
 	jprobe_return();
 	return 0;
 
 ignore_binary:
-	pr_info("%s: In jsys_execve(): Ignoring binary", DEVICE_NAME);
+	pr_info("%s: In jsys_execve(): Ignoring binary\n", DEVICE_NAME);
 	jprobe_return();
 	return 0;
 }
@@ -612,13 +584,13 @@ static struct kretprobe fork_kretprobe = {
 static int __init ebbchar_init(void){
 	int ret, i;
 	
-	pr_info("%s: Initiating %s", DEVICE_NAME, DEVICE_NAME);
+	pr_info("%s: Initiating %s\n", DEVICE_NAME, DEVICE_NAME);
 	
 	pH_aremonitoring = 1;
 	
 	pH_delay_factor = 3;
 	
-	pH_loglevel = PH_LOG_IO; // Temp line for maximum output
+	//pH_loglevel = PH_LOG_IO; // Temp line for maximum output
 	
 	// Initialize kretprobes_array
 	kretprobes_array[0] = fork_kretprobe;
@@ -767,7 +739,7 @@ void pH_open_seq_logfile(pH_profile *profile)
 
 inline void pH_append_call(pH_seq *s, int new_value)
 {
-        if (s->last < 0) { pr_err("s->last is not initialized!"); return; }
+        if (s->last < 0) { pr_err("%s: s->last is not initialized!\n", DEVICE_NAME); return; }
         
         s->last = (s->last + 1) % (s->length);
         s->data[s->last] = new_value;
