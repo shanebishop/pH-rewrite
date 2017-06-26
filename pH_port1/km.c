@@ -750,15 +750,22 @@ void pH_add_seq(pH_seq *s, pH_profile_data *data)
         int i, cur_call, prev_call, cur_idx;
         u8 *seqdata = s->data;
         int seqlen = s->length;
+	pr_err("%s: Initialized variables for pH_add_seq\n", DEVICE_NAME);
         
         cur_idx = s->last;
         cur_call = seqdata[cur_idx];
+	pr_err("%s: Initialized cur_idx and cur_call\n", DEVICE_NAME);
+	
         for (i = 1; i < seqlen; i++) {
+		pr_err("%s: i=%d cur_call=%d prev_call=%d cur_idx=%d\n", DEVICE_NAME, i, cur_call, prev_call, cur_idx);
                 if (data->entry[cur_call] == NULL) {
                         if (pH_add_seq_storage(data, cur_call)) return;
                 }
+		pr_err("%s: Made it through if\n", DEVICE_NAME);
                 prev_call = seqdata[(cur_idx + seqlen - i) % seqlen];
+		pr_err("%s: Set prev_call\n", DEVICE_NAME);
                 data->entry[cur_call][prev_call] |= (1 << (i - 1));
+		pr_err("%s: Set data->entry values\n", DEVICE_NAME);
         }
 }
 
@@ -881,6 +888,7 @@ inline void pH_add_anomaly_count(pH_task_struct *s, int val)
         s->alf.first = i;
 }
 
+/*
 int pH_copy_train_to_test(pH_profile *profile)
 {
         pH_profile_data *train = &(profile->train);
@@ -908,6 +916,7 @@ int pH_copy_train_to_test(pH_profile *profile)
         
         return 0;
 }
+*/
 
 void pH_start_normal(pH_task_struct *s)
 {
@@ -917,8 +926,11 @@ void pH_start_normal(pH_task_struct *s)
         
         pH_reset_ALF(s);
         
-        if (pH_copy_train_to_test(profile))
+	/*
+        if (pH_copy_train_to_test(profile)) {
                 return;
+	}
+	*/
 
         profile->anomalies = 0;
         profile->normal = 1;
