@@ -366,7 +366,7 @@ int process_syscall(long syscall) {
     }
 	pr_err("%s: Trained process\n", DEVICE_NAME);
 
-    pH_process_normal(profile, process->seq, procss, syscall);
+    pH_process_normal(profile, process->seq, process, syscall);
 	pr_err("%s: Processed as normal\n", DEVICE_NAME);
 
     LFC = pH_LFC(process);
@@ -597,7 +597,7 @@ static int __init ebbchar_init(void){
 	
 	// Initialize hashtables
 	hash_init(profile_hashtable);
-	hash_init(proc_hashtable);
+	//hash_init(proc_hashtable);
 	
 	syscalls_this_write = 0;
 	
