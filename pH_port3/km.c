@@ -10,6 +10,8 @@
 #include <linux/slab.h>      // For kmalloc
 #include <linux/vmalloc.h>   // For vmalloc
 
+#include "system_call_prototypes.h"
+
 #define  DEVICE_NAME "ebbchar"
 #define  CLASS_NAME  "ebb"
 
@@ -122,8 +124,14 @@ typedef struct pH_locality {
 	int max;
 } pH_locality;
 
+typedef struct my_syscall {
+	struct my_syscall* next;
+	unsigned long syscall_num;
+} my_syscall;
+
 typedef struct pH_task_struct { // My own version of a pH_task_state
 	struct pH_task_struct* next; // For linked lists
+	my_syscall* syscall_list;
 	long process_id;
 	pH_locality alf;
 	pH_seq* seq;
@@ -132,8 +140,10 @@ typedef struct pH_task_struct { // My own version of a pH_task_state
 	pH_profile* profile; // Pointer to appropriate profile
 } pH_task_struct;
 
+// My global variables
 pH_task_struct* llist_start = NULL;
 pH_profile* profile_llist_start = NULL;
+struct jprobe jprobes_array[num_syscalls];
 
 void add_to_profile_llist(pH_profile* p) {
 	if (profile_llist_start == NULL) {
@@ -194,8 +204,64 @@ int new_profile(pH_profile* profile, char* filename) {
 	return 0;
 }
 
+void add_to_my_syscall_llist(pH_task_struct* t, my_syscall* s) {
+	pr_err("%s: In add_to_my_syscall_llist\n", DEVICE_NAME);
+	
+	if (t->syscall_llist == NULL) {
+		t->syscall_llist = s;
+		s->next = NULL;
+	}
+	else {
+		my_syscall* iterator = t->syscall_llist;
+		
+		while (iterator->next) iterator = iterator->next;
+		
+		iterator->next = s;
+		s->next = NULL;
+	}
+}
+
+pH_task_struct* llist_retrieve_process(int process_id) {
+	pH_task_struct* iterator = llist_start;
+	
+	if (llist_start == NULL) {
+		return NULL;
+	}
+	
+	do {
+		if (iterator->process_id == process_id) return iterator;
+		iterator = iterator->next;
+	} while (iterator);
+	
+	return NULL;
+}
+
 int process_syscall(long syscall) {
-	pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
+	pH_task_struct* process;
+	my_syscall* new_syscall;
+	
+	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
+	
+	// Retrieve process
+	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
+	if (!process) {
+		// Ignore this syscall
+		return 0;
+	}
+	pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
+	
+	// Allocate space for new_syscall
+	new_syscall = kmalloc(sizeof(my_syscall), GFP_KERNEL);
+	if (!new_syscall) {
+		pr_err("%s: Unable to allocate space for new_syscall\n", DEVICE_NAME);
+		return -ENOMEM;
+	}
+	pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
+	
+	// Add new_syscall to the linked list of syscalls
+	new_syscall->syscall_num = syscall;
+	add_to_my_syscall_llist(process, new_syscall);
+	
 	return 0;
 }
 
@@ -232,7 +298,6 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	return NULL;
 }
 
-// jsys_execve prototype
 static long jsys_execve(const char __user *filename,
 	const char __user *const __user *argv,
 	const char __user *const __user *envp)
@@ -264,6 +329,7 @@ static long jsys_execve(const char __user *filename,
 	}
 	
 	this_process->process_id = pid_vnr(task_tgid(current));
+	this_process->syscall_llist = NULL;
 	
 	// Retrieve the corresponding profile
 	profile = retrieve_pH_profile_by_filename(path_to_binary);
@@ -304,12 +370,14 @@ not_monitoring:
 	return 0;
 }
 
+/*
 static struct jprobe sys_execve_jprobe = {
 	.entry = jsys_execve,
 	.kp = {
 		.symbol_name = "sys_execve",
 	},
 };
+*/
 
 void print_llist(void) {
 	pH_task_struct* iterator = llist_start;
@@ -327,16 +395,18 @@ void print_llist(void) {
 }
 
 static int __init ebbchar_init(void){
-	int ret;
+	int ret, i;
 	
 	printk(KERN_INFO "%s: Initializing the EBBChar LKM\n", DEVICE_NAME);
 	
 	pH_aremonitoring = 1;
 	
-	ret = register_jprobe(&sys_execve_jprobe);
-	if (ret < 0) {
-		pr_err("%s: register_jprobe failed, returned %d\n", DEVICE_NAME, ret);
-		return -1;
+	for (i = 0; i < num_syscalls; i++) {
+		ret = register_jprobe(&jprobes_array[i]);
+		if (ret < 0) {
+			pr_err("%s: register_jprobe failed, returned %d\n", DEVICE_NAME, ret);
+			return -1;
+		}
 	}
 
 	// Try to dynamically allocate a major number for the device
@@ -370,9 +440,13 @@ static int __init ebbchar_init(void){
 }
 
 static void __exit ebbchar_exit(void){
+	int i;
+	
 	print_llist();
 	
-	unregister_jprobe(&sys_execve_jprobe);
+	for (i = 0; i < num_syscalls; i++) {
+		unregister_jprobe(&jprobes_array[i]);
+	}
 	
 	mutex_destroy(&ebbchar_mutex);
 	device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
