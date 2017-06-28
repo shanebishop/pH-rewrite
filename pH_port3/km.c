@@ -36,30 +36,6 @@ static struct device* ebbcharDevice = NULL;
 
 const char *PH_FILE_MAGIC="pH profile 0.18\n";
 
-/* this was atomic, but now we need a long - so, we could make
-   a spinlock for this */
-unsigned long pH_syscall_count = 0;
-//spinlock_t pH_syscall_count_lock = SPIN_LOCK_UNLOCKED;
-
-pH_profile *pH_profile_list = NULL;
-int pH_default_looklen = 9;
-struct file *pH_logfile = NULL;
-int pH_delay_factor = 0;
-unsigned int pH_normal_factor = 128;
-#define pH_normal_factor_den 32        /* a define to make the asm better */
-int pH_aremonitoring = 0;
-int pH_monitorSignal = 0;
-int pH_mod_min = 500;
-int pH_normal_min = 5;
-int pH_anomaly_limit = 30;   /* test reset if profile->anomalies */
-                                 /* exceeds this limit */
-int pH_tolerize_limit = 12; /* train reset if LFC exceeds this limit */
-//int pH_loglevel = PH_LOG_ACTION;
-int pH_log_sequences = 0;
-int pH_suspend_execve = 0; /* min LFC to suspend execve's, 0 = no suspends */
-int pH_suspend_execve_time = 3600 * 24 * 2;  /* time to suspend execve's */
-int pH_normal_wait = 7 * 24 * 3600;/* seconds before putting normal to work */
-
 static DEFINE_MUTEX(ebbchar_mutex);
 
 static int     dev_open(struct inode *, struct file *);
@@ -131,7 +107,7 @@ typedef struct my_syscall {
 
 typedef struct pH_task_struct { // My own version of a pH_task_state
 	struct pH_task_struct* next; // For linked lists
-	my_syscall* syscall_list;
+	my_syscall* syscall_llist;
 	long process_id;
 	pH_locality alf;
 	pH_seq* seq;
@@ -139,6 +115,30 @@ typedef struct pH_task_struct { // My own version of a pH_task_state
 	unsigned long count;
 	pH_profile* profile; // Pointer to appropriate profile
 } pH_task_struct;
+
+/* this was atomic, but now we need a long - so, we could make
+   a spinlock for this */
+unsigned long pH_syscall_count = 0;
+//spinlock_t pH_syscall_count_lock = SPIN_LOCK_UNLOCKED;
+
+pH_profile *pH_profile_list = NULL;
+int pH_default_looklen = 9;
+struct file *pH_logfile = NULL;
+int pH_delay_factor = 0;
+unsigned int pH_normal_factor = 128;
+#define pH_normal_factor_den 32        /* a define to make the asm better */
+int pH_aremonitoring = 0;
+int pH_monitorSignal = 0;
+int pH_mod_min = 500;
+int pH_normal_min = 5;
+int pH_anomaly_limit = 30;   /* test reset if profile->anomalies */
+                                 /* exceeds this limit */
+int pH_tolerize_limit = 12; /* train reset if LFC exceeds this limit */
+//int pH_loglevel = PH_LOG_ACTION;
+int pH_log_sequences = 0;
+int pH_suspend_execve = 0; /* min LFC to suspend execve's, 0 = no suspends */
+int pH_suspend_execve_time = 3600 * 24 * 2;  /* time to suspend execve's */
+int pH_normal_wait = 7 * 24 * 3600;/* seconds before putting normal to work */
 
 // My global variables
 pH_task_struct* llist_start = NULL;
@@ -267,7 +267,7 @@ int process_syscall(long syscall) {
 
 void add_to_llist(pH_task_struct* t) {
 	if (llist_start == NULL) {
-		list_start = t;
+		llist_start = t;
 		t->next = NULL;
 	}
 	else {
