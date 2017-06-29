@@ -353,8 +353,10 @@ static long jsys_execve(const char __user *filename,
 	this_process->profile = profile;
 	
 	add_to_llist(this_process);
+	pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
 	process_syscall(59);
+	pr_err("%s: Processed syscall\n", DEVICE_NAME);
 	
 	jprobe_return();
 	return 0;
