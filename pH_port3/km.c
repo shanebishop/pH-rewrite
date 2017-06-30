@@ -236,9 +236,12 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 	return NULL;
 }
 
+inline void pH_append_call(pH_seq*, int);
+
 int process_syscall(long syscall) {
 	pH_task_struct* process;
 	my_syscall* new_syscall;
+	pH_profile* profile;
 	
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
 	
@@ -249,6 +252,34 @@ int process_syscall(long syscall) {
 		return 0;
 	}
 	pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
+	
+	profile = process->profile; // Store process->profile in profile for shorter reference
+	
+	if (!profile || profile == NULL) {
+		pr_err("%s: pH_task_struct_corrupted: No profile\n", DEVICE_NAME);
+		return -1;
+	}
+	pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
+	
+	if ((process->seq) == NULL) {
+		pH_seq* temp = (pH_seq*) vmalloc(sizeof(pH_seq));
+		if (!temp) {
+			pr_err("%s: Unable to allocate memory for temp in process_syscall\n", DEVICE_NAME);
+			return -ENOMEM;
+		}
+		
+		process->seq = temp;
+		INIT_LIST_HEAD(&temp->seqList);
+	}
+	
+	process->seq->length = profile->length;
+	process->seq->last = profile->length - 1;
+	
+	process->count++;
+	pH_append_call(process->seq, syscall);
+	pr_err("%s: Successfully appended call\n", DEVICE_NAME);
+	
+	profile->count++;
 	
 	// Allocate space for new_syscall
 	new_syscall = kmalloc(sizeof(my_syscall), GFP_KERNEL);
@@ -318,7 +349,7 @@ static long jsys_execve(const char __user *filename,
 	}
 	
 	// Copy memory from userspace to kernel land
-	memcpy(path_to_binary, filename, sizeof(char) * 4000);
+	copy_from_user(path_to_binary, filename, sizeof(char) * 4000);
 	pr_err("%s: path_to_binary = %s\n", DEVICE_NAME, path_to_binary);
 	
 	// Allocate memory for this_process
@@ -328,8 +359,14 @@ static long jsys_execve(const char __user *filename,
 		goto no_memory;
 	}
 	
+	// Initialize this process - check with Anil to see if these are the right values to initialize it to
 	this_process->process_id = pid_vnr(task_tgid(current));
+	//pH_reset_ALF(this_process);
+	this_process->seq = NULL;
 	this_process->syscall_llist = NULL;
+	this_process->delay = 0;
+	this_process->count = 0;
+	pr_err("%s: Initialized process\n", DEVICE_NAME);
 	
 	// Retrieve the corresponding profile
 	profile = retrieve_pH_profile_by_filename(path_to_binary);
@@ -472,6 +509,13 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 
 static int dev_release(struct inode *inodep, struct file *filep){
 	return 0;
+}
+
+inline void pH_append_call(pH_seq* s, int new_value) {
+	if (s->last < 0) { pr_err("%s: s->last is not initialized\n", DEVICE_NAME); return; }
+	
+	s->last = (s->last + 1) % (s->length);
+	s->data[s->last] = new_value;
 }
 
 module_init(ebbchar_init);
