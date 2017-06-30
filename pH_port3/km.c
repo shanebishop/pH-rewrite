@@ -27,6 +27,10 @@ MODULE_LICENSE("GPL"); // Don't ever forget this line!
 #define PH_FILE_MAGIC_LEN 20
 #define PH_EMPTY_SYSCALL 255 // Note: This value is used as the "no system call" marker in sequences"
 
+// My definitions
+#define TRUE  (1 == 1)
+#define FALSE !TRUE
+
 static int    majorNumber;
 //static char   message[256] = {0};
 //static short  size_of_message;
@@ -144,6 +148,7 @@ int pH_normal_wait = 7 * 24 * 3600;/* seconds before putting normal to work */
 pH_task_struct* llist_start = NULL;
 pH_profile* profile_llist_start = NULL;
 struct jprobe jprobes_array[num_syscalls];
+bool module_inserted_successfully = FALSE;
 
 void add_to_profile_llist(pH_profile* p) {
 	if (profile_llist_start == NULL) {
@@ -243,6 +248,8 @@ int process_syscall(long syscall) {
 	my_syscall* new_syscall;
 	pH_profile* profile;
 	
+	if (!module_inserted_successfully) return -1;
+	
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
 	
 	// Retrieve process
@@ -337,7 +344,7 @@ static long jsys_execve(const char __user *filename,
 	pH_task_struct* this_process;
 	pH_profile* profile;
 	
-	if (!pH_aremonitoring) { goto not_monitoring; }
+	if (!module_inserted_successfully) { goto not_inserted; }
 
 	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
 	
@@ -407,6 +414,11 @@ not_monitoring:
 	pr_err("%s: Not monitoring\n", DEVICE_NAME);
 	jprobe_return();
 	return 0;
+	
+not_inserted:
+	pr_err("%s: Module was not inserted successfully\n", DEVICE_NAME);
+	jprobe_return();
+	return 0;
 }
 
 /*
@@ -436,45 +448,63 @@ void print_llist(void) {
 static int __init ebbchar_init(void){
 	int ret, i;
 	
-	printk(KERN_INFO "%s: Initializing the EBBChar LKM\n", DEVICE_NAME);
-	
-	pH_aremonitoring = 1;
-	
-	for (i = 0; i < num_syscalls; i++) {
-		ret = register_jprobe(&jprobes_array[i]);
-		if (ret < 0) {
-			pr_err("%s: register_jprobe failed, returned %d\n", DEVICE_NAME, ret);
-			return -1;
-		}
-	}
+	pr_info("%s: Initializing the EBBChar LKM\n", DEVICE_NAME);
 
 	// Try to dynamically allocate a major number for the device
 	majorNumber = register_chrdev(0, DEVICE_NAME, &fops);
 	if (majorNumber<0){
-	  printk(KERN_ALERT "%s: Failed to register a major number\n", DEVICE_NAME);
+	  pr_err("%s: Failed to register a major number\n", DEVICE_NAME);
 	  return majorNumber;
 	}
-	printk(KERN_INFO "%s: registered correctly with major number %d\n", DEVICE_NAME, majorNumber);
+	pr_err("%s: registered correctly with major number %d\n", DEVICE_NAME, majorNumber);
 
 	// Register the device class
 	ebbcharClass = class_create(THIS_MODULE, CLASS_NAME);
 	if (IS_ERR(ebbcharClass)){           // Check for error and clean up if there is
 	  unregister_chrdev(majorNumber, DEVICE_NAME);
-	  printk(KERN_ALERT "%s: Failed to register device class\n", DEVICE_NAME);
+	  pr_err("%s: Failed to register device class\n", DEVICE_NAME);
 	  return PTR_ERR(ebbcharClass);
 	}
-	printk(KERN_INFO "%s: device class registered correctly\n", DEVICE_NAME);
+	pr_err("%s: device class registered correctly\n", DEVICE_NAME);
 
 	// Register the device driver
 	ebbcharDevice = device_create(ebbcharClass, NULL, MKDEV(majorNumber, 0), NULL, DEVICE_NAME);
 	if (IS_ERR(ebbcharDevice)){          // Clean up if there is an error
-	  class_destroy(ebbcharClass);      // Repeated code but the alternative is goto statements
+	  class_destroy(ebbcharClass);
 	  unregister_chrdev(majorNumber, DEVICE_NAME);
-	  printk(KERN_ALERT "%s: Failed to create the device\n", DEVICE_NAME);
+	  pr_err("%s: Failed to create the device\n", DEVICE_NAME);
 	  return PTR_ERR(ebbcharDevice);
 	}
-	printk(KERN_INFO "%s: device class created correctly\n", DEVICE_NAME); // Device was initialized
+	pr_err("%s: device class created correctly\n", DEVICE_NAME); // Device was initialized
 	mutex_init(&ebbchar_mutex); // Initialize the mutex dynamically
+	
+	for (i = 0; i < num_syscalls; i++) {
+		ret = register_jprobe(&jprobes_array[i]);
+		if (ret < 0) {
+			pr_err("%s: register_jprobe failed (%s), returned %d\n", DEVICE_NAME, jprobes_array[i].kp.symbol_name, ret);
+			
+			// Should it be j <= i?
+			for (j = 0; j < i; j++) {
+				unregister_jprobe(&jprobes_array[i]);
+			}
+			
+			mutex_destroy(&ebbchar_mutex);
+			device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
+			class_unregister(ebbcharClass);
+			class_destroy(ebbcharClass);
+			unregister_chrdev(majorNumber, DEVICE_NAME);
+			
+			pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
+			pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
+			
+			return PTR_ERR(ebbcharDevice);
+		}
+	}
+	
+	pr_err("%s: Sucessfully initialized %s\n", DEVICE_NAME, DEVICE_NAME);
+	module_successfully_inserted = TRUE;
+	pH_aremonitoring = 1;
+	
 	return 0;
 }
 
@@ -492,7 +522,7 @@ static void __exit ebbchar_exit(void){
 	class_unregister(ebbcharClass);
 	class_destroy(ebbcharClass);
 	unregister_chrdev(majorNumber, DEVICE_NAME);
-	printk(KERN_INFO "EBBChar: Goodbye from the LKM!\n");
+	pr_err("EBBChar: Goodbye from the LKM!\n");
 }
 
 static int dev_open(struct inode *inodep, struct file *filep){
