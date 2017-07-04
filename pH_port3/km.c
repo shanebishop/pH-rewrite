@@ -241,7 +241,9 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 	return NULL;
 }
 
+// Function prototypes for process_syscall
 inline void pH_append_call(pH_seq*, int);
+inline void pH_train(pH_task_state*);
 
 int process_syscall(long syscall) {
 	pH_task_struct* process;
@@ -287,6 +289,9 @@ int process_syscall(long syscall) {
 	pr_err("%s: Successfully appended call\n", DEVICE_NAME);
 	
 	profile->count++;
+	
+	pH_train(process);
+	pr_err("%s: Trained process\n", DEVICE_NAME);
 	
 	// Allocate space for new_syscall
 	new_syscall = kmalloc(sizeof(my_syscall), GFP_KERNEL);
@@ -546,6 +551,108 @@ inline void pH_append_call(pH_seq* s, int new_value) {
 	
 	s->last = (s->last + 1) % (s->length);
 	s->data[s->last] = new_value;
+}
+
+int pH_add_seq_storage(pH_profile_data *data, int val)
+{
+        pH_seqflags *page;
+
+        if (data->count_page >= PH_COUNT_PAGE_MAX) {
+                data->current_page++;
+                data->count_page = 0;
+        }
+
+        if (data->current_page >= PH_MAX_PAGES)
+                return -1;
+
+        if (data->count_page == 0) {
+                page = (pH_seqflags *) kmalloc(PAGE_SIZE, GFP_KERNEL);
+                if (page)
+                        data->pages[data->current_page] = page;
+                else
+                        return -1;
+        } else {
+                page = data->pages[data->current_page];
+        }
+
+        data->entry[val] = page + (data->count_page * PH_NUM_SYSCALLS);
+        data->count_page++;
+        
+        return 0;
+}
+
+void pH_add_seq(pH_seq *s, pH_profile_data *data)
+{
+        int i, cur_call, prev_call, cur_idx;
+        u8 *seqdata = s->data;
+        int seqlen = s->length;
+	pr_err("%s: Initialized variables for pH_add_seq\n", DEVICE_NAME);
+	
+	if (!data || data == NULL) {
+		pr_err("%s: ERROR: data is NULL in pH_add_seq\n", DEVICE_NAME);
+		return;
+	}
+        
+        cur_idx = s->last;
+        cur_call = seqdata[cur_idx];
+	pr_err("%s: Initialized cur_idx and cur_call\n", DEVICE_NAME);
+	
+        for (i = 1; i < seqlen; i++) {
+		pr_err("%s: i=%d cur_call=%d prev_call=%d cur_idx=%d\n", DEVICE_NAME, i, cur_call, prev_call, cur_idx);
+                if (data->entry[cur_call] == NULL) {
+                        pr_err("%s: data->entry[cur_call] == NULL\n", DEVICE_NAME);
+			if (pH_add_seq_storage(data, cur_call))
+                                return;
+                }
+		else { // Temp else
+			prev_call = seqdata[(cur_idx + seqlen - i) % seqlen];
+			pr_err("%s: Set prev_call\n", DEVICE_NAME);
+			data->entry[cur_call][prev_call] |= (1 << (i - 1));
+			pr_err("%s: Set data->entry values\n", DEVICE_NAME);
+		}
+        }
+}
+
+inline void pH_train(pH_task_state *s)
+{
+        pH_seq *seq = s->seq;
+        pH_profile *profile = s->profile;
+        pH_profile_data *train = &(profile->train);
+
+        train->train_count++;
+        //if (pH_test_seq(seq, train)) { 
+                if (profile->frozen) {
+                        profile->frozen = 0;
+                        action("%d (%s) normal cancelled",
+                               current->pid, profile->filename);
+                }
+                pH_add_seq(seq,train);  
+                train->sequences++; 
+                train->last_mod_count = 0;
+
+                //pH_log_sequence(profile, seq);
+        /*
+	} else {
+                unsigned long normal_count; 
+                
+                train->last_mod_count++;
+                
+                if (profile->frozen)
+                        return;
+
+                normal_count = train->train_count -  
+                        train->last_mod_count; 
+
+                if ((normal_count > 0) &&
+                    ((train->train_count * pH_normal_factor_den) >
+                     (normal_count * pH_normal_factor))) {
+                        //action("%d (%s) frozen",
+                        //       current->pid, profile->filename);
+                        profile->frozen = 1;
+                        profile->normal_time = xtime.tv_sec + pH_normal_wait;
+                } 
+        } 
+	*/
 }
 
 module_init(ebbchar_init);
