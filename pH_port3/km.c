@@ -618,8 +618,49 @@ void pH_add_seq(pH_seq *s, pH_profile_data *data)
 		else { // Temp else
 			prev_call = seqdata[(cur_idx + seqlen - i) % seqlen];
 			pr_err("%s: Set prev_call\n", DEVICE_NAME);
+			
 			data->entry[cur_call][prev_call] |= (1 << (i - 1));
 			pr_err("%s: Set data->entry values\n", DEVICE_NAME);
+			
+			/*
+			Here we have a chunk of code where we replicate the above line in a bunch of
+			shorter lines to help with debugging
+			*/
+			/*
+			pH_seqflags** entry;
+			int *cur_call_array;
+			pH_seqflags *cur_seqflags;
+			int i_minus_one;
+			int after_shift_op;
+			pr_err("%s: Declared required variables for test code\n", DEVICE_NAME);
+			
+			entry = data->entry;
+			pr_err("%s: Initialized entry (entry = %p, data->entry = %p)\n", DEVICE_NAME, entry, data->entry);
+			cur_call_array = entry[cur_call];
+			pr_err("%s: Initialized cur_call_array (cur_call_array = %p, entry[cur_call] = %p)\n", DEVICE_NAME, cur_call_array, data->entry[cur_call]);
+			cur_seqflags = &(cur_call_array[prev_call]);
+			pr_err("%s: data->entry[cur_call][prev_call] = %d\n", DEVICE_NAME, data->entry[cur_call][prev_call]);
+			pr_err("%s: Initialized required variables for test code\n", DEVICE_NAME);
+
+			//int cur_seqflags_value = (int) *cur_seqflags;
+			//pr_err("%s: Got cur_seqflags_value\n", DEVICE_NAME);
+			
+			//cur_seqflags = &(data->entry[cur_call][prev_call]);
+
+			pr_err("%s: data->entry[cur_call][prev_call] address is %p\n", DEVICE_NAME, &(data->entry[cur_call][prev_call]));
+			pr_err("%s: cur_seqflags address is %p\n", DEVICE_NAME, cur_seqflags);
+			pr_err("%s: cur_seqflags value is %d\n", DEVICE_NAME, *cur_seqflags);
+			
+			i_minus_one = i - 1;
+			//pr_err("%s: i - 1 = %d\n", DEVICE_NAME, i_minus_one);
+			after_shift_op = 1 << i_minus_one;
+			//pr_err("%s: 1 << (i - 1) = %d\n", DEVICE_NAME, after_shift_op);
+			
+			*cur_seqflags = *cur_seqflags | after_shift_op;
+			pr_err("%s: data->entry[cur_call][prev_call] = %d\n", DEVICE_NAME, data->entry[cur_call][prev_call]);
+			pr_err("%s: cur_seqflags = %d\n", DEVICE_NAME, *cur_seqflags);
+			pr_err("%s: Successfully got through entire expansion of trouble line\n", DEVICE_NAME);
+			*/
 		}
         }
 }
