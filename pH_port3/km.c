@@ -18,7 +18,8 @@
 MODULE_LICENSE("GPL"); // Don't ever forget this line!
 
 // Anil's definitions
-#define PH_NUM_SYSCALLS 256 // Size of array
+//#define PH_NUM_SYSCALLS 256 // Size of array
+#define PH_NUM_SYSCALLS num_syscalls // Size of array
 #define PH_COUNT_PAGE_MAX (PAGE_SIZE / PH_NUM_SYSCALLS)
 #define PH_MAX_PAGES (PH_NUM_SYSCALLS / PH_COUNT_PAGE_MAX)
 #define PH_MAX_SEQLEN 9
@@ -556,7 +557,9 @@ inline void pH_append_call(pH_seq* s, int new_value) {
 int pH_add_seq_storage(pH_profile_data *data, int val)
 {
         pH_seqflags *page;
+	int i, j;
 
+	/*
         if (data->count_page >= PH_COUNT_PAGE_MAX) {
                 data->current_page++;
                 data->count_page = 0;
@@ -576,6 +579,14 @@ int pH_add_seq_storage(pH_profile_data *data, int val)
         }
 
         data->entry[val] = page + (data->count_page * PH_NUM_SYSCALLS);
+	*/
+	
+	data->entry[val] = kmalloc(sizeof(pH_seqflags) * PH_NUM_SYSCALLS, GFP_KERNEL);
+	if (!data->entry[val] {
+		pr_err("%s: Unable to allocate memory in pH_add_seq_storage\n", DEVICE_NAME);
+		return -ENOMEM;
+	}
+	
         data->count_page++;
         
         return 0;
