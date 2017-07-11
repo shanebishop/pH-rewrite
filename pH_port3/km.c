@@ -28,6 +28,39 @@ MODULE_LICENSE("GPL"); // Don't ever forget this line!
 #define PH_FILE_MAGIC_LEN 20
 #define PH_EMPTY_SYSCALL 255 // Note: This value is used as the "no system call" marker in sequences"
 
+#define PH_LOG_ERR 1      /* real errors */
+#define PH_LOG_STATE 2    /* changes in state */
+#define PH_LOG_ACTION 3   /* actions pH takes (delays) */
+#define PH_LOG_IO 4    /* I/O operations (read/write profiles) */
+
+#define err(format, arg...) \
+{ \
+        if (pH_loglevel >= PH_LOG_ERR) { \
+                printk(KERN_ERR "pH: " format "\n" , ## arg); \
+        } \
+}
+
+#define state(format, arg...) \
+{ \
+        if (pH_loglevel >= PH_LOG_STATE) { \
+                printk(KERN_INFO "pH: " format "\n" , ## arg); \
+        } \
+}
+
+#define action(format, arg...) \
+{ \
+        if (pH_loglevel >= PH_LOG_ACTION) { \
+                printk(KERN_DEBUG "pH: " format "\n" , ## arg); \
+        } \
+}
+
+#define io(format, arg...) \
+{ \
+        if (pH_loglevel >= PH_LOG_IO) { \
+                printk(KERN_DEBUG "pH: " format "\n" , ## arg); \
+        } \
+}
+
 // My definitions
 #define TRUE  (1 == 1)
 #define FALSE !TRUE
@@ -103,6 +136,30 @@ struct pH_profile {
 	pH_seq seq;
 };
 
+typedef struct pH_seq_logrec {
+        unsigned long count;
+        int pid;
+        struct timespec time;
+        pH_seq seq;
+} pH_seq_logrec;
+
+#define PH_CALLREC_SYSCALL 0
+#define PH_CALLREC_FORK    1
+#define PH_CALLREC_EXECVE  2
+
+typedef struct pH_call_logrec {
+        u16 pid;
+        union {
+                u16 syscall;      /* type = 0 */
+                u16 child_pid;    /* type = 1 (fork) */
+                u16 filename_len; /* type = 2 (execve) */
+        } u;
+        unsigned long count;
+        long sec;
+        long nsec;
+        u8 type;          /* 0 = regular call, 1 = fork, 2, execve */
+} pH_call_logrec;
+
 typedef struct pH_locality {
 	u8 win[PH_LOCALITY_WIN];
 	int first;
@@ -160,7 +217,7 @@ int pH_normal_min = 5;
 int pH_anomaly_limit = 30;   /* test reset if profile->anomalies */
                                  /* exceeds this limit */
 int pH_tolerize_limit = 12; /* train reset if LFC exceeds this limit */
-//int pH_loglevel = PH_LOG_ACTION;
+int pH_loglevel = PH_LOG_ACTION;
 int pH_log_sequences = 0;
 int pH_suspend_execve = 0; /* min LFC to suspend execve's, 0 = no suspends */
 int pH_suspend_execve_time = 3600 * 24 * 2;  /* time to suspend execve's */
@@ -222,11 +279,12 @@ int new_profile(pH_profile* profile, char* filename) {
 
 	profile->test = profile->train;
 
-	//profile->next = NULL;
+	profile->next = NULL;
 	//pH_refcount_init(profile, 0);
 	profile->filename = filename;
 
 	//pH_open_seq_logfile(profile);
+	profile->seq_logfile = NULL;
 
 	// Add this new profile to the hashtable
 	//hash_add(profile_hashtable, &profile->hlist, pid_vnr(task_tgid(current)));
@@ -272,6 +330,8 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 // Function prototypes for process_syscall
 inline void pH_append_call(pH_seq*, int);
 inline void pH_train(pH_task_state*);
+void stack_push(pH_task_struct*, pH_seq*);
+void stack_print(pH_task_struct*);
 
 int process_syscall(long syscall) {
 	pH_task_struct* process;
@@ -300,18 +360,30 @@ int process_syscall(long syscall) {
 	pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
 	if ((process->seq) == NULL) {
-		pH_seq* temp = (pH_seq*) vmalloc(sizeof(pH_seq));
+		pH_seq* temp = (pH_seq*) kmalloc(sizeof(pH_seq), GFP_KERNEL);
 		if (!temp) {
 			pr_err("%s: Unable to allocate memory for temp in process_syscall\n", DEVICE_NAME);
 			return -ENOMEM;
 		}
 		
-		process->seq = temp;
+		temp->next = NULL;
+		temp->length = profile->length;
+		temp->last = profile->length - 1;
+		
+		stack_push(process, temp);
 		INIT_LIST_HEAD(&temp->seqList);
 	}
+	else {
+		//stack_print(process);
+		//module_inserted_successfully = FALSE;
+		//pr_err("%s: Quitting early\n", DEVICE_NAME);
+		//return 0;
+	}
 	
+	/*
 	process->seq->length = profile->length;
 	process->seq->last = profile->length - 1;
+	*/
 	
 	process->count++;
 	pH_append_call(process->seq, syscall);
@@ -326,6 +398,7 @@ int process_syscall(long syscall) {
 	new_syscall = kmalloc(sizeof(my_syscall), GFP_KERNEL);
 	if (!new_syscall) {
 		pr_err("%s: Unable to allocate space for new_syscall\n", DEVICE_NAME);
+		kfree(process->seq);
 		return -ENOMEM;
 	}
 	pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
@@ -369,6 +442,8 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	
 	return NULL;
 }
+
+void free_pH_task_struct(pH_task_struct*);
 
 static long jsys_execve(const char __user *filename,
 	const char __user *const __user *argv,
@@ -446,6 +521,10 @@ static long jsys_execve(const char __user *filename,
 	
 no_memory:
 	pr_err("%s: Ran out of memory\n", DEVICE_NAME);
+	
+	kfree(path_to_binary);
+	free_pH_task_struct(this_process);
+	
 	jprobe_return();
 	return 0;
 
@@ -459,15 +538,6 @@ not_inserted:
 	jprobe_return();
 	return 0;
 }
-
-/*
-static struct jprobe sys_execve_jprobe = {
-	.entry = jsys_execve,
-	.kp = {
-		.symbol_name = "sys_execve",
-	},
-};
-*/
 
 void print_llist(void) {
 	pH_task_struct* iterator = llist_start;
@@ -614,6 +684,7 @@ void pH_free_profile(pH_profile* profile) {
 	
 	if (profile == NULL) {
 		err("No profile to free!");
+		return;
 	}
 	
 	pH_remove_profile_from_list(profile);
@@ -637,28 +708,25 @@ void remove_process_from_llist(pH_task_struct* process) {
 	
 	pr_err("%s: In pH_remove_profile_from_list\n", DEVICE_NAME);
 	
-	if (llist_start == NULL) {
-		err("pH_profile_list is empty (NULL) when trying to free profile %s", profile->filename);
-	}
-	else if (llist_start == profile) {
-		llist_start = llist_start->next;
-	}
-	else {
-		prev_process = llist_start;
-		cur_process = llist_start->next;
-		while (cur_process != NULL) {
-			if (cur_process == profile) [
-				prev_process->next = profile->next;
-				
-				return;
-			}
-				
-			prev_process = cur_process;
-			cur_process = cur_process->next;
-		}
-		
-		err("While freeing, couldn't find process %ld in llist_start", process->process_id);
-	}
+	if (llist_start == process) {
+        llist_start = process->next;
+    } else if (llist_start == NULL) {
+        err("llist_start is NULL when trying to free process %ld",
+            process->process_id);
+    } else {
+        prev_task_struct = llist_start;
+        cur_task_struct = prev_task_struct->next;
+        while ((cur_task_struct != process) && (cur_task_struct != NULL)) {
+            prev_task_struct = cur_task_struct;
+            cur_task_struct = prev_task_struct->next;
+        }
+        if (cur_task_struct == process) {
+            prev_task_struct->next = cur_task_struct->next;
+        } else {
+            err("while freeing, couldn't find process %ld in "
+                "llist_start", process->process_id);
+        }
+    }
 }
 				
 void free_syscalls(pH_task_struct* t) {
@@ -695,6 +763,8 @@ void free_pH_task_struct(pH_task_struct* process) {
 		return;
 	}
 	
+	stack_print(process);
+	
 	while (process->seq != NULL) {
 		stack_pop(process);
 	}
@@ -717,7 +787,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 	
 	// When everything is done, remove process from llist, vfree process
 	remove_process_from_llist(process);
-	vfree(process);
+	kfree(process);
 	process = NULL;
 }
 				
@@ -747,30 +817,62 @@ not_inserted:
 	return 0;
 }
 				
-void stack_push(pH_task_struct* process, pH_seq* new_node) {
-	pH_seq* top = process->seq;
+void stack_print(pH_task_struct* process) {
+	int i;
+	pH_seq* iterator = process->seq;
 	
-	if (top == NULL) {
+	if (process->seq == NULL) {
+		pr_err("%s: Printing stack for process %s: Stack is empty\n", DEVICE_NAME, process->profile->filename);
+		return;
+	}
+	
+	i = 0;
+	
+	pr_err("%s: Printing stack for process %s...\n", DEVICE_NAME, process->profile->filename);
+	do {
+		pr_err("%s: %d: length = %d\n", DEVICE_NAME, i, iterator->length);
+		
+		iterator = iterator->next;
+		i++;
+	} while (iterator);
+	
+	pr_err("%s: Stack has length %d\n", DEVICE_NAME, i);
+}
+				
+void stack_push(pH_task_struct* process, pH_seq* new_node) {
+	//pH_seq* top = process->seq;
+	
+	if (process == NULL) {
+		pr_err("%s: ERROR: process is NULL in stack_push\n", DEVICE_NAME);
+		return;
+	}
+	
+	if (new_node == NULL) {
+		pr_err("%s: ERROR: new_node is NULL in stack_push\n", DEVICE_NAME);
+		return;
+	}
+	
+	if (process->seq == NULL) {
 		new_node->next = NULL;
-		top = new_node;
+		process->seq = new_node;
 	}
 	else {
-		new_node->next = top;
-		top = new_node;
+		new_node->next = process->seq;
+		process->seq = new_node;
 	}
 }
 				
 void stack_pop(pH_task_struct* process) {
 	pH_seq* temp;
-	pH_seq* top = process->seq;
+	//pH_seq* top = process->seq;
 	
-	if (top == NULL) {
+	if (process->seq == NULL) {
 		pr_err("%s: Stack is empty - cannot delete an element\n", DEVICE_NAME);
 		return;
 	}
 	
-	temp = top;
-	top = top->next;
+	temp = process->seq;
+	process->seq = process->seq->next;
 	kfree(temp);
 	temp = NULL;
 }
@@ -778,28 +880,35 @@ void stack_pop(pH_task_struct* process) {
 pH_seq* stack_peek(pH_task_struct* process) {
 	return process->seq;
 }
-				
+
+// This is for when a process receives a signal, NOT for when it resumes execution following
+// the signal. I will need to implement a second jprobe handler for resuming execution.
 static void jhandle_signal(struct ksignal* ksig, struct pt_regs* regs) {
 	pH_seq* new_sequence;
 	pH_task_struct* process;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
-	new_sequence = kmalloc(sizeof(pH_seq), GFP_KERNEL);
-	
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	
 	if (process != NULL) {
+		new_sequence = kmalloc(sizeof(pH_seq), GFP_KERNEL);
+		if (!new_sequence) {
+			pr_err("%s: Unable to allocate memory for new_sequence in jhandle_signal\n", DEVICE_NAME);
+			goto no_memory;
+		}
+		
 		stack_push(process, new_sequence);
-	}
-	else {
-		kfree(new_sequence);
 	}
 	
 	jprobe_return();
 	return 0;
 	
 not_inserted:
+	jprobe_return();
+	return;
+
+no_memory:
 	jprobe_return();
 	return;
 }
@@ -864,6 +973,7 @@ static int __init ebbchar_init(void){
 	pr_err("%s: device class created correctly\n", DEVICE_NAME); // Device was initialized
 	mutex_init(&ebbchar_mutex); // Initialize the mutex dynamically
 	
+	/*
 	// Register fork_kretprobe
 	fork_kretprobe.kp.symbol_name = "_do_fork";
 	ret = register_kretprobe(&fork_kretprobe);
@@ -901,6 +1011,7 @@ static int __init ebbchar_init(void){
 
 		return PTR_ERR(ebbcharDevice);
 	}
+	*/
 	
 	for (i = 0; i < num_syscalls; i++) {
 		ret = register_jprobe(&jprobes_array[i]);
@@ -939,18 +1050,26 @@ static int __init ebbchar_init(void){
 static void __exit ebbchar_exit(void){
 	int i;
 	
+	// Set all booleans accordingly - this should be the first thing you do to prevent any more code from running
+	pH_aremonitoring = FALSE;
+	module_inserted_successfully = FALSE;
+	
 	pr_err("%s: Exiting...\n", DEVICE_NAME);
 	
 	//print_llist(); // For now, don't bother with printing the llist
 	
+	/*
 	for (i = 0; i < num_syscalls; i++) {
 		unregister_jprobe(&jprobes_array[i]);
 	}
+	*/
 	
+	/*
 	unregister_kretprobe(&fork_kretprobe);
 	pr_err("%s: Missed probing %d instances of fork\n", DEVICE_NAME, fork_kretprobe.nmissed);
 	unregister_kretprobe(&exit_kretprobe);
 	pr_err("%s: Missed probing %d instances of exit\n", DEVICE_NAME, exit_kretprobe.nmissed);
+	*/
 	
 	pr_err("%s: Freeing profiles...\n", DEVICE_NAME);
 	free_profiles();
@@ -990,8 +1109,7 @@ inline void pH_append_call(pH_seq* s, int new_value) {
 
 int pH_add_seq_storage(pH_profile_data *data, int val)
 {
-        pH_seqflags *page;
-	int i, j;
+	int i;
 
 	/*
         if (data->count_page >= PH_COUNT_PAGE_MAX) {
@@ -1016,7 +1134,7 @@ int pH_add_seq_storage(pH_profile_data *data, int val)
 	*/
 	
 	data->entry[val] = kmalloc(sizeof(pH_seqflags) * PH_NUM_SYSCALLS, GFP_KERNEL);
-	if (!data->entry[val] {
+	if (!data->entry[val]) {
 		pr_err("%s: Unable to allocate memory in pH_add_seq_storage\n", DEVICE_NAME);
 		return -ENOMEM;
 	}
@@ -1025,14 +1143,14 @@ int pH_add_seq_storage(pH_profile_data *data, int val)
 		data->entry[val][i] = 0;
 	}
         
-        return 0;
+    return 0;
 }
 
 void pH_add_seq(pH_seq *s, pH_profile_data *data)
 {
-        int i, cur_call, prev_call, cur_idx;
-        u8 *seqdata = s->data;
-        int seqlen = s->length;
+	int i, cur_call, prev_call, cur_idx;
+	u8 *seqdata = s->data;
+	int seqlen = s->length;
 	pr_err("%s: Initialized variables for pH_add_seq\n", DEVICE_NAME);
 	
 	if (!data || data == NULL) {
@@ -1040,65 +1158,103 @@ void pH_add_seq(pH_seq *s, pH_profile_data *data)
 		return;
 	}
         
-        cur_idx = s->last;
-        cur_call = seqdata[cur_idx];
+	cur_idx = s->last;
+	cur_call = seqdata[cur_idx];
 	pr_err("%s: Initialized cur_idx and cur_call\n", DEVICE_NAME);
 	
-        for (i = 1; i < seqlen; i++) {
-		pr_err("%s: i=%d cur_call=%d prev_call=%d cur_idx=%d\n", DEVICE_NAME, i, cur_call, prev_call, cur_idx);
-                if (data->entry[cur_call] == NULL) {
-                        pr_err("%s: data->entry[cur_call] == NULL\n", DEVICE_NAME);
-			if (pH_add_seq_storage(data, cur_call))
-                                return;
-                }
-		prev_call = seqdata[(cur_idx + seqlen - i) % seqlen];
-		pr_err("%s: Set prev_call\n", DEVICE_NAME);
+	for (i = 1; i < seqlen; i++) {
+	pr_err("%s: i=%d cur_call=%d prev_call=%d cur_idx=%d\n", DEVICE_NAME, i, cur_call, prev_call, cur_idx);
+	if (data->entry[cur_call] == NULL) {
+		pr_err("%s: data->entry[cur_call] == NULL\n", DEVICE_NAME);
+		if (pH_add_seq_storage(data, cur_call)) return;
+	}
+	prev_call = seqdata[(cur_idx + seqlen - i) % seqlen];
+	pr_err("%s: Set prev_call\n", DEVICE_NAME);
 
-		data->entry[cur_call][prev_call] |= (1 << (i - 1));
-		pr_err("%s: Set data->entry values\n", DEVICE_NAME);
+	data->entry[cur_call][prev_call] |= (1 << (i - 1));
+	pr_err("%s: Set data->entry values\n", DEVICE_NAME);
 
-		/*
-		Here we have a chunk of code where we replicate the above line in a bunch of
-		shorter lines to help with debugging
-		*/
-		/*
-		pH_seqflags** entry;
-		int *cur_call_array;
-		pH_seqflags *cur_seqflags;
-		int i_minus_one;
-		int after_shift_op;
-		pr_err("%s: Declared required variables for test code\n", DEVICE_NAME);
+	/*
+	Here we have a chunk of code where we replicate the above line in a bunch of
+	shorter lines to help with debugging
+	*/
+	/*
+	pH_seqflags** entry;
+	int *cur_call_array;
+	pH_seqflags *cur_seqflags;
+	int i_minus_one;
+	int after_shift_op;
+	pr_err("%s: Declared required variables for test code\n", DEVICE_NAME);
 
-		entry = data->entry;
-		pr_err("%s: Initialized entry (entry = %p, data->entry = %p)\n", DEVICE_NAME, entry, data->entry);
-		cur_call_array = entry[cur_call];
-		pr_err("%s: Initialized cur_call_array (cur_call_array = %p, entry[cur_call] = %p)\n", DEVICE_NAME, cur_call_array, data->entry[cur_call]);
-		cur_seqflags = &(cur_call_array[prev_call]);
-		pr_err("%s: data->entry[cur_call][prev_call] = %d\n", DEVICE_NAME, data->entry[cur_call][prev_call]);
-		pr_err("%s: Initialized required variables for test code\n", DEVICE_NAME);
+	entry = data->entry;
+	pr_err("%s: Initialized entry (entry = %p, data->entry = %p)\n", DEVICE_NAME, entry, data->entry);
+	cur_call_array = entry[cur_call];
+	pr_err("%s: Initialized cur_call_array (cur_call_array = %p, entry[cur_call] = %p)\n", DEVICE_NAME, cur_call_array, data->entry[cur_call]);
+	cur_seqflags = &(cur_call_array[prev_call]);
+	pr_err("%s: data->entry[cur_call][prev_call] = %d\n", DEVICE_NAME, data->entry[cur_call][prev_call]);
+	pr_err("%s: Initialized required variables for test code\n", DEVICE_NAME);
 
-		//int cur_seqflags_value = (int) *cur_seqflags;
-		//pr_err("%s: Got cur_seqflags_value\n", DEVICE_NAME);
+	//int cur_seqflags_value = (int) *cur_seqflags;
+	//pr_err("%s: Got cur_seqflags_value\n", DEVICE_NAME);
 
-		//cur_seqflags = &(data->entry[cur_call][prev_call]);
+	//cur_seqflags = &(data->entry[cur_call][prev_call]);
 
-		pr_err("%s: data->entry[cur_call][prev_call] address is %p\n", DEVICE_NAME, &(data->entry[cur_call][prev_call]));
-		pr_err("%s: cur_seqflags address is %p\n", DEVICE_NAME, cur_seqflags);
-		pr_err("%s: cur_seqflags value is %d\n", DEVICE_NAME, *cur_seqflags);
+	pr_err("%s: data->entry[cur_call][prev_call] address is %p\n", DEVICE_NAME, &(data->entry[cur_call][prev_call]));
+	pr_err("%s: cur_seqflags address is %p\n", DEVICE_NAME, cur_seqflags);
+	pr_err("%s: cur_seqflags value is %d\n", DEVICE_NAME, *cur_seqflags);
 
-		i_minus_one = i - 1;
-		//pr_err("%s: i - 1 = %d\n", DEVICE_NAME, i_minus_one);
-		after_shift_op = 1 << i_minus_one;
-		//pr_err("%s: 1 << (i - 1) = %d\n", DEVICE_NAME, after_shift_op);
+	i_minus_one = i - 1;
+	//pr_err("%s: i - 1 = %d\n", DEVICE_NAME, i_minus_one);
+	after_shift_op = 1 << i_minus_one;
+	//pr_err("%s: 1 << (i - 1) = %d\n", DEVICE_NAME, after_shift_op);
 
-		*cur_seqflags = *cur_seqflags | after_shift_op;
-		pr_err("%s: data->entry[cur_call][prev_call] = %d\n", DEVICE_NAME, data->entry[cur_call][prev_call]);
-		pr_err("%s: cur_seqflags = %d\n", DEVICE_NAME, *cur_seqflags);
-		pr_err("%s: Successfully got through entire expansion of trouble line\n", DEVICE_NAME);
-		*/
+	*cur_seqflags = *cur_seqflags | after_shift_op;
+	pr_err("%s: data->entry[cur_call][prev_call] = %d\n", DEVICE_NAME, data->entry[cur_call][prev_call]);
+	pr_err("%s: cur_seqflags = %d\n", DEVICE_NAME, *cur_seqflags);
+	pr_err("%s: Successfully got through entire expansion of trouble line\n", DEVICE_NAME);
+	*/
+	}
+}
+
+inline void pH_log_sequence(pH_profile *profile, pH_seq *seq)
+{
+        if (profile->seq_logfile && pH_log_sequences) {
+                pH_seq_logrec rec;
+                
+                rec.count = profile->count;
+                rec.pid = current->pid;
+                //rec.time = xtime;
+                rec.seq = *seq;
         }
 }
 
+int pH_test_seq(pH_seq *s, pH_profile_data *data)
+{
+	int i, cur_call, prev_call, cur_idx;
+	u8 *seqdata = s->data;
+	int seqlen = s->length;
+	int mismatches = 0;
+
+	cur_idx = s->last;
+	cur_call = seqdata[cur_idx];
+
+	// If the current syscall has not been encountered, everything (seqlen-1) is a mismatch
+	if (data->entry[cur_call] == NULL)
+		    return (seqlen - 1);
+
+	// Iterates over seqlen-1 times - skips 0th position because it was checked above
+	for (i = 1; i < seqlen; i++) {
+		    // Retrieves the previous call
+		    prev_call = seqdata[(cur_idx + seqlen - i) % seqlen];
+		    
+		    if ((data->entry[cur_call][prev_call] & (1 << (i - 1))) == 0) {
+		            mismatches++;
+		    }
+	}
+
+	return mismatches;
+}
+				
 inline void pH_train(pH_task_state *s)
 {
         pH_seq *seq = s->seq;
@@ -1115,7 +1271,7 @@ inline void pH_train(pH_task_state *s)
                 train->sequences++; 
                 train->last_mod_count = 0;
 
-                //pH_log_sequence(profile, seq);
+                pH_log_sequence(profile, seq);
 	} else {
                 unsigned long normal_count; 
                 
