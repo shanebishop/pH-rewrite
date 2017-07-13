@@ -176,9 +176,11 @@ typedef struct my_syscall {
 typedef struct pH_task_struct { // My own version of a pH_task_state
 	struct pH_task_struct* next; // For linked lists
 	my_syscall* syscall_llist;
+	struct mutex syscall_list_sem;
 	long process_id;
 	pH_locality alf;
 	pH_seq* seq;
+	struct mutex pH_seq_stack_sem;
 	int delay;
 	unsigned long count;
 	pH_profile* profile; // Pointer to appropriate profile
@@ -228,18 +230,24 @@ pH_task_struct* llist_start = NULL;
 struct jprobe jprobes_array[num_syscalls];
 bool module_inserted_successfully = FALSE;
 
+// Mutex declarations
+static DEFINE_MUTEX(pH_profile_list_sem);
+static DEFINE_MUTEX(pH_task_struct_list_sem);
+
 void add_to_profile_llist(pH_profile* p) {
 	if (pH_profile_list == NULL) {
 		pH_profile_list = p;
 		p->next = NULL;
 	}
 	else {
+		mutex_lock(&pH_profile_list_sem);
 		pH_profile* iterator = pH_profile_list;
 		
 		while (iterator->next) iterator = iterator->next;
 		
 		iterator->next = p;
 		p->next = NULL;
+		mutex_unlock(&pH_profile_list_sem);
 	}
 }
 
@@ -303,27 +311,38 @@ void add_to_my_syscall_llist(pH_task_struct* t, my_syscall* s) {
 		s->next = NULL;
 	}
 	else {
+		mutex_lock(&(t->syscall_list_sem));
 		my_syscall* iterator = t->syscall_llist;
 		
 		while (iterator->next) iterator = iterator->next;
 		
 		iterator->next = s;
 		s->next = NULL;
+		mutex_unlock(&(t->syscall_list_sem));
 	}
 }
 
+// One issue with this function is if the process_id goes out of use or is reused while the lock
+// is held, it might return an incorrect result. Perhaps this is why my code is crashing.
 pH_task_struct* llist_retrieve_process(int process_id) {
-	pH_task_struct* iterator = llist_start;
+	pH_task_struct* iterator = NULL;
+	
+	if (!module_inserted_correctly || !pH_aremonitoring) {
+		pr_err("%s: ERROR: llist_retrieve_process called before module has been inserted correctly\n", DEVICE_NAME);
+		return NULL;
+	}
 	
 	if (llist_start == NULL) {
 		return NULL;
 	}
 	
+	mutex_lock(&pH_task_struct_list_sem);
 	do {
 		if (iterator->process_id == process_id) return iterator;
 		iterator = iterator->next;
 	} while (iterator);
 	
+	mutex_unlock(&pH_task_struct_list_sem);
 	return NULL;
 }
 
@@ -341,6 +360,8 @@ int process_syscall(long syscall) {
 	if (!module_inserted_successfully) return 0;
 	
 	if (!pH_aremonitoring) return 0;
+	
+	if (!pH_task_struct_list || pH_task_struct_list == NULL) return 0;
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
@@ -380,11 +401,6 @@ int process_syscall(long syscall) {
 		//return 0;
 	}
 	
-	/*
-	process->seq->length = profile->length;
-	process->seq->last = profile->length - 1;
-	*/
-	
 	process->count++;
 	pH_append_call(process->seq, syscall);
 	pr_err("%s: Successfully appended call\n", DEVICE_NAME);
@@ -399,6 +415,7 @@ int process_syscall(long syscall) {
 	if (!new_syscall) {
 		pr_err("%s: Unable to allocate space for new_syscall\n", DEVICE_NAME);
 		kfree(process->seq);
+		process->seq = NULL;
 		return -ENOMEM;
 	}
 	pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
@@ -416,12 +433,14 @@ void add_to_llist(pH_task_struct* t) {
 		t->next = NULL;
 	}
 	else {
+		mutex_lock(&pH_task_struct_list_sem);
 		pH_task_struct* iterator = llist_start;
 		
 		while (iterator->next) iterator = iterator->next;
 		
 		iterator->next = t;
 		t->next = NULL;
+		mutex_unlock(&pH_task_struct_list_sem);
 	}
 }
 
@@ -432,6 +451,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 		return NULL;
 	}
 	
+	mutex_lock(&pH_profile_list_sem);
 	do {
 		if (strcmp(filename, iterator->filename) == 0) {
 			return iterator;
@@ -440,6 +460,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 		iterator = iterator->next;
 	} while (iterator);
 	
+	mutex_unlock(&pH_profile_list_sem);
 	return NULL;
 }
 
@@ -452,12 +473,15 @@ static long jsys_execve(const char __user *filename,
 	char* path_to_binary;
 	pH_task_struct* this_process;
 	pH_profile* profile;
+	int current_process_id;
 	
 	if (!module_inserted_successfully) { goto not_inserted; }
 	
 	if (!pH_aremonitoring) goto not_monitoring;
 
 	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
+	
+	current_process_id = pid_vnr(task_tgid(current));
 	
 	// Allocate space for path_to_binary
 	path_to_binary = kmalloc(sizeof(char) * 4000, GFP_KERNEL);
@@ -478,10 +502,12 @@ static long jsys_execve(const char __user *filename,
 	}
 	
 	// Initialize this process - check with Anil to see if these are the right values to initialize it to
-	this_process->process_id = pid_vnr(task_tgid(current));
+	this_process->process_id = current_process_id;
 	//pH_reset_ALF(this_process);
 	this_process->seq = NULL;
+	mutex_init(&(this_process->pH_seq_stack_sem));
 	this_process->syscall_llist = NULL;
+	mutex_init(&(this_process->syscall_list_sem));
 	this_process->delay = 0;
 	this_process->count = 0;
 	pr_err("%s: Initialized process\n", DEVICE_NAME);
@@ -506,11 +532,20 @@ static long jsys_execve(const char __user *filename,
 	}
 	else {
 		kfree(path_to_binary);
+		path_to_binary = NULL;
 	}
 	
 	this_process->profile = profile;
 	
 	add_to_llist(this_process);
+	pH_task_struct* test_process = llist_retrieve_process(current_process_id);
+	if (!test_process || test_process == NULL) {
+		pr_err("%s: ERROR: Retrieving the process just put into the list should work, but it didn't\n", DEVICE_NAME);
+		module_inserted_successfully = FALSE;
+		pr_err("%s: Quitting early in jsys_execve\n", DEVICE_NAME);
+		jprobe_return();
+		return -1;
+	}
 	pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
 	process_syscall(59);
@@ -523,7 +558,9 @@ no_memory:
 	pr_err("%s: Ran out of memory\n", DEVICE_NAME);
 	
 	kfree(path_to_binary);
+	path_to_binary = NULL;
 	free_pH_task_struct(this_process);
+	this_process = NULL;
 	
 	jprobe_return();
 	return 0;
@@ -648,18 +685,25 @@ void pH_free_profile_storage(pH_profile* profile) {
 	}
 }
 
-void pH_remove_profile_from_list(pH_profile* profile) {
+// Returns 0 on success and anything else on failure
+// Calling functions MUST handle returned errors if possible
+int pH_remove_profile_from_list(pH_profile* profile) {
 	pH_profile *prev_profile, *cur_profile;
 	
 	if (!profile || profile == NULL) return;
 	
 	pr_err("%s: In pH_remove_profile_from_list\n", DEVICE_NAME);
+	mutex_lock(&pH_profile_list_sem);
 	
 	if (pH_profile_list == NULL) {
 		err("pH_profile_list is empty (NULL) when trying to free profile %s", profile->filename);
+		mutex_unlock(&pH_profile_list_sem);
+		return -1;
 	}
 	else if (pH_profile_list == profile) {
 		pH_profile_list = pH_profile_list->next;
+		mutex_unlock(&pH_profile_list_sem);
+		return 0;
 	}
 	else {
 		prev_profile = pH_profile_list;
@@ -668,6 +712,7 @@ void pH_remove_profile_from_list(pH_profile* profile) {
 			if (cur_profile == profile) [
 				prev_profile->next = profile->next;
 				
+				mutex_unlock(&pH_profile_list_sem);
 				return;
 			}
 				
@@ -676,6 +721,8 @@ void pH_remove_profile_from_list(pH_profile* profile) {
 		}
 		
 		err("While freeing, couldn't find profile %s in pH_profile_list", profile->filename);
+		mutex_unlock(&pH_profile_list_sem);
+		return -1;
 	}
 }
 
@@ -701,18 +748,23 @@ void pH_free_profile(pH_profile* profile) {
 	profile = NULL; // This is okay, becsue profile was removed from the linked list above
 }
 				
-void remove_process_from_llist(pH_task_struct* process) {
+int remove_process_from_llist(pH_task_struct* process) {
 	pH_task_struct *prev_process, *cur_process;
 	
 	if (!process || process == NULL) return;
 	
 	pr_err("%s: In pH_remove_profile_from_list\n", DEVICE_NAME);
+	mutex_lock(&pH_task_struct_list_sem);
 	
 	if (llist_start == process) {
         llist_start = process->next;
+		mutex_unlock(&pH_task_struct_list_sem);
+		return 0;
     } else if (llist_start == NULL) {
         err("llist_start is NULL when trying to free process %ld",
             process->process_id);
+		mutex_unlock(&pH_task_struct_list_sem);
+		return -1;
     } else {
         prev_task_struct = llist_start;
         cur_task_struct = prev_task_struct->next;
@@ -722,9 +774,14 @@ void remove_process_from_llist(pH_task_struct* process) {
         }
         if (cur_task_struct == process) {
             prev_task_struct->next = cur_task_struct->next;
+			
+			mutex_unlock(&pH_task_struct_list_sem);
+			return 0;
         } else {
             err("while freeing, couldn't find process %ld in "
                 "llist_start", process->process_id);
+			mutex_unlock(&pH_task_struct_list_sem);
+			return -1;
         }
     }
 }
@@ -733,17 +790,23 @@ void free_syscalls(pH_task_struct* t) {
 	my_syscall* current_syscall;
 	my_syscall* iterator = t->syscall_llist;
 	
+	mutex_lock(&(t->syscall_list_sem);
+	
 	while (iterator) {
 		current_syscall = iterator;
 		iterator = iterator->next;
 		kfree(current_syscall);
 		current_syscall = NULL;
 	}
+			   
+	mutex_unlock(&(t->syscall_list_sem);
 }
 				
 void free_profiles(void) {
 	pH_profile* current_profile;
 	pH_profile* iterator = pH_profile_list;
+	
+	mutex_lock(&pH_profile_list_sem);
 	
 	while (iterator) {
 		current_profile = iterator;
@@ -751,22 +814,37 @@ void free_profiles(void) {
 		kfree(current_profile);
 		current_profile = NULL;
 	}
+	
+	mutex_unlock(&pH_profile_list_sem);
 }
 
 void stack_pop(pH_task_struct*);
 				
 void free_pH_task_struct(pH_task_struct* process) {
 	pH_profile* profile;
+	int i = 0;
 	
 	if (!process || process == NULL) {
 		pr_err("%s: process is NULL in free_pH_task_struct\n", DEVICE_NAME);
 		return;
 	}
 	
-	stack_print(process);
+	if (!(process->seq) || process->seq == NULL) {
+		pr_err("%s: ERROR: In free_pH_task_struct with supposedly corrupted process\n", DEVICE_NAME);
+	}
+	
+	if (pH_aremonitoring) stack_print(process);
 	
 	while (process->seq != NULL) {
+		if (i > 1000) {
+			pr_err("%s: Been in this loop for quite some time... Exiting\n", DEVICE_NAME);
+			module_inserted_successfully = FALSE;
+			pH_aremonitoring = 0;
+			return;
+		}
+		
 		stack_pop(process);
+		i++;
 	}
 	
 	free_syscall(process);
@@ -782,6 +860,24 @@ void free_pH_task_struct(pH_task_struct* process) {
 			// Free profile
 			pH_free_profile(profile);
 			profile = NULL; // Okay becasue the profile is removed from llist in pH_free_profile
+		}
+	}
+	mutex_destroy(&(process->pH_stack_sem));
+	
+	free_syscalls(process);
+	mutex_destroy(&(process->syscall_list_sem));
+	
+	profile = process->profile;
+	
+	if (profile != NULL) {
+		atomic_dec(&(profile->refcount));
+		
+		if (profile->refcount.counter < 1) {
+			profile->refcount.counter = 0;
+			
+			// Free profile
+			pH_free_profile(profile);
+			profile = NULL;
 		}
 	}
 	
@@ -821,6 +917,11 @@ void stack_print(pH_task_struct* process) {
 	int i;
 	pH_seq* iterator = process->seq;
 	
+	if (!process || process == NULL) {
+		pr_err("%s: In stack_print with NULL process\n", DEVICE_NAME);
+		return;
+	}
+	
 	if (process->seq == NULL) {
 		pr_err("%s: Printing stack for process %s: Stack is empty\n", DEVICE_NAME, process->profile->filename);
 		return;
@@ -829,6 +930,7 @@ void stack_print(pH_task_struct* process) {
 	i = 0;
 	
 	pr_err("%s: Printing stack for process %s...\n", DEVICE_NAME, process->profile->filename);
+	mutex_lock(&(process->pH_seq_stack_sem));
 	do {
 		pr_err("%s: %d: length = %d\n", DEVICE_NAME, i, iterator->length);
 		
@@ -836,6 +938,7 @@ void stack_print(pH_task_struct* process) {
 		i++;
 	} while (iterator);
 	
+	mutex_unlock(&(process->pH_seq_stack_sem));
 	pr_err("%s: Stack has length %d\n", DEVICE_NAME, i);
 }
 				
@@ -852,6 +955,7 @@ void stack_push(pH_task_struct* process, pH_seq* new_node) {
 		return;
 	}
 	
+	mutex_lock(&(process->pH_seq_stack_sem));
 	if (process->seq == NULL) {
 		new_node->next = NULL;
 		process->seq = new_node;
@@ -860,8 +964,12 @@ void stack_push(pH_task_struct* process, pH_seq* new_node) {
 		new_node->next = process->seq;
 		process->seq = new_node;
 	}
+	mutex_unlock(&(process->pH_seq_stack_sem));
 }
-				
+
+// Note: This implementation of pop DOES NOT return the deleted element. To do so would
+// require memory is alloctaed for temp, and then that all of top's data is copied to temp, and
+// then that temp is returned WITHOUT being freed
 void stack_pop(pH_task_struct* process) {
 	pH_seq* temp;
 	//pH_seq* top = process->seq;
@@ -871,13 +979,20 @@ void stack_pop(pH_task_struct* process) {
 		return;
 	}
 	
+	mutex_lock(&(process->pH_seq_stack_sem));
 	temp = process->seq;
 	process->seq = process->seq->next;
 	kfree(temp);
 	temp = NULL;
+	mutex_unlock(&(process->pH_seq_stack_sem));
 }
 				
 pH_seq* stack_peek(pH_task_struct* process) {
+	if (!mutex_is_locked(&(process->pH_seq_stack_sem))) {
+		pr_err("%s: stack_peek can only be called if the stack is locked\n", DEVICE_NAME);
+		return NULL;
+	}
+	
 	return process->seq;
 }
 
@@ -935,9 +1050,26 @@ not_inserted:
 }
 				
 void free_pH_task_structs(void) {
+	/* // Old implementation of this function
 	while (llist_start != NULL) {
 		free_pH_task_struct(llist_start);
 	}
+	*/
+	
+	// New implementation of this function
+	pH_task_struct* current_struct;
+	pH_task_struct* iterator;
+	
+	iterator = llist_start;
+	
+	mutex_lock(&pH_task_struct_list_sem);
+	while (iterator) {
+		current_struct = iterator;
+		iterator = iterator->next;
+		kfree(current_struct);
+		current_struct = NULL;
+	}
+	mutex_unlock(&pH_task_struct_list_sem);
 }
 				
 static int __init ebbchar_init(void){
