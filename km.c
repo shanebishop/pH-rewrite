@@ -25,6 +25,7 @@ Notes:
 #include "ebbcharmutex.h"       
 
 /* commit test*/
+/* commit test 2*/
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Shane Bishop");
