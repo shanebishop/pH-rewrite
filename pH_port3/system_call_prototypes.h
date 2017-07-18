@@ -25,6 +25,9 @@ static long jsys_execve(const char __user *,
 	const char __user *const __user *,
 	const char __user *const __user *);
 
+// jsys_exit prototype
+static long jsys_exit(int);
+
 // Global variables
 //#define num_syscalls (sizeof(syscalls) / sizeof(syscalls[0]))
 //static struct jprobe jprobes_array[num_syscalls];
@@ -148,7 +151,7 @@ static long jsys_kexec_file_load(int kernel_fd, int initrd_fd,
 				    const char __user *cmdline_ptr,
 				    unsigned long flags) { process_syscall(71); jprobe_return(); return 0; }
 
-static long jsys_exit(int error_code) { process_syscall(72); jprobe_return(); return 0; }
+//static long jsys_exit(int error_code) { process_syscall(72); jprobe_return(); return 0; }
 static long jsys_exit_group(int error_code) { process_syscall(73); jprobe_return(); return 0; }
 static long jsys_wait4(pid_t pid, int __user *stat_addr,
 				int options, struct rusage __user *ru) { process_syscall(74); jprobe_return(); return 0; }
