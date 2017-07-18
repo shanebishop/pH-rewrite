@@ -9,6 +9,7 @@
 #include <linux/kprobes.h>   // For kprobes
 #include <linux/slab.h>      // For kmalloc
 #include <linux/vmalloc.h>   // For vmalloc
+#include <linux/spinlock.h>  // For spinlocks
 
 #include "system_call_prototypes.h"
 
@@ -133,7 +134,7 @@ struct pH_profile {
 	pH_profile *next;
 	//struct file *seq_logfile;
 	pH_seq seq;
-	struct mutex lock;
+	spinlock_t lock;
 };
 
 typedef struct pH_seq_logrec {
@@ -179,7 +180,7 @@ typedef struct pH_task_struct { // My own version of a pH_task_state
 	long process_id;
 	pH_locality alf;
 	pH_seq* seq;
-	struct mutex pH_seq_stack_sem;
+	spinlock_t pH_seq_stack_sem;
 	int delay;
 	unsigned long count;
 	pH_profile* profile; // Pointer to appropriate profile
@@ -214,9 +215,13 @@ pH_task_struct* pH_task_struct_list = NULL;
 struct jprobe jprobes_array[num_syscalls];
 bool module_inserted_successfully = FALSE;
 pH_profile* master_profile;
-
-// Mutex declarations
-static DEFINE_MUTEX(pH_profile_list_sem);
+/*
+int syscall_queue[];
+int syscall_queue_front = -1;
+int syscall_queue_rear = -1;
+int syscall_queue_max = 1000;
+*/
+spinlock_t pH_profile_list_sem;
 
 void add_to_profile_llist(pH_profile* p) {
 	if (pH_profile_list == NULL) {
@@ -226,9 +231,9 @@ void add_to_profile_llist(pH_profile* p) {
 	else {
 		pH_profile* iterator = pH_profile_list;
 		
-		mutex_lock(&pH_profile_list_sem);
+		spin_lock(&pH_profile_list_sem);
 		while (iterator->next) iterator = iterator->next;
-		mutex_unlock(&pH_profile_list_sem);
+		spin_unlock(&pH_profile_list_sem);
 		
 		iterator->next = p;
 		p->next = NULL;
@@ -251,7 +256,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	profile->anomalies = 0;
 	profile->length = pH_default_looklen;
 	profile->count = 0;
-	mutex_init(&(profile->lock));
+	spin_lock_init(&(profile->lock));
 
 	profile->train.sequences = 0;
 	profile->train.last_mod_count = 0;
@@ -351,7 +356,7 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 		return 0;
 	}
 	
-	new_sequence = kmalloc(sizeof(pH_seq), GFP_KERNEL);
+	new_sequence = kmalloc(sizeof(pH_seq), GFP_ATOMIC);
 	if (!new_sequence || new_sequence == NULL) {
 		pr_err("%s: Unable to allocate space for new_sequence in make_and_push_new_pH_seq\n", DEVICE_NAME);
 		return -ENOMEM;
@@ -369,6 +374,35 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	pr_err("%s: Exiting make_and_push_new_pH_seq\n", DEVICE_NAME);
 	return 0;
 }
+
+/*
+void add_syscall_to_queue(int syscall) {
+	if (syscall_queue_rear = syscall_queue_max - 1) {
+		pr_err("%s: Ran out of room in syscall queue\n", DEVICE_NAME);
+		return;
+	}
+	
+	if (syscall_queue_front == -1 && syscall_queue_rear == -1) {
+		syscall_queue_front = syscall_queue_rear = 0;
+	}
+	else syscall_queue_rear++;
+	
+	syscall_queue[syscall_queue_rear] = syscall;
+}
+
+int remove_syscall_from_queue(void) {
+	int ret;
+	
+	if (syscall_queue_front == -1 || syscall_queue_front > syscall_queue_rear) {
+		pr_err("%s: Underflow in remove_syscall_from_queue\n", DEVICE_NAME);
+		return -1;
+	}
+	
+	ret = syscall_queue[syscall_queue_front];
+	syscall_queue_front++;
+	return ret;
+}
+*/
 
 // Function prototypes for process_syscall()
 inline void pH_append_call(pH_seq*, int);
@@ -412,7 +446,7 @@ int process_syscall(long syscall) {
 	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
 	if (process && (process->seq) == NULL) {
-		pH_seq* temp = (pH_seq*) kmalloc(sizeof(pH_seq), GFP_KERNEL);
+		pH_seq* temp = (pH_seq*) kmalloc(sizeof(pH_seq), GFP_ATOMIC);
 		if (!temp) {
 			pr_err("%s: Unable to allocate memory for temp in process_syscall\n", DEVICE_NAME);
 			return -ENOMEM;
@@ -445,11 +479,11 @@ int process_syscall(long syscall) {
 	//pr_err("%s: binary = %s\n", DEVICE_NAME, process->profile->filename);
 	//pr_err("%s: profile = %p %d\n", DEVICE_NAME, profile, profile != NULL);
 	//pr_err("%s: &(process->profile->lock) = %p\n", DEVICE_NAME, &(process->profile->lock));
-	mutex_lock(&(profile->lock));
+	spin_lock(&(profile->lock));
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
 	//pr_err("%s: profile->count = %d\n", DEVICE_NAME, profile->count);
-	mutex_unlock(&(profile->lock));
+	spin_unlock(&(profile->lock));
 	
 	//pr_err("%s: process = %p %d\n", DEVICE_NAME, process, process != NULL);
 	///pr_err("%s: profile = %p %d\n", DEVICE_NAME, profile, profile != NULL);
@@ -463,7 +497,7 @@ int process_syscall(long syscall) {
 	*/
 	
 	// Allocate space for new_syscall
-	new_syscall = kmalloc(sizeof(my_syscall), GFP_KERNEL);
+	new_syscall = kmalloc(sizeof(my_syscall), GFP_ATOMIC);
 	if (!new_syscall) {
 		pr_err("%s: Unable to allocate space for new_syscall\n", DEVICE_NAME);
 		kfree(process->seq);
@@ -503,11 +537,11 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	}
 	//pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
 	
-	mutex_lock(&pH_profile_list_sem);
+	spin_lock(&pH_profile_list_sem);
 	do {
 		if (strcmp(filename, iterator->filename) == 0) {
 			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
-			mutex_unlock(&pH_profile_list_sem);
+			spin_unlock(&pH_profile_list_sem);
 			return iterator;
 		}
 		
@@ -515,7 +549,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 		//pr_err("%s: Iterating\n", DEVICE_NAME);
 	} while (iterator);
 	
-	mutex_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_profile_list_sem);
 	//pr_err("%s: No matching profile was found\n", DEVICE_NAME);
 	return NULL;
 }
@@ -536,7 +570,7 @@ static long jsys_execve(const char __user *filename,
 	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
 	
 	// Allocate space for path_to_binary
-	path_to_binary = kmalloc(sizeof(char) * 4000, GFP_KERNEL);
+	path_to_binary = kmalloc(sizeof(char) * 4000, GFP_ATOMIC);
 	if (!path_to_binary) {
 		pr_err("%s: Unable to allocate memory for path_to_binary\n", DEVICE_NAME);
 		goto no_memory;
@@ -547,7 +581,7 @@ static long jsys_execve(const char __user *filename,
 	pr_err("%s: path_to_binary = %s\n", DEVICE_NAME, path_to_binary);
 	
 	// Allocate memory for this_process
-	this_process = kmalloc(sizeof(pH_task_struct), GFP_KERNEL);
+	this_process = kmalloc(sizeof(pH_task_struct), GFP_ATOMIC);
 	if (!this_process) {
 		pr_err("%s: Unable to allocate memory for this_process\n", DEVICE_NAME);
 		goto no_memory;
@@ -639,15 +673,15 @@ int pH_remove_profile_from_list(pH_profile *profile)
 
     //pr_err("%s: In pH_remove_profile_from_list\n", DEVICE_NAME);
 
-	mutex_lock(&pH_profile_list_sem);
+	spin_lock(&pH_profile_list_sem);
     if (pH_profile_list == NULL) {
     	err("pH_profile_list is empty (NULL) when trying to free profile %s", profile->filename);
-    	mutex_unlock(&pH_profile_list_sem);
+    	spin_unlock(&pH_profile_list_sem);
     	return -1;
     }
     else if (pH_profile_list == profile) {
     	pH_profile_list = pH_profile_list->next;
-    	mutex_unlock(&pH_profile_list_sem);
+    	spin_unlock(&pH_profile_list_sem);
     	return 0;
     }
     else {
@@ -656,7 +690,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
     	while (cur_profile != NULL) {
     		if (cur_profile == profile) {
     			prev_profile->next = profile->next;
-    			mutex_unlock(&pH_profile_list_sem);
+    			spin_unlock(&pH_profile_list_sem);
     			return 0;
     		}
     		
@@ -665,7 +699,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
     	}
     	
     	err("While freeing, couldn't find profile %s in pH_profile_list", profile->filename);
-    	mutex_unlock(&pH_profile_list_sem);
+    	spin_unlock(&pH_profile_list_sem);
     	return -1;
     }
 }
@@ -686,7 +720,7 @@ void pH_free_profile(pH_profile *profile)
     }
 
     pH_free_profile_storage(profile);
-    mutex_destroy(&(profile->lock)); // Leave the mutex intact?
+    //mutex_destroy(&(profile->lock)); // Leave the mutex intact?
     vfree(profile);
     profile = NULL; // This is okay, because profile was removed from the linked list above
 }
@@ -740,14 +774,14 @@ void free_profiles(void) {
 	pH_profile* current_profile;
 	pH_profile* iterator = pH_profile_list;
 	
-	mutex_lock(&pH_profile_list_sem);
+	spin_lock(&pH_profile_list_sem);
 	while (iterator) {
 		current_profile = iterator;
 		iterator = iterator->next;
 		pH_free_profile(current_profile);
 		current_profile = NULL;
 	}
-	mutex_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_profile_list_sem);
 }
 
 void stack_pop(pH_task_struct*);
@@ -787,7 +821,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 	//stack_print(process);
 	//pr_err("%s: Quitting early\n", DEVICE_NAME);
 	//return 0;
-	mutex_destroy(&(process->pH_seq_stack_sem)); // Leave the mutex intact?
+	//mutex_destroy(&(process->pH_seq_stack_sem)); // Leave the mutex intact?
 	
 	free_syscalls(process);
 	//pr_err("%s: Freed syscalls\n", DEVICE_NAME);
@@ -983,10 +1017,17 @@ static int __init ebbchar_init(void){
 	}
 	pr_err("%s: Registered all syscall probes\n", DEVICE_NAME);
 	
-	mutex_init(&pH_profile_list_sem);
-	
-	master_profile = vmalloc(sizeof(pH_profile));
+	spin_lock_init(&pH_profile_list_sem);
+
+	master_profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
 	new_profile(master_profile, "/test/path/to/binary");
+	
+	/*
+	syscall_queue = __vmalloc(sizeof(int) * syscall_queue_max, GFP_ATOMIC, PAGE_KERNEL);
+	for (i = 0; i < syscall_queue_max; i++) {
+		syscall_queue[i] = -1;
+	}
+	*/
 
 	pr_err("%s: PH_NUM_SYSCALLS = %d\n", DEVICE_NAME, PH_NUM_SYSCALLS);
 	pr_err("%s: Successfully initialized %s\n", DEVICE_NAME, DEVICE_NAME);
@@ -1074,7 +1115,7 @@ int pH_add_seq_storage(pH_profile_data *data, int val)
     
     /*
     for (i = 0; i < PH_NUM_SYSCALLS; i++) {
-    	data->entry[val][i] = kmalloc(sizeof(pH_seqflags), GFP_KERNEL);
+    	data->entry[val][i] = kmalloc(sizeof(pH_seqflags), GFP_ATOMIC);
     	if (!data->entry[val][i]) {
     		pr_err("%s: Unable to allocate memory in pH_add_seq_storage\n", DEVICE_NAME);
     		return -ENOMEM;
@@ -1083,7 +1124,7 @@ int pH_add_seq_storage(pH_profile_data *data, int val)
     pr_err("%s: Iterated over data->entry[val]\n", DEVICE_NAME);
     */
     
-    data->entry[val] = kmalloc(sizeof(pH_seqflags) * PH_NUM_SYSCALLS, GFP_KERNEL);
+    data->entry[val] = kmalloc(sizeof(pH_seqflags) * PH_NUM_SYSCALLS, GFP_ATOMIC);
     if (!data->entry[val]) {
     	pr_err("%s: Unable to allocate memory in pH_add_seq_storage\n", DEVICE_NAME);
     	return -ENOMEM;
@@ -1248,7 +1289,6 @@ inline void pH_train(pH_task_struct *s)
             train->last_mod_count++;
             
             if (profile->frozen) {
-                    //mutex_unlock(&(profile->lock));
                     return;
             }
 
