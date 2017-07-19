@@ -439,9 +439,8 @@ int process_syscall(long syscall) {
 	}
 	if (profile->filename == NULL) {
 		pr_err("%s: profile is corrupted in process_syscall: NULL profile->filename\n", DEVICE_NAME);
-		pr_err("%s: &(process->profile->lock) = %p\n", DEVICE_NAME, &(process->profile->lock));
-		pr_err("%s: Quitting early in process_syscall\n", DEVICE_NAME);
-		module_inserted_successfully = FALSE;
+		//pr_err("%s: Quitting early in process_syscall\n", DEVICE_NAME);
+		//module_inserted_successfully = FALSE;
 		return -1;
 	}
 	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
