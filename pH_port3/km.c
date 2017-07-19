@@ -850,6 +850,7 @@ void free_syscalls(pH_task_struct* t) {
 }
 
 void free_profiles(void) {
+	/* // Old implementation
 	pH_profile* current_profile;
 	pH_profile* iterator = pH_profile_list;
 	
@@ -861,6 +862,12 @@ void free_profiles(void) {
 		current_profile = NULL;
 	}
 	//spin_unlock(&pH_profile_list_sem);
+	*/
+	
+	// New implementation
+	while (pH_profile_list != NULL) {
+		pH_free_profile(pH_profile_list);
+	}
 }
 
 void stack_pop(pH_task_struct*);
