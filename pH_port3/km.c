@@ -1349,13 +1349,12 @@ static void __exit ebbchar_exit(void){
 	//unregister_jprobe(&handle_signal_jprobe);
 	//unregister_jprobe(&sys_sigreturn_jprobe);
 	
-	/* // Unregister jprobes - it seems this was working just fine before, but Anil said its okay
+	// Unregister jprobes - it seems this was working just fine before, but Anil said its okay
 	// if I don't bother with unregistering them
 	for (i = 0; i < num_syscalls; i++) {
 		unregister_jprobe(&jprobes_array[i]);
 	}
 	pr_err("%s: Unregistered jprobes\n", DEVICE_NAME);
-	*/
 	
 	/* // Temporarily commented out to test module removal with KEDR
 	// Unregister fork_kretprobe
@@ -1377,7 +1376,7 @@ static void __exit ebbchar_exit(void){
 	class_unregister(ebbcharClass);
 	class_destroy(ebbcharClass);
 	unregister_chrdev(majorNumber, DEVICE_NAME);
-	pr_err("%s: Goodbye from the LKM!\n", DEVICE_NAME);
+	pr_err("%s: %s successfully removed\n", DEVICE_NAME, DEVICE_NAME);
 }
 
 static int dev_open(struct inode *inodep, struct file *filep){

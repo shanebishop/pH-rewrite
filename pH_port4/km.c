@@ -1,5 +1,5 @@
 /*
-Stored in https://github.com/shanebishop/pH-rewrite.git
+URL for cloning: https://github.com/shanebishop/pH-rewrite.git
 
 Notes:
 -Know when to use retreive_pH_profile_by_filename instead of retreive_pH_profile_by_pid
