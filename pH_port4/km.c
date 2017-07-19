@@ -469,7 +469,7 @@ int process_syscall(long syscall) {
 	
 	if (process) process->count++;
 	if (process) pH_append_call(process->seq, syscall);
-	//pr_err("%s: Successfully appended call\n", DEVICE_NAME);
+	//pr_err("%s: Successfully appended call %d\n", DEVICE_NAME, syscall);
 	
 	//pr_err("%s: process = %p %d\n", DEVICE_NAME, process, process != NULL);
 	//pr_err("%s: binary = %s\n", DEVICE_NAME, process->profile->filename);
@@ -770,7 +770,6 @@ void pH_free_profile_storage(pH_profile *profile)
 
 	pr_err("%s: In pH_free_profile_storage\n", DEVICE_NAME);
 
-	spin_lock(&(profile->lock));
     kfree(profile->filename);
     profile->filename = NULL;
     pr_err("%s: Freed profile->filename\n", DEVICE_NAME);
@@ -785,7 +784,6 @@ void pH_free_profile_storage(pH_profile *profile)
             	profile->test.entry[i] = NULL;
             }
     }
-    spin_unlock(&(profile->lock));
 }
 
 // Returns 0 on success and anything else on failure
@@ -838,6 +836,7 @@ void pH_free_profile(pH_profile *profile)
         return;
     }
     
+    spin_lock(&(profile->lock));
     pH_remove_profile_from_list(profile);
 
     if (pH_aremonitoring) {
@@ -845,6 +844,7 @@ void pH_free_profile(pH_profile *profile)
     }
 
     pH_free_profile_storage(profile);
+    spin_unlock(&(profile->lock));
     //mutex_destroy(&(profile->lock)); // Leave the mutex intact?
     vfree(profile);
     profile = NULL; // This is okay, because profile was removed from the linked list above
@@ -1474,7 +1474,7 @@ static void __exit ebbchar_exit(void){
 	class_unregister(ebbcharClass);
 	class_destroy(ebbcharClass);
 	unregister_chrdev(majorNumber, DEVICE_NAME);
-	pr_err("%s: Goodbye from the LKM!\n", DEVICE_NAME);
+	pr_err("%s: %s successfully removed\n", DEVICE_NAME, DEVICE_NAME);
 }
 
 static int dev_open(struct inode *inodep, struct file *filep){
