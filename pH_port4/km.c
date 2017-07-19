@@ -437,12 +437,14 @@ int process_syscall(long syscall) {
 		pr_err("%s: pH_task_struct corrupted: No profile\n", DEVICE_NAME);
 		return -1;
 	}
+	/*
 	if (profile->filename == NULL) {
 		pr_err("%s: profile is corrupted in process_syscall: NULL profile->filename\n", DEVICE_NAME);
 		//pr_err("%s: Quitting early in process_syscall\n", DEVICE_NAME);
 		//module_inserted_successfully = FALSE;
 		return -1;
 	}
+	*/
 	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
 	if (process && (process->seq) == NULL) {
@@ -768,6 +770,7 @@ void pH_free_profile_storage(pH_profile *profile)
 
 	pr_err("%s: In pH_free_profile_storage\n", DEVICE_NAME);
 
+	spin_lock(&(profile->lock));
     kfree(profile->filename);
     profile->filename = NULL;
     pr_err("%s: Freed profile->filename\n", DEVICE_NAME);
@@ -782,6 +785,7 @@ void pH_free_profile_storage(pH_profile *profile)
             	profile->test.entry[i] = NULL;
             }
     }
+    spin_unlock(&(profile->lock));
 }
 
 // Returns 0 on success and anything else on failure
