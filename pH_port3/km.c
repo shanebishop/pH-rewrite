@@ -332,6 +332,8 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 		return NULL;
 	}
 	
+	iterator = pH_task_struct_list;
+	
 	do {
 		if (iterator->process_id == process_id) {
 			pr_err("%s: Found it! Returning\n", DEVICE_NAME);
@@ -644,6 +646,24 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	retval = regs_return_value(regs);
 	now = ktime_get();
 	
+	/* // Commented out until I am ready to test this
+	// Retrieve binary by using current to retrieve PID, and then grab the task struct then binary from there
+	parent_process = llist_retrieve_process(pid_vnr(task_tgid(current)));
+	if (!parent_process || parent_process == NULL) {
+		pr_err("%s: In fork_handler with NULL parent_process\n", DEVICE_NAME);
+		return -1;
+	}
+	
+	profile = parent_process->profile;
+	if (!profile || profile == NULL) {
+		pr_err("%s: In fork_handler with NULL parent_process->profile\n", DEVICE_NAME);
+		return -1;
+	}
+	
+	path_to_binary = profile->filename;
+	handle_new_process(path_to_binary, profile, retval);
+	*/
+	
 	return 0;
 }
 
@@ -678,28 +698,7 @@ static int exit_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	return 0;
 }
 
-static int exit_entry_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
-	pH_task_struct* process;
-	
-	if (!module_inserted_successfully) return 0;
-	
-	pr_err("%s: In exit_handler for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
-	
-	/*
-	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
-	
-	if (process == NULL) return 0;
-	
-	pr_err("%s: In exit_handler for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
-	
-	free_pH_task_struct(process);
-	*/
-	
-	return 0;
-}
-
 static struct kretprobe exit_kretprobe = {
-	.entry_handler = exit_entry_handler,
 	.handler = exit_handler,
 	.data_size = sizeof(struct my_kretprobe_data),
 	.maxactive = 20,
@@ -730,7 +729,7 @@ void pH_free_profile_storage(pH_profile* profile) {
 int pH_remove_profile_from_list(pH_profile* profile) {
 	pH_profile *prev_profile, *cur_profile;
 	
-	if (!profile || profile == NULL) return;
+	if (!profile || profile == NULL) return 0;
 	
 	pr_err("%s: In pH_remove_profile_from_list\n", DEVICE_NAME);
 	spin_lock(&pH_profile_list_sem);
@@ -753,7 +752,7 @@ int pH_remove_profile_from_list(pH_profile* profile) {
 				prev_profile->next = profile->next;
 				
 				spin_unlock(&pH_profile_list_sem);
-				return;
+				return 0;
 			}
 				
 			prev_profile = cur_profile;
@@ -1007,6 +1006,8 @@ void stack_pop(pH_task_struct* process) {
 	pH_seq* temp;
 	//pH_seq* top = process->seq;
 	
+	pr_err("%s: In stack_pop\n", DEVICE_NAME);
+	
 	if (process->seq == NULL) {
 		pr_err("%s: Stack is empty - cannot delete an element\n", DEVICE_NAME);
 		return;
@@ -1030,17 +1031,15 @@ static void jhandle_signal(struct ksignal* ksig, struct pt_regs* regs) {
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
+	pr_err("%s: In jhandle_signal\n", DEVICE_NAME);
+	
+	/* // Commented out until I am ready to test this
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	
 	if (process != NULL) {
-		new_sequence = kmalloc(sizeof(pH_seq), GFP_ATOMIC);
-		if (!new_sequence) {
-			pr_err("%s: Unable to allocate memory for new_sequence in jhandle_signal\n", DEVICE_NAME);
-			goto no_memory;
-		}
-		
-		stack_push(process, new_sequence);
+		make_and_push_new_pH_seq(process);
 	}
+	*/
 	
 	jprobe_return();
 	return 0;
