@@ -356,8 +356,6 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	
 	if (!process || process == NULL) {
 		pr_err("%s: process is NULL in make_and_push_new_pH_seq\n", DEVICE_NAME);
-		//pr_err("%s: Quitting early in make_and_push_new_pH_seq\n", DEVICE_NAME);
-		//module_inserted_successfully = FALSE;
 		return 0;
 	}
 	
@@ -365,8 +363,6 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	
 	if (!profile || profile == NULL) {
 		pr_err("%s: profile is NULL in make_and_push_new_pH_seq\n", DEVICE_NAME);
-		//pr_err("%s: Quitting early in make_and_push_new_pH_seq\n", DEVICE_NAME);
-		//module_inserted_successfully = FALSE;
 		return 0;
 	}
 	
@@ -393,7 +389,6 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 inline void pH_append_call(pH_seq*, int);
 inline void pH_train(pH_task_struct*);
 void stack_print(pH_task_struct*);
-void early_quit(void);
 
 int process_syscall(long syscall) {
 	pH_task_struct* process;
@@ -420,13 +415,11 @@ int process_syscall(long syscall) {
 	if (process) profile = process->profile; // Store process->profile in profile for shorter reference
 	else {
 		pr_err("%s: ERROR: process is NULL\n", DEVICE_NAME);
-		module_inserted_successfully = FALSE;
 		return -1;
 	}
 	
 	if (!profile || profile == NULL) {
 		pr_err("%s: pH_task_struct corrupted: No profile\n", DEVICE_NAME);
-		early_quit();
 		return -1;
 	}
 	//pr_err("%s: If the following two lines aren't displayed, then the profile is corrupted\n", DEVICE_NAME);
@@ -438,7 +431,6 @@ int process_syscall(long syscall) {
 		pH_seq* temp = (pH_seq*) kmalloc(sizeof(pH_seq), GFP_ATOMIC);
 		if (!temp) {
 			pr_err("%s: Unable to allocate memory for temp in process_syscall\n", DEVICE_NAME);
-			early_quit();
 			return -ENOMEM;
 		}
 
@@ -454,25 +446,9 @@ int process_syscall(long syscall) {
 		INIT_LIST_HEAD(&temp->seqList);
 		//pr_err("%s: Successfully allocated memory for temp in process_syscall\n", DEVICE_NAME);
 	}
-	else {
-		//stack_print(process);
-		//module_inserted_successfully = FALSE;
-		//pr_err("%s: Quitting early\n", DEVICE_NAME);
-		//return 0;
-	}
 	
 	if (process) process->count++;
-	else {
-		pr_err("%s: ERROR: process is NULL\n", DEVICE_NAME);
-		module_inserted_successfully = FALSE;
-		return -1;
-	}
 	if (process) pH_append_call(process->seq, syscall);
-	else {
-		pr_err("%s: ERROR: process isNULL\n", DEVICE_NAME);
-		module_inserted_successfully = FALSE;
-		return -1;
-	}
 	//pr_err("%s: Successfully appended call\n", DEVICE_NAME);
 	
 	//pr_err("%s: process = %p %d\n", DEVICE_NAME, process, process != NULL);
@@ -491,7 +467,6 @@ int process_syscall(long syscall) {
 	if (process) pH_train(process);
 	else {
 		pr_err("%s: ERROR: process is NULL\n", DEVICE_NAME);
-		module_inserted_successfully = FALSE;
 		return -1;
 	}
 	//pr_err("%s: Trained process\n", DEVICE_NAME);
@@ -501,7 +476,6 @@ int process_syscall(long syscall) {
 	if (!new_syscall) {
 		pr_err("%s: Unable to allocate space for new_syscall\n", DEVICE_NAME);
 		kfree(process->seq);
-		early_quit();
 		return -ENOMEM;
 	}
 	//pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
@@ -570,7 +544,7 @@ static long jsys_execve(const char __user *filename,
 	
 	if (!pH_aremonitoring) goto not_monitoring;
 
-	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
+	//pr_err("%s: In jsys_execve\n", DEVICE_NAME);
 	
 	current_process_id = pid_vnr(task_tgid(current));
 	
@@ -631,7 +605,7 @@ static long jsys_execve(const char __user *filename,
 	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
 	process_syscall(59);
-	pr_err("%s: Back in jsys_execve after processing syscall\n", DEVICE_NAME);
+	//pr_err("%s: Back in jsys_execve after processing syscall\n", DEVICE_NAME);
 	
 	jprobe_return();
 	return 0;
@@ -641,7 +615,6 @@ no_memory:
 	
 	kfree(path_to_binary);
 	free_pH_task_struct(this_process);
-	early_quit();
 	
 	jprobe_return();
 	return 0;
@@ -751,7 +724,7 @@ void pH_free_profile_storage(pH_profile *profile)
 {
     int i;
 
-	//pr_err("%s: In pH_free_profile_storage\n", DEVICE_NAME);
+	pr_err("%s: In pH_free_profile_storage\n", DEVICE_NAME);
 
     kfree(profile->filename);
     profile->filename = NULL;
@@ -777,7 +750,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
     
 	if (!profile || profile == NULL) return 0;
 
-    //pr_err("%s: In pH_remove_profile_from_list\n", DEVICE_NAME);
+    pr_err("%s: In pH_remove_profile_from_list\n", DEVICE_NAME);
 
 	spin_lock(&pH_profile_list_sem);
     if (pH_profile_list == NULL) {
@@ -812,7 +785,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
 
 void pH_free_profile(pH_profile *profile)
 {
-    //pr_err("%s: In pH_free_profile\n", DEVICE_NAME);
+    pr_err("%s: In pH_free_profile\n", DEVICE_NAME);
     
     if (!profile || profile == NULL) {
         err("no profile to free!");
@@ -908,15 +881,10 @@ void free_pH_task_struct(pH_task_struct* process) {
 	if (pH_aremonitoring) {
 		stack_print(process);
 	}
-	//module_inserted_successfully = FALSE;
-	//pr_err("%s: Quitting early\n", DEVICE_NAME);
-	//return 0;
 	
 	while (process->seq != NULL) {
 		if (i > 1000) {
 			pr_err("%s: Been in this loop for quite some time... Exiting\n", DEVICE_NAME);
-			//module_inserted_successfully = FALSE;
-			//pH_aremonitoring = 0;
 			return;
 		}
 		
@@ -926,15 +894,12 @@ void free_pH_task_struct(pH_task_struct* process) {
 		//pr_err("%s: After stack_pop(process);\n", DEVICE_NAME);
 		i++;
 	}
-	//pr_err("%s: Emptied stack of pH_seqs\n", DEVICE_NAME);
-	//stack_print(process);
-	//module_inserted_successfully = FALSE;
-	//pr_err("%s: Quitting early\n", DEVICE_NAME);
-	//return 0;
+	pr_err("%s: Emptied stack of pH_seqs\n", DEVICE_NAME);
+	stack_print(process);
 	//mutex_destroy(&(process->pH_seq_stack_sem)); // Leave the mutex intact?
 	
 	free_syscalls(process);
-	//pr_err("%s: Freed syscalls\n", DEVICE_NAME);
+	pr_err("%s: Freed syscalls\n", DEVICE_NAME);
 	
 	profile = process->profile;
 	
@@ -956,7 +921,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 	remove_process_from_llist(process);
 	kfree(process);
 	process = NULL; // Okay because process is removed from llist above
-	//pr_err("%s: Freed process (end of function)\n", DEVICE_NAME);
+	pr_err("%s: Freed process (end of function)\n", DEVICE_NAME);
 }
 
 static long jsys_exit(int error_code) {
@@ -1154,37 +1119,6 @@ void free_pH_task_structs(void) {
 	while (pH_task_struct_list != NULL) {
 		free_pH_task_struct(pH_task_struct_list);
 	}
-}
-
-void early_quit(void) {
-	int i;
-	
-	module_inserted_successfully = FALSE;
-	pH_aremonitoring = 0;
-	
-	pr_err("%s: ERROR: Fatal error occurred\n", DEVICE_NAME);
-	pr_err("%s: Exiting %s...\n", DEVICE_NAME, DEVICE_NAME);
-	
-	// Unregister fork_kretprobe
-	unregister_kretprobe(&fork_kretprobe);
-	pr_err("%s: Missed probing %d instances of fork\n", DEVICE_NAME, fork_kretprobe.nmissed);
-	
-	// Unregister exit_kretprobe
-	unregister_kretprobe(&exit_kretprobe);
-	pr_err("%s: Missed probing %d instances of exit\n", DEVICE_NAME, exit_kretprobe.nmissed);
-	
-	pr_err("%s: Freeing profiles...\n", DEVICE_NAME);
-	free_profiles();
-	pr_err("%s: Freeing pH_task_structs...\n", DEVICE_NAME);
-	free_pH_task_structs();
-	
-	mutex_destroy(&ebbchar_mutex);
-	device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-	class_unregister(ebbcharClass);
-	class_destroy(ebbcharClass);
-	unregister_chrdev(majorNumber, DEVICE_NAME);
-	
-	pr_err("%s: To keep your system secure, please run 'sudo rmmod km' as soon as possible\n", DEVICE_NAME);
 }
 
 static int __init ebbchar_init(void){
@@ -1546,18 +1480,14 @@ void pH_add_seq(pH_seq *s, pH_profile_data *data)
 		
 		if (cur_call < 0 || cur_call > PH_NUM_SYSCALLS) {
 			pr_err("%s: cur_call is out of bounds\n", DEVICE_NAME);
-			//pH_aremonitoring = 0;
 		}
 		if (prev_call < 0 || prev_call > PH_NUM_SYSCALLS) {
 			pr_err("%s: prev_call is out of bounds\n", DEVICE_NAME);
-			//pH_aremonitoring = 0;
 		}
 		if (data->entry[cur_call][prev_call] < 0 || data->entry[cur_call][prev_call] > 256) {
 			pr_err("%s: Value is not in the interval [0, 256] (%d)\n", DEVICE_NAME, data->entry[cur_call][prev_call]);
-			//pH_aremonitoring = 0;
 		}
 		if (!pH_aremonitoring) {
-			//module_inserted_successfully = FALSE;
 			return;
 		}
 		data->entry[cur_call][prev_call] |= (1 << (i - 1));
