@@ -948,21 +948,23 @@ void free_pH_task_struct(pH_task_struct* process) {
 	free_syscalls(process);
 	pr_err("%s: Freed syscalls\n", DEVICE_NAME);
 	
-	profile = process->profile;
+	if (module_inserted_successfully) {
+		profile = process->profile;
 	
-	if (profile != NULL) {
-		atomic_dec(&(profile->refcount));
+		if (profile != NULL) {
+			atomic_dec(&(profile->refcount));
 	
-		if (profile->refcount.counter < 1) {
-			profile->refcount.counter = 0;
+			if (profile->refcount.counter < 1) {
+				profile->refcount.counter = 0;
 		
-			// Free profile
-			pH_free_profile(profile);
-			profile = NULL; // Okay because the profile is removed from llist in pH_free_profile
-			pr_err("%s: Freed profile\n", DEVICE_NAME);
+				// Free profile
+				pH_free_profile(profile);
+				profile = NULL; // Okay because the profile is removed from llist in pH_free_profile
+				pr_err("%s: Freed profile\n", DEVICE_NAME);
+			}
 		}
+		//pr_err("%s: Made it through if\n", DEVICE_NAME);
 	}
-	//pr_err("%s: Made it through if\n", DEVICE_NAME);
 	
 	// When everything else is done, remove process from llist, kfree process
 	remove_process_from_llist(process);
@@ -1020,7 +1022,7 @@ void stack_print(pH_task_struct* process) {
 	pr_err("%s: Got through variable declaration\n", DEVICE_NAME);
 	
 	if (process->seq == NULL) {
-		if (process->profile != NULL) {
+		if (process->profile != NULL && module_inserted_successfully) {
 			//pr_err("%s: process->profile != NULL\n", DEVICE_NAME);
 			pr_err("%s: Printing stack for process %s: Stack is empty\n", DEVICE_NAME, process->profile->filename);
 		}
@@ -1034,7 +1036,7 @@ void stack_print(pH_task_struct* process) {
 	
 	pr_err("%s: process->seq = %p, iterator = %p\n", DEVICE_NAME, process->seq, iterator);
 	
-	if (process->profile != NULL) {
+	if (process->profile != NULL && process->profile->filename != NULL) {
 		pr_err("%s: Printing stack for process %s...\n", DEVICE_NAME, process->profile->filename);
 	}
 	else {
@@ -1438,16 +1440,15 @@ static void __exit ebbchar_exit(void){
 	
 	//unregister_jprobe(&handle_signal_jprobe);
 	//unregister_jprobe(&sys_sigreturn_jprobe);
+	unregister_jprobe(&do_signal_jprobe);
 	
-	/* // Unregister jprobes - it seems this was working just fine before, but Anil said its okay
+	// Unregister jprobes - it seems this was working just fine before, but Anil said its okay
 	// if I don't bother with unregistering them
 	for (i = 0; i < num_syscalls; i++) {
 		unregister_jprobe(&jprobes_array[i]);
 	}
-	pr_err("%s: Unregistered jprobes\n", DEVICE_NAME);
-	*/
-	
-	/* // Temporarily commented out to test module removal with KEDR
+	pr_err("%s: Unregistered syscall jprobes\n", DEVICE_NAME);
+
 	// Unregister fork_kretprobe
 	unregister_kretprobe(&fork_kretprobe);
 	pr_err("%s: Missed probing %d instances of fork\n", DEVICE_NAME, fork_kretprobe.nmissed);
@@ -1455,7 +1456,6 @@ static void __exit ebbchar_exit(void){
 	// Unregister exit_kretprobe
 	unregister_kretprobe(&exit_kretprobe);
 	pr_err("%s: Missed probing %d instances of exit\n", DEVICE_NAME, exit_kretprobe.nmissed);
-	*/
 	
 	pr_err("%s: Freeing profiles...\n", DEVICE_NAME);
 	free_profiles();
