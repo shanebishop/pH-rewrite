@@ -437,9 +437,11 @@ int process_syscall(long syscall) {
 		pr_err("%s: pH_task_struct corrupted: No profile\n", DEVICE_NAME);
 		return -1;
 	}
-	//pr_err("%s: If the following two lines aren't displayed, then the profile is corrupted\n", DEVICE_NAME);
-	//pr_err("%s: profile->count = %d\n", DEVICE_NAME, profile->count);
-	//pr_err("%s: profile->train.train_count = %d\n", DEVICE_NAME, profile->train.train_count);
+	if (profile->filename == NULL) {
+		pr_err("%s: profile is corrupted in process_syscall: NULL profile->filename\n", DEVICE_NAME);
+		pr_err("%s: Quitting early in process_syscall\n", DEVICE_NAME);
+		module_inserted_successfully = FALSE;
+	}
 	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
 	if (process && (process->seq) == NULL) {
@@ -469,7 +471,7 @@ int process_syscall(long syscall) {
 	//pr_err("%s: process = %p %d\n", DEVICE_NAME, process, process != NULL);
 	//pr_err("%s: binary = %s\n", DEVICE_NAME, process->profile->filename);
 	//pr_err("%s: profile = %p %d\n", DEVICE_NAME, profile, profile != NULL);
-	pr_err("%s: &(process->profile->lock) = %p %d\n", DEVICE_NAME, &(process->profile->lock));
+	pr_err("%s: &(process->profile->lock) = %p\n", DEVICE_NAME, &(process->profile->lock));
 	spin_lock(&(profile->lock));
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
