@@ -990,9 +990,9 @@ static long jsys_exit(int error_code) {
 	
 	if (process == NULL) goto not_monitoring;
 	
-	spin_lock(&(profile->lock));
+	spin_lock(&(process->profile->lock));
 	pr_err("%s: In jsys_exit for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
-	spin_unlock(&(profile->lock));
+	spin_unlock(&(process->profile->lock));
 	
 	process_syscall(73); // Process this syscall before calling free_pH_task_struct on process
 	pr_err("%s: Back in jsys_exit after processing syscall\n", DEVICE_NAME);
@@ -1032,9 +1032,9 @@ void stack_print(pH_task_struct* process) {
 	if (process->seq == NULL) {
 		if (process->profile != NULL) {
 			//pr_err("%s: process->profile != NULL\n", DEVICE_NAME);
-			spin_lock(&(profile->lock));
+			spin_lock(&(process->profile->lock));
 			pr_err("%s: Printing stack for process %s: Stack is empty\n", DEVICE_NAME, process->profile->filename);
-			spin_unlock(&(profile->lock));
+			spin_unlock(&(process->profile->lock));
 		}
 		else {
 			pr_err("%s: Printing stack for process %ld: Stack is empty\n", DEVICE_NAME, process->process_id);
@@ -1047,9 +1047,9 @@ void stack_print(pH_task_struct* process) {
 	pr_err("%s: process->seq = %p, iterator = %p\n", DEVICE_NAME, process->seq, iterator);
 	
 	if (process->profile != NULL) {
-		spin_lock(&(profile->lock));
+		spin_lock(&(process->profile->lock));
 		pr_err("%s: Printing stack for process %s...\n", DEVICE_NAME, process->profile->filename);
-		spin_unlock(&(profile->lock));
+		spin_unlock(&(process->profile->lock));
 	}
 	else {
 		pr_err("%s: Printing stack for process %ld...\n", DEVICE_NAME, process->process_id);
