@@ -586,6 +586,10 @@ static long jsys_execve(const char __user *filename,
 	}
 	pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
+	// Temporarily bypass processing syscalls
+	jprobe_return();
+	return 0;
+	
 	process_syscall(59);
 	pr_err("%s: Back in jsys_execve after processing syscall\n", DEVICE_NAME);
 	
