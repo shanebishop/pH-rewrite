@@ -853,14 +853,14 @@ void free_profiles(void) {
 	pH_profile* current_profile;
 	pH_profile* iterator = pH_profile_list;
 	
-	spin_lock(&pH_profile_list_sem);
+	//spin_lock(&pH_profile_list_sem);
 	while (iterator) {
 		current_profile = iterator;
 		iterator = iterator->next;
 		pH_free_profile(current_profile);
 		current_profile = NULL;
 	}
-	spin_unlock(&pH_profile_list_sem);
+	//spin_unlock(&pH_profile_list_sem);
 }
 
 void stack_pop(pH_task_struct*);
