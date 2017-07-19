@@ -908,21 +908,23 @@ void free_pH_task_struct(pH_task_struct* process) {
 	free_syscalls(process);
 	pr_err("%s: Freed syscalls\n", DEVICE_NAME);
 	
-	profile = process->profile;
+	if (module_inserted_successfully) {
+		profile = process->profile;
 	
-	if (profile != NULL) {
-		atomic_dec(&(profile->refcount));
+		if (profile != NULL) {
+			atomic_dec(&(profile->refcount));
 	
-		if (profile->refcount.counter < 1) {
-			profile->refcount.counter = 0;
+			if (profile->refcount.counter < 1) {
+				profile->refcount.counter = 0;
 		
-			// Free profile
-			pH_free_profile(profile);
-			profile = NULL; // Okay because the profile is removed from llist in pH_free_profile
-			pr_err("%s: Freed profile\n", DEVICE_NAME);
+				// Free profile
+				pH_free_profile(profile);
+				profile = NULL; // Okay because the profile is removed from llist in pH_free_profile
+				pr_err("%s: Freed profile\n", DEVICE_NAME);
+			}
 		}
+		//pr_err("%s: Made it through if\n", DEVICE_NAME);
 	}
-	//pr_err("%s: Made it through if\n", DEVICE_NAME);
 	
 	// When everything else is done, remove process from llist, kfree process
 	remove_process_from_llist(process);
@@ -982,15 +984,13 @@ void stack_print(pH_task_struct* process) {
 	pr_err("%s: Got through variable declaration\n", DEVICE_NAME);
 	
 	if (process->seq == NULL) {
-		/*
-		if (process->profile != NULL && process->profile->filename != NULL) {
+		if (process->profile != NULL && module_inserted_successfully) {
 			pr_err("%s: process->profile != NULL\n", DEVICE_NAME);
 			pr_err("%s: Printing stack for process %s: Stack is empty\n", DEVICE_NAME, process->profile->filename);
 		}
 		else {
 			pr_err("%s: Printing stack for process %d: Stack is empty\n", DEVICE_NAME, process->process_id);
 		}
-		*/
 		pr_err("%s: Printing stack for process %d: Stack is empty\n", DEVICE_NAME, process->process_id);
 		return;
 	}
