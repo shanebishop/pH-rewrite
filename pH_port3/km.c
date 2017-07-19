@@ -980,10 +980,9 @@ void stack_print(pH_task_struct* process) {
 	int i;
 	pH_seq* iterator = process->seq;
 	pr_err("%s: Got through variable declaration\n", DEVICE_NAME);
-	pr_err("%s: process->seq = %p, iterator = %p\n", DEVICE_NAME, process->seq, iterator);
 	
 	if (process->seq == NULL) {
-		if (process->profile != NULL) {
+		if (process->profile != NULL && process->profile->filename != NULL) {
 			pr_err("%s: process->profile != NULL\n", DEVICE_NAME);
 			pr_err("%s: Printing stack for process %s: Stack is empty\n", DEVICE_NAME, process->profile->filename);
 		}
@@ -995,7 +994,9 @@ void stack_print(pH_task_struct* process) {
 	
 	i = 0;
 	
-	if (process->profile != NULL) {
+	pr_err("%s: process->seq = %p, iterator = %p\n", DEVICE_NAME, process->seq, iterator);
+	
+	if (process->profile != NULL && process->profile->filename != NULL) {
 		pr_err("%s: Printing stack for process %s...\n", DEVICE_NAME, process->profile->filename);
 	}
 	else {
