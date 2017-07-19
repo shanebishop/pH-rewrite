@@ -589,7 +589,7 @@ static long jsys_execve(const char __user *filename,
 		}
 		
 		new_profile(profile, path_to_binary);
-		//pr_err("%s: Made new profile\n", DEVICE_NAME);
+		pr_err("%s: Made new profile for %s\n", DEVICE_NAME, path_to_binary);
 		
 		if (!profile) {
 			pr_err("%s: new_profile() made a corrupted or NULL profile\n", DEVICE_NAME);
@@ -807,7 +807,7 @@ void pH_free_profile(pH_profile *profile)
 int remove_process_from_llist(pH_task_struct* process) {
 	pH_task_struct *prev_task_struct, *cur_task_struct;
 	
-	//pr_err("%s: In remove_process_from_llist\n", DEVICE_NAME);
+	pr_err("%s: In remove_process_from_llist\n", DEVICE_NAME);
 
 	if (pH_task_struct_list == NULL) {
 		err("pH_task_struct_list is empty (NULL) when trying to free process %ld", process->process_id);
