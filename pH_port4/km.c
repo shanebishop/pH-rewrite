@@ -1428,7 +1428,7 @@ static int __init ebbchar_init(void){
 
 // Perhaps the best way to remove the module is just to reboot?
 static void __exit ebbchar_exit(void){
-	//int i;
+	int i;
 	
 	// Set all booleans accordingly - this should be the first thing you do to prevent any more code from running
 	pH_aremonitoring = 0;
