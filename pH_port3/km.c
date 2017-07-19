@@ -326,17 +326,21 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 		return NULL;
 	}
 	
-	//pr_err("%s: In llist_retrieve_process\n", DEVICE_NAME);
+	pr_err("%s: In llist_retrieve_process with process_id %d\n", DEVICE_NAME, process_id);
 	
 	if (pH_task_struct_list == NULL) {
 		return NULL;
 	}
 	
 	do {
-		if (iterator->process_id == process_id) return iterator;
+		if (iterator->process_id == process_id) {
+			pr_err("%s: Found it! Returning\n", DEVICE_NAME);
+			return iterator;
+		}
 		iterator = iterator->next;
 	} while (iterator);
 	
+	pr_err("%s: Process %d not found\n", DEVICE_NAME, process_id);
 	return NULL;
 }
 
