@@ -982,6 +982,7 @@ void stack_print(pH_task_struct* process) {
 	pr_err("%s: Got through variable declaration\n", DEVICE_NAME);
 	
 	if (process->seq == NULL) {
+		/*
 		if (process->profile != NULL && process->profile->filename != NULL) {
 			pr_err("%s: process->profile != NULL\n", DEVICE_NAME);
 			pr_err("%s: Printing stack for process %s: Stack is empty\n", DEVICE_NAME, process->profile->filename);
@@ -989,6 +990,8 @@ void stack_print(pH_task_struct* process) {
 		else {
 			pr_err("%s: Printing stack for process %d: Stack is empty\n", DEVICE_NAME, process->process_id);
 		}
+		*/
+		pr_err("%s: Printing stack for process %d: Stack is empty\n", DEVICE_NAME, process->process_id);
 		return;
 	}
 	
