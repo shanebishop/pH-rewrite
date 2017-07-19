@@ -390,12 +390,10 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	//pr_err("%s: Initializing new_sequence in make_and_push_new_pH_seq...\n", DEVICE_NAME);
 	new_sequence->next = NULL;
 	//pr_err("%s: Set new_sequence->next to NULL\n", DEVICE_NAME);
-	spin_lock(&(profile->lock));
 	new_sequence->length = profile->length;
 	//pr_err("%s: Set new_sequence->length to %d\n", DEVICE_NAME, profile->length);
 	new_sequence->last = profile->length - 1;
 	//pr_err("%s: Set new_sequence->last to %d\n", DEVICE_NAME, profile->length - 1);
-	spin_unlock(&(profile->lock));
 	stack_push(process, new_sequence);
 	//pr_err("%s: Pushed new_sequence\n", DEVICE_NAME);
 	//pr_err("%s: Exiting make_and_push_new_pH_seq\n", DEVICE_NAME);
@@ -457,10 +455,8 @@ int process_syscall(long syscall) {
 		}
 
 		temp->next = NULL;
-		spin_lock(&(profile->lock));
 		temp->length = profile->length;
 		temp->last = profile->length - 1;
-		spin_unlock(&(profile->lock));
 		
 		//pr_err("%s: Got here 1\n", DEVICE_NAME);
 		//process->seq = temp;
@@ -675,7 +671,6 @@ not_monitoring:
 	return 0;
 }
 
-/*
 void print_llist(void) {
 	pH_task_struct* iterator = pH_task_struct_list;
 	
@@ -690,7 +685,6 @@ void print_llist(void) {
 		iterator = iterator->next;
 	} while (iterator);
 }
-*/
 
 // Struct required for all kretprobe structs
 struct my_kretprobe_data {
@@ -729,9 +723,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 		return -1;
 	}
 	
-	spin_lock(&(profile->lock));
 	path_to_binary = profile->filename;
-	spin_unlock(&(profile->lock));
 	handle_new_process(path_to_binary, profile, retval);
 	
 	return 0;
@@ -990,9 +982,7 @@ static long jsys_exit(int error_code) {
 	
 	if (process == NULL) goto not_monitoring;
 	
-	spin_lock(&(process->profile->lock));
 	pr_err("%s: In jsys_exit for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
-	spin_unlock(&(process->profile->lock));
 	
 	process_syscall(73); // Process this syscall before calling free_pH_task_struct on process
 	pr_err("%s: Back in jsys_exit after processing syscall\n", DEVICE_NAME);
@@ -1032,9 +1022,7 @@ void stack_print(pH_task_struct* process) {
 	if (process->seq == NULL) {
 		if (process->profile != NULL) {
 			//pr_err("%s: process->profile != NULL\n", DEVICE_NAME);
-			spin_lock(&(process->profile->lock));
 			pr_err("%s: Printing stack for process %s: Stack is empty\n", DEVICE_NAME, process->profile->filename);
-			spin_unlock(&(process->profile->lock));
 		}
 		else {
 			pr_err("%s: Printing stack for process %ld: Stack is empty\n", DEVICE_NAME, process->process_id);
@@ -1047,9 +1035,7 @@ void stack_print(pH_task_struct* process) {
 	pr_err("%s: process->seq = %p, iterator = %p\n", DEVICE_NAME, process->seq, iterator);
 	
 	if (process->profile != NULL) {
-		spin_lock(&(process->profile->lock));
 		pr_err("%s: Printing stack for process %s...\n", DEVICE_NAME, process->profile->filename);
-		spin_unlock(&(process->profile->lock));
 	}
 	else {
 		pr_err("%s: Printing stack for process %ld...\n", DEVICE_NAME, process->process_id);
@@ -1677,12 +1663,10 @@ inline void pH_train(pH_task_struct *s)
 
     train->train_count++;
     if (pH_test_seq(seq, train)) { 
-            spin_lock(&(profile->lock));
             if (profile->frozen) {
                     profile->frozen = 0;
                     action("%d (%s) normal cancelled", current->pid, profile->filename);
             }
-            spin_unlock(&(profile->lock));
             pH_add_seq(seq, train);
             train->sequences++; 
             train->last_mod_count = 0;
@@ -1694,21 +1678,17 @@ inline void pH_train(pH_task_struct *s)
             
             train->last_mod_count++;
             
-            spin_lock(&(profile->lock));
             if (profile->frozen) {
-                    spin_unlock(&(profile->lock));
+                    //mutex_unlock(&(profile->lock));
                     return;
             }
-            spin_unlock(&(profile->lock));
 
             normal_count = train->train_count - train->last_mod_count; 
 
             if ((normal_count > 0) && ((train->train_count * pH_normal_factor_den) > (normal_count * pH_normal_factor))) {
-                    spin_lock(&(profile->lock));
                     action("%d (%s) frozen", current->pid, profile->filename);
                     profile->frozen = 1;
                     //profile->normal_time = xtime.tv_sec + pH_normal_wait;
-                    spin_unlock(&(profile->lock));
             } 
     }
 }
