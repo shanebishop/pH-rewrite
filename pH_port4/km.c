@@ -469,7 +469,7 @@ int process_syscall(long syscall) {
 	//pr_err("%s: process = %p %d\n", DEVICE_NAME, process, process != NULL);
 	//pr_err("%s: binary = %s\n", DEVICE_NAME, process->profile->filename);
 	//pr_err("%s: profile = %p %d\n", DEVICE_NAME, profile, profile != NULL);
-	pr_err("%s: &(process->profile->lock) = %p %d\n", DEVICE_NAME, &(process->profile->lock), process->profile->lock != NULL);
+	pr_err("%s: &(process->profile->lock) = %p %d\n", DEVICE_NAME, &(process->profile->lock));
 	spin_lock(&(profile->lock));
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
