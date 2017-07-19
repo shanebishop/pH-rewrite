@@ -439,8 +439,10 @@ int process_syscall(long syscall) {
 	}
 	if (profile->filename == NULL) {
 		pr_err("%s: profile is corrupted in process_syscall: NULL profile->filename\n", DEVICE_NAME);
+		pr_err("%s: &(process->profile->lock) = %p\n", DEVICE_NAME, &(process->profile->lock));
 		pr_err("%s: Quitting early in process_syscall\n", DEVICE_NAME);
 		module_inserted_successfully = FALSE;
+		return -1;
 	}
 	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
@@ -471,7 +473,7 @@ int process_syscall(long syscall) {
 	//pr_err("%s: process = %p %d\n", DEVICE_NAME, process, process != NULL);
 	//pr_err("%s: binary = %s\n", DEVICE_NAME, process->profile->filename);
 	//pr_err("%s: profile = %p %d\n", DEVICE_NAME, profile, profile != NULL);
-	pr_err("%s: &(process->profile->lock) = %p\n", DEVICE_NAME, &(process->profile->lock));
+	//pr_err("%s: &(process->profile->lock) = %p\n", DEVICE_NAME, &(process->profile->lock));
 	spin_lock(&(profile->lock));
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
