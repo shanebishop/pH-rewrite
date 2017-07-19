@@ -1011,7 +1011,6 @@ void stack_print(pH_task_struct* process) {
 	int i;
 	pH_seq* iterator = process->seq;
 	pr_err("%s: Got through variable declaration\n", DEVICE_NAME);
-	pr_err("%s: process->seq = %p, iterator = %p\n", DEVICE_NAME, process->seq, iterator);
 	
 	if (process->seq == NULL) {
 		if (process->profile != NULL) {
@@ -1025,6 +1024,8 @@ void stack_print(pH_task_struct* process) {
 	}
 	
 	i = 0;
+	
+	pr_err("%s: process->seq = %p, iterator = %p\n", DEVICE_NAME, process->seq, iterator);
 	
 	if (process->profile != NULL) {
 		pr_err("%s: Printing stack for process %s...\n", DEVICE_NAME, process->profile->filename);
