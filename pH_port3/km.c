@@ -450,12 +450,10 @@ int process_syscall(long syscall) {
 	//pr_err("%s: profile->count = %d\n", DEVICE_NAME, profile->count);
 	//pr_err("%s: profile->train.train_count = %d\n", DEVICE_NAME, profile->train.train_count);
 	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
-	spin_lock(&(profile->lock));
 	
 	if (process && (process->seq) == NULL) {
 		pr_err("%s: process->seq was NULL in process_syscall - look at jsys_execve\n", DEVICE_NAME);
 		pr_err("%s: Error in process_syscall - returning...\n", DEVICE_NAME);
-		spin_unlock(&(profile->lock));
 		return -1;
 		
 		/* // This should be done in jsys_execve now
@@ -487,11 +485,11 @@ int process_syscall(long syscall) {
 	//pr_err("%s: binary = %s\n", DEVICE_NAME, process->profile->filename);
 	//pr_err("%s: profile = %p %d\n", DEVICE_NAME, profile, profile != NULL);
 	//pr_err("%s: &(process->profile->lock) = %p\n", DEVICE_NAME, &(process->profile->lock));
-	//spin_lock(&(profile->lock));
+	spin_lock(&(profile->lock));
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
 	//pr_err("%s: profile->count = %d\n", DEVICE_NAME, profile->count);
-	//spin_unlock(&(profile->lock));
+	spin_unlock(&(profile->lock));
 	
 	//pr_err("%s: process = %p %d\n", DEVICE_NAME, process, process != NULL);
 	///pr_err("%s: profile = %p %d\n", DEVICE_NAME, profile, profile != NULL);
@@ -499,10 +497,8 @@ int process_syscall(long syscall) {
 	if (process) pH_train(process);
 	else {
 		pr_err("%s: ERROR: process is NULL\n", DEVICE_NAME);
-		spin_unlock(&(profile->lock));
 		return -1;
 	}
-	spin_unlock(&(profile->lock));
 	pr_err("%s: Trained process\n", DEVICE_NAME);
 	
 	// Allocate space for new_syscall
@@ -859,10 +855,10 @@ void pH_free_profile(pH_profile *profile)
         return;
     }
     
-    //spin_lock(&(profile->lock));
+    spin_lock(&(profile->lock));
     if (pH_remove_profile_from_list(profile) != 0) {
 		pr_err("%s: ERROR: pH_remove_profile_from_list was unsuccessful in pH_free_profile!\n", DEVICE_NAME);
-		//spin_unlock(&(profile->lock));
+		spin_unlock(&(profile->lock));
 		return;
 	}
 
@@ -871,7 +867,7 @@ void pH_free_profile(pH_profile *profile)
     }
 
     pH_free_profile_storage(profile);
-    //spin_unlock(&(profile->lock));
+    spin_unlock(&(profile->lock));
     //mutex_destroy(&(profile->lock)); // Leave the mutex intact?
     vfree(profile);
     profile = NULL; // This is okay, because profile was removed from the linked list above
