@@ -814,7 +814,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
 		return -1;
 	}
 
-    pr_err("%s: In pH_remove_profile_from_list\n", DEVICE_NAME);
+    pr_err("%s: In pH_remove_profile_from_list for %s\n", DEVICE_NAME, profile->filename);
 
 	spin_lock(&pH_profile_list_sem);
     if (pH_profile_list == NULL) {
@@ -875,7 +875,7 @@ void pH_free_profile(pH_profile *profile)
 int remove_process_from_llist(pH_task_struct* process) {
 	pH_task_struct *prev_task_struct, *cur_task_struct;
 	
-	pr_err("%s: In remove_process_from_llist for %s\n", DEVICE_NAME, profile->filename);
+	pr_err("%s: In remove_process_from_llist for %ld\n", DEVICE_NAME, process->process_id);
 
 	if (pH_task_struct_list == NULL) {
 		err("pH_task_struct_list is empty (NULL) when trying to free process %ld", process->process_id);
