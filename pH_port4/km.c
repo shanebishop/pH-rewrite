@@ -203,6 +203,7 @@ struct jprobe handle_signal_jprobe = {
 	//},
 };
 
+/*
 static long jsys_sigreturn(struct pt_regs*);
 
 struct jprobe sys_sigreturn_jprobe = {
@@ -211,6 +212,7 @@ struct jprobe sys_sigreturn_jprobe = {
 		.symbol_name = "sys_sigreturn",
 	},
 };
+*/
 
 static void jdo_signal(struct pt_regs* regs);
 
