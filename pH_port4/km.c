@@ -248,9 +248,8 @@ struct jprobe jprobes_array[num_syscalls];
 bool module_inserted_successfully = FALSE;
 spinlock_t pH_profile_list_sem;
 
-inline bool pH_monitoring(pH_task_struct *tsk)
-{
-        return (tsk->profile != NULL);
+inline bool pH_monitoring(pH_task_struct* process) {
+        return process->profile != NULL;
 }
 
 inline bool pH_profile_in_use(pH_profile *profile)
@@ -867,7 +866,11 @@ void pH_free_profile(pH_profile *profile)
     }
     
     spin_lock(&(profile->lock));
-    pH_remove_profile_from_list(profile);
+    if (pH_remove_profile_from_list(profile) != 0) {
+    	pr_err("%s: ERROR: pH_remove_profile_from_list was unsuccessful in pH_free_profile!\n", DEVICE_NAME);
+    	spin_unlock(&(profile->lock));
+    	return;
+    }
 
     if (pH_aremonitoring) {
         //pH_write_profile(profile);
@@ -1197,6 +1200,7 @@ not_inserted:
 	return;
 }
 
+/*
 static long jsys_sigreturn(struct pt_regs* regs) {
 	pH_task_struct* process;
 	
@@ -1220,6 +1224,7 @@ not_inserted:
 	jprobe_return();
 	return 0;
 }
+*/
 
 void free_pH_task_structs(void) {
 	while (pH_task_struct_list != NULL) {

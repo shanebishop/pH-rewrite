@@ -1,3 +1,12 @@
+/*
+URL for cloning: https://github.com/shanebishop/pH-rewrite.git
+
+Notes:
+-Know when to use retreive_pH_profile_by_filename instead of retreive_pH_profile_by_pid
+-When retrieving the PID of a process, use pid_vnr(task_tgid(tsk));, where tsk is the task_struct of the particular process
+-Make sure that syscalls are still processed even while waiting to hear back from the user
+-Make sure to update filenames and stuff when done (including ebbchar_init, ebbchar_exit, and ebbchar_mutex)
+*/
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/device.h>
@@ -387,7 +396,7 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	
 	if (!profile || profile == NULL) {
 		pr_err("%s: profile is NULL in make_and_push_new_pH_seq\n", DEVICE_NAME);
-		return 0;
+		return -1;
 	}
 	
 	new_sequence = kmalloc(sizeof(pH_seq), GFP_ATOMIC);
