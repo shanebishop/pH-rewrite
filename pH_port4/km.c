@@ -142,7 +142,7 @@ struct pH_profile {
 	pH_profile *next;
 	//struct file *seq_logfile;
 	pH_seq seq;
-	spinlock_t lock;
+	spinlock_t* lock;
 };
 
 typedef struct pH_seq_logrec {
@@ -307,7 +307,13 @@ int new_profile(pH_profile* profile, char* filename) {
 	profile->anomalies = 0;
 	profile->length = pH_default_looklen;
 	profile->count = 0;
-	spin_lock_init(&(profile->lock));
+
+	profile->lock = kmalloc(sizeof(spinlock_t), GFP_ATOMIC);
+	if (!(profile->lock) || profile->lock == NULL) {
+		pr_err("%s: Unable to allocate memory for profile->lock in new_profile()\n", DEVICE_NAME);
+		return -ENOMEM;
+	}
+	spin_lock_init(profile->lock);
 
 	profile->train.sequences = 0;
 	profile->train.last_mod_count = 0;
@@ -501,11 +507,11 @@ int process_syscall(long syscall) {
 	//pr_err("%s: binary = %s\n", DEVICE_NAME, process->profile->filename);
 	//pr_err("%s: profile = %p %d\n", DEVICE_NAME, profile, profile != NULL);
 	//pr_err("%s: &(process->profile->lock) = %p\n", DEVICE_NAME, &(process->profile->lock));
-	spin_lock(&(profile->lock));
+	spin_lock(profile->lock);
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
 	//pr_err("%s: profile->count = %d\n", DEVICE_NAME, profile->count);
-	spin_unlock(&(profile->lock));
+	spin_unlock(profile->lock);
 	
 	//pr_err("%s: process = %p %d\n", DEVICE_NAME, process, process != NULL);
 	///pr_err("%s: profile = %p %d\n", DEVICE_NAME, profile, profile != NULL);
@@ -867,10 +873,10 @@ void pH_free_profile(pH_profile *profile)
         return;
     }
     
-    spin_lock(&(profile->lock));
+    spin_lock(profile->lock);
     if (pH_remove_profile_from_list(profile) != 0) {
     	pr_err("%s: ERROR: pH_remove_profile_from_list was unsuccessful in pH_free_profile!\n", DEVICE_NAME);
-    	spin_unlock(&(profile->lock));
+    	spin_unlock(profile->lock);
     	return;
     }
 
@@ -879,8 +885,9 @@ void pH_free_profile(pH_profile *profile)
     }
 
     pH_free_profile_storage(profile);
-    spin_unlock(&(profile->lock));
-    //mutex_destroy(&(profile->lock)); // Leave the mutex intact?
+    spin_unlock(profile->lock);
+    kfree(profile->lock);
+    profile->lock = NULL;
     vfree(profile);
     profile = NULL; // This is okay, because profile was removed from the linked list above
     pr_err("%s: Freed pH_profile (end of function)\n", DEVICE_NAME);
