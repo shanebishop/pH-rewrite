@@ -248,9 +248,9 @@ struct jprobe jprobes_array[num_syscalls];
 bool module_inserted_successfully = FALSE;
 spinlock_t pH_profile_list_sem;
 
-inline bool pH_monitoring(struct task_struct *tsk)
+inline bool pH_monitoring(pH_task_struct *tsk)
 {
-        return (tsk->pH_state.profile != NULL);
+        return (tsk->profile != NULL);
 }
 
 inline bool pH_profile_in_use(pH_profile *profile)
