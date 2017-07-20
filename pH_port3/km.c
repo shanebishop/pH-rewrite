@@ -233,6 +233,30 @@ struct jprobe jprobes_array[num_syscalls];
 bool module_inserted_successfully = FALSE;
 spinlock_t pH_profile_list_sem;
 
+inline bool pH_monitoring(pH_task_struct* process) {
+	return process->profile != NULL;
+}
+
+inline bool pH_profile_in_use(pH_profile* profile) {
+	return atomic_read(&(profile->refcount)) > 0;
+}
+
+inline void pH_refcount_inc(pH_profile* profile) {
+	atomic_inc(&(profile->refcount));
+}
+
+inline bool pH_refcount_dec_and_test(pH_profile *profile) {
+	return atomic_dec_and_test(&(profile->refcount));
+}
+
+inline void pH_refcount_dec(pH_profile *profile) {
+	atomic_dec(&(profile->refcount));
+}
+
+inline void pH_refcount_init(pH_profile *profile, int i) {
+	profile->refcount.counter = i;
+}
+
 void add_to_profile_llist(pH_profile* p) {
 	if (pH_profile_list == NULL) {
 		pH_profile_list = p;
@@ -287,7 +311,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	profile->test = profile->train;
 
 	profile->next = NULL;
-	//pH_refcount_init(profile, 0);
+	pH_refcount_init(profile, 0);
 	profile->filename = filename;
 
 	//pH_open_seq_logfile(profile);
@@ -427,7 +451,13 @@ int process_syscall(long syscall) {
 	//pr_err("%s: profile->train.train_count = %d\n", DEVICE_NAME, profile->train.train_count);
 	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
+	
 	if (process && (process->seq) == NULL) {
+		pr_err("%s: process->seq was NULL in process_syscall - look at jsys_execve\n", DEVICE_NAME);
+		pr_err("%s: Error in process_syscall - returning...\n", DEVICE_NAME);
+		return -1;
+		
+		/* // This should be done in jsys_execve now
 		pH_seq* temp = (pH_seq*) kmalloc(sizeof(pH_seq), GFP_ATOMIC);
 		if (!temp) {
 			pr_err("%s: Unable to allocate memory for temp in process_syscall\n", DEVICE_NAME);
@@ -445,6 +475,7 @@ int process_syscall(long syscall) {
 		//pr_err("%s: Got here 2\n", DEVICE_NAME);
 		INIT_LIST_HEAD(&temp->seqList);
 		//pr_err("%s: Successfully allocated memory for temp in process_syscall\n", DEVICE_NAME);
+		*/
 	}
 	
 	if (process) process->count++;
@@ -539,6 +570,7 @@ static long jsys_execve(const char __user *filename,
 	pH_task_struct* this_process;
 	pH_profile* profile;
 	int current_process_id;
+	int i;
 
 	if (!module_inserted_successfully) goto not_inserted;
 	
@@ -599,6 +631,29 @@ static long jsys_execve(const char __user *filename,
 		kfree(path_to_binary);
 	}
 	
+	this_process->seq = kmalloc(sizeof(pH_seq), GFP_ATOMIC);
+	if (!(this_process->seq)) {
+		pr_err("%s: Unable to allocate memory for this_process->seq in jsys_execve\n", DEVICE_NAME);
+		goto no_memory;
+	}
+
+	this_process->seq->next = NULL;
+	this_process->seq->length = profile->length;
+	this_process->seq->last = profile->length - 1;
+	
+	for (i = 0; i < PH_MAX_SEQLEN; i++) {
+		this_process->seq->data[i] = PH_EMPTY_SYSCALL;
+	}
+	
+	//pr_err("%s: Got here 1\n", DEVICE_NAME);
+	//process->seq = temp;
+	//INIT_LIST_HEAD(&temp->seqList);
+	stack_push(this_process, this_process->seq);
+	//pr_err("%s: Got here 2\n", DEVICE_NAME);
+	INIT_LIST_HEAD(&(this_process->seq->seqList));
+	//pr_err("%s: Successfully allocated memory for temp in process_syscall\n", DEVICE_NAME);
+	
+	pH_refcount_inc(profile);
 	this_process->profile = profile;
 	
 	add_process_to_llist(this_process);
@@ -614,7 +669,9 @@ no_memory:
 	pr_err("%s: Ran out of memory\n", DEVICE_NAME);
 	
 	kfree(path_to_binary);
-	free_pH_task_struct(this_process);
+	path_to_binary = NULL;
+	if (this_process != NULL) free_pH_task_struct(this_process);
+	this_process = NULL;
 	
 	jprobe_return();
 	return 0;
@@ -713,11 +770,12 @@ static int exit_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 }
 
 static struct kretprobe exit_kretprobe = {
-	.handler = /*(kprobe_opcode_t*)*/ exit_handler,
+	.handler = exit_handler,
 	.data_size = sizeof(struct my_kretprobe_data),
 	.maxactive = 20,
 };
 
+// This function should only be called when the profile is locked
 void pH_free_profile_storage(pH_profile *profile)
 {
     int i;
@@ -741,12 +799,18 @@ void pH_free_profile_storage(pH_profile *profile)
 }
 
 // Returns 0 on success and anything else on failure
+// This function should only be called when the profile is locked
 // Calling functions MUST handle returned errors if possible
 int pH_remove_profile_from_list(pH_profile *profile)
 {
     pH_profile *prev_profile, *cur_profile;
     
 	if (!profile || profile == NULL) return 0;
+	
+	if (atomic_read(&(profile->refcount)) != 0) {
+		pr_err("%s: ERROR: Trying to remove a profile that is in use\n", DEVICE_NAME);
+		return -1;
+	}
 
     pr_err("%s: In pH_remove_profile_from_list\n", DEVICE_NAME);
 
@@ -790,13 +854,17 @@ void pH_free_profile(pH_profile *profile)
         return;
     }
     
-    pH_remove_profile_from_list(profile);
+    spin_lock(&(profile->lock));
+    if (pH_remove_profile_from_list(profile) != 0) {
+		pr_err("%s: pH_remove_profile_from_list was unsuccessful\n", DEVICE_NAME);
+	}
 
     if (pH_aremonitoring) {
         //pH_write_profile(profile);
     }
 
     pH_free_profile_storage(profile);
+    spin_unlock(&(profile->lock));
     //mutex_destroy(&(profile->lock)); // Leave the mutex intact?
     vfree(profile);
     profile = NULL; // This is okay, because profile was removed from the linked list above
@@ -864,6 +932,9 @@ void free_profiles(void) {
 	
 	// New implementation
 	while (pH_profile_list != NULL) {
+		spin_lock(&(pH_profile_list->lock));
+		pH_profile_list->refcount.counter = 0;
+		spin_unlock(&(pH_profile_list->lock));
 		pH_free_profile(pH_profile_list);
 	}
 }
@@ -985,9 +1056,9 @@ void stack_print(pH_task_struct* process) {
 			pr_err("%s: Printing stack for process %s: Stack is empty\n", DEVICE_NAME, process->profile->filename);
 		}
 		else {
-			pr_err("%s: Printing stack for process %d: Stack is empty\n", DEVICE_NAME, process->process_id);
+			pr_err("%s: Printing stack for process %ld: Stack is empty\n", DEVICE_NAME, process->process_id);
 		}
-		pr_err("%s: Printing stack for process %d: Stack is empty\n", DEVICE_NAME, process->process_id);
+		pr_err("%s: Printing stack for process %ld: Stack is empty\n", DEVICE_NAME, process->process_id);
 		return;
 	}
 	
@@ -999,7 +1070,7 @@ void stack_print(pH_task_struct* process) {
 		pr_err("%s: Printing stack for process %s...\n", DEVICE_NAME, process->profile->filename);
 	}
 	else {
-		pr_err("%s: Printing stack for process %d...\n", DEVICE_NAME, process->process_id);
+		pr_err("%s: Printing stack for process %ld...\n", DEVICE_NAME, process->process_id);
 	}
 	do {
 		pr_err("%s: %d: length = %d\n", DEVICE_NAME, i, iterator->length);
@@ -1253,12 +1324,18 @@ static int __init ebbchar_init(void){
 		
 		return PTR_ERR(ebbcharDevice);
 	}
+	*/
 	
 	// Regiser exit_kretprobe
 	exit_kretprobe.kp.addr = (kprobe_opcode_t*) kallsyms_lookup_name("do_exit");
 	
-	if (kallsyms_lookup_name("do_exit") == NULL) {
-		pr_err("%s: Did not find symbol 'do_exit'\n", DEVICE_NAME);
+	if (kallsyms_lookup_name("do_exit") != 0) {
+		pr_err("%s: Found symbol 'do_exit'\n", DEVICE_NAME);
+	}
+	
+	ret = register_kretprobe(&exit_kretprobe);
+	if (ret < 0) {
+		pr_err("%s: Failed to register do_exit kretprobe, returned %d\n", DEVICE_NAME, ret);
 		
 		//unregister_jprobe(&handle_signal_jprobe);
 		//unregister_jprobe(&sys_sigreturn_jprobe);
@@ -1275,30 +1352,7 @@ static int __init ebbchar_init(void){
 		
 		return PTR_ERR(ebbcharDevice);
 	}
-	pr_err("%s: Found symbol 'do_exit'\n", DEVICE_NAME);
-	
-	
-	ret = register_kretprobe(&exit_kretprobe);
-	if (ret < 0) {
-		pr_err("%s: Failed to register do_exit kretprobe, returned %d\n", DEVICE_NAME, ret);
-		
-		//unregister_jprobe(&handle_signal_jprobe);
-		//unregister_jprobe(&sys_sigreturn_jprobe);
-		unregister_kretprobe(&fork_kretprobe);
-		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
-	}
 	pr_err("%s: Registered exit_kretprobe\n", DEVICE_NAME);
-	*/
 
 	//pr_err("%s: num_syscalls = %d\n", DEVICE_NAME, num_syscalls);
 	for (i = 0; i < num_syscalls; i++) {
@@ -1367,11 +1421,11 @@ static void __exit ebbchar_exit(void){
 	// Unregister fork_kretprobe
 	unregister_kretprobe(&fork_kretprobe);
 	pr_err("%s: Missed probing %d instances of fork\n", DEVICE_NAME, fork_kretprobe.nmissed);
+	*/
 	
 	// Unregister exit_kretprobe
 	unregister_kretprobe(&exit_kretprobe);
 	pr_err("%s: Missed probing %d instances of exit\n", DEVICE_NAME, exit_kretprobe.nmissed);
-	*/
 	
 	pr_err("%s: Freeing profiles...\n", DEVICE_NAME);
 	free_profiles();
