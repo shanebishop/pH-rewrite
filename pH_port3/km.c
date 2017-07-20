@@ -354,7 +354,7 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 		return NULL;
 	}
 	
-	//pr_err("%s: In llist_retrieve_process\n", DEVICE_NAME);
+	pr_err("%s: In llist_retrieve_process\n", DEVICE_NAME);
 
 	if (pH_task_struct_list == NULL) {
 		return NULL;
@@ -362,13 +362,13 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 	
 	do {
 		if (iterator->process_id == process_id) {
-			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
+			pr_err("%s: Found it! Returning\n", DEVICE_NAME);
 			return iterator;
 		}
 		iterator = iterator->next;
 	} while (iterator);
 	
-	//pr_err("%s: Process %d not found\n", DEVICE_NAME, process_id);
+	pr_err("%s: Process %d not found\n", DEVICE_NAME, process_id);
 	return NULL;
 }
 
@@ -425,7 +425,7 @@ int process_syscall(long syscall) {
 	
 	if (!pH_task_struct_list || pH_task_struct_list == NULL) return 0;
 
-	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
+	pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
@@ -434,7 +434,7 @@ int process_syscall(long syscall) {
 		return 0;
 	}
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
-	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
+	pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
 	
 	if (process) profile = process->profile; // Store process->profile in profile for shorter reference
 	else {
@@ -450,7 +450,6 @@ int process_syscall(long syscall) {
 	//pr_err("%s: profile->count = %d\n", DEVICE_NAME, profile->count);
 	//pr_err("%s: profile->train.train_count = %d\n", DEVICE_NAME, profile->train.train_count);
 	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
-	
 	
 	if (process && (process->seq) == NULL) {
 		pr_err("%s: process->seq was NULL in process_syscall - look at jsys_execve\n", DEVICE_NAME);
@@ -480,7 +479,7 @@ int process_syscall(long syscall) {
 	
 	if (process) process->count++;
 	if (process) pH_append_call(process->seq, syscall);
-	//pr_err("%s: Successfully appended call\n", DEVICE_NAME);
+	pr_err("%s: Successfully appended call\n", DEVICE_NAME);
 	
 	//pr_err("%s: process = %p %d\n", DEVICE_NAME, process, process != NULL);
 	//pr_err("%s: binary = %s\n", DEVICE_NAME, process->profile->filename);
@@ -500,7 +499,7 @@ int process_syscall(long syscall) {
 		pr_err("%s: ERROR: process is NULL\n", DEVICE_NAME);
 		return -1;
 	}
-	//pr_err("%s: Trained process\n", DEVICE_NAME);
+	pr_err("%s: Trained process\n", DEVICE_NAME);
 	
 	// Allocate space for new_syscall
 	new_syscall = kmalloc(sizeof(my_syscall), GFP_ATOMIC);
@@ -509,13 +508,13 @@ int process_syscall(long syscall) {
 		kfree(process->seq);
 		return -ENOMEM;
 	}
-	//pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
+	pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
 	
 	// Add new_syscall to the linked list of syscalls
 	new_syscall->syscall_num = syscall;
 	add_to_my_syscall_llist(process, new_syscall);
 	
-	//pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
+	pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
 	
 	return 0;
 }
@@ -541,12 +540,12 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	if (pH_profile_list == NULL) {
 		return NULL;
 	}
-	//pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
+	pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
 	
 	spin_lock(&pH_profile_list_sem);
 	do {
 		if (strcmp(filename, iterator->filename) == 0) {
-			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
+			pr_err("%s: Found it! Returning\n", DEVICE_NAME);
 			spin_unlock(&pH_profile_list_sem);
 			return iterator;
 		}
@@ -556,7 +555,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	} while (iterator);
 	
 	spin_unlock(&pH_profile_list_sem);
-	//pr_err("%s: No matching profile was found\n", DEVICE_NAME);
+	pr_err("%s: No matching profile was found\n", DEVICE_NAME);
 	return NULL;
 }
 
@@ -576,7 +575,7 @@ static long jsys_execve(const char __user *filename,
 	
 	if (!pH_aremonitoring) goto not_monitoring;
 
-	//pr_err("%s: In jsys_execve\n", DEVICE_NAME);
+	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
 	
 	current_process_id = pid_vnr(task_tgid(current));
 	
@@ -589,7 +588,7 @@ static long jsys_execve(const char __user *filename,
 	
 	// Copy memory from userspace to kernel land
 	copy_from_user(path_to_binary, filename, sizeof(char) * 4000);
-	//pr_err("%s: path_to_binary = %s\n", DEVICE_NAME, path_to_binary);
+	pr_err("%s: path_to_binary = %s\n", DEVICE_NAME, path_to_binary);
 	
 	// Allocate memory for this_process
 	this_process = kmalloc(sizeof(pH_task_struct), GFP_ATOMIC);
@@ -605,12 +604,12 @@ static long jsys_execve(const char __user *filename,
 	this_process->syscall_llist = NULL;
 	this_process->delay = 0;
 	this_process->count = 0;
-	//pr_err("%s: Initialized process\n", DEVICE_NAME);
+	pr_err("%s: Initialized process\n", DEVICE_NAME);
 	
 	// Retrieve the corresponding profile
 	//pr_err("%s: Retrieving profile from llist...\n", DEVICE_NAME);
 	profile = retrieve_pH_profile_by_filename(path_to_binary);
-	//pr_err("%s: Attempted to retrieve profile\n", DEVICE_NAME);
+	pr_err("%s: Attempted to retrieve profile\n", DEVICE_NAME);
 	
 	// If there is no corresponding profile, make a new one
 	if (!profile) {
@@ -659,10 +658,10 @@ static long jsys_execve(const char __user *filename,
 	pr_err("%s: Successfully initialized profile in jsys_execve\n", DEVICE_NAME);
 	
 	add_process_to_llist(this_process);
-	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
+	pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
 	process_syscall(59);
-	//pr_err("%s: Back in jsys_execve after processing syscall\n", DEVICE_NAME);
+	pr_err("%s: Back in jsys_execve after processing syscall\n", DEVICE_NAME);
 	
 	jprobe_return();
 	return 0;
@@ -786,7 +785,7 @@ void pH_free_profile_storage(pH_profile *profile)
 
     kfree(profile->filename);
     profile->filename = NULL;
-    //pr_err("%s: Freed profile->filename\n", DEVICE_NAME);
+    pr_err("%s: Freed profile->filename\n", DEVICE_NAME);
     
     for (i = 0; i < PH_NUM_SYSCALLS; i++) {
             if (profile->train.entry[i]) {
@@ -994,7 +993,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 				pr_err("%s: Freed profile\n", DEVICE_NAME);
 			}
 		}
-		//pr_err("%s: Made it through if\n", DEVICE_NAME);
+		pr_err("%s: Made it through if\n", DEVICE_NAME);
 	}
 	
 	// When everything else is done, remove process from llist, kfree process
@@ -1134,7 +1133,7 @@ void stack_pop(pH_task_struct* process) {
 	//pr_err("%s: Freed temp\n", DEVICE_NAME);
 	temp = NULL;
 	//mutex_unlock(&(process->pH_seq_stack_sem));
-	//pr_err("%s: Done stack_pop\n", DEVICE_NAME);
+	pr_err("%s: Done stack_pop\n", DEVICE_NAME);
 }
 
 pH_seq* stack_peek(pH_task_struct* process) {
@@ -1501,7 +1500,7 @@ int pH_add_seq_storage(pH_profile_data *data, int val)
     for (i = 0; i < PH_NUM_SYSCALLS; i++) {
     	data->entry[val][i] = 0;
     }
-    //pr_err("%s: Iterated over data->entry[val]\n", DEVICE_NAME);
+    pr_err("%s: Iterated over data->entry[val]\n", DEVICE_NAME);
     
     return 0;
 }
@@ -1512,7 +1511,7 @@ void pH_add_seq(pH_seq *s, pH_profile_data *data)
 	int i, cur_call, prev_call, cur_idx;
 	u8 *seqdata = s->data;
 	int seqlen = s->length;
-	//pr_err("%s: Initialized variables for pH_add_seq\n", DEVICE_NAME);
+	pr_err("%s: Initialized variables for pH_add_seq\n", DEVICE_NAME);
 
 	if (!data || data == NULL) {
 		pr_err("%s: ERROR: data is NULL in pH_add_seq\n", DEVICE_NAME);
@@ -1521,7 +1520,7 @@ void pH_add_seq(pH_seq *s, pH_profile_data *data)
 
 	cur_idx = s->last;
 	cur_call = seqdata[cur_idx];
-	//pr_err("%s: Initialized cur_idx and cur_call\n", DEVICE_NAME);
+	pr_err("%s: Initialized cur_idx and cur_call\n", DEVICE_NAME);
 
 	for (i = 1; i < seqlen; i++) {
 		//pr_err("%s: PH_NUM_SYSCALLS = %d\n", DEVICE_NAME, PH_NUM_SYSCALLS); // PH_NUM_SYSCALLS = 361
