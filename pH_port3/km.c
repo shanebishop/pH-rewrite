@@ -698,7 +698,6 @@ static int exit_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	
 	pr_err("%s: In exit_handler for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
 	
-	/*
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	
 	if (process == NULL) return 0;
@@ -709,7 +708,6 @@ static int exit_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	now = ktime_get();
 	
 	free_pH_task_struct(process);
-	*/
 	
 	return 0;
 }
@@ -940,7 +938,6 @@ static long jsys_exit(int error_code) {
 	
 	pr_err("%s: In jsys_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
 	
-	/*
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	
 	if (process == NULL) goto not_monitoring;
@@ -951,7 +948,6 @@ static long jsys_exit(int error_code) {
 	pr_err("%s: Back in jsys_exit after processing syscall\n", DEVICE_NAME);
 	
 	free_pH_task_struct(process);
-	*/
 	
 	jprobe_return();
 	return 0;
