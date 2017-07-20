@@ -636,6 +636,7 @@ static long jsys_execve(const char __user *filename,
 		pr_err("%s: Unable to allocate memory for this_process->seq in jsys_execve\n", DEVICE_NAME);
 		goto no_memory;
 	}
+	pr_err("%s: Successfully allocated memory for this_process->seq in jsys_execve\n", DEVICE_NAME);
 
 	this_process->seq->next = NULL;
 	this_process->seq->length = profile->length;
@@ -651,10 +652,11 @@ static long jsys_execve(const char __user *filename,
 	stack_push(this_process, this_process->seq);
 	//pr_err("%s: Got here 2\n", DEVICE_NAME);
 	INIT_LIST_HEAD(&(this_process->seq->seqList));
-	//pr_err("%s: Successfully allocated memory for temp in process_syscall\n", DEVICE_NAME);
+	pr_err("%s: Successfully initialized this_process->seq in jsys_execve\n", DEVICE_NAME);
 	
 	pH_refcount_inc(profile);
 	this_process->profile = profile;
+	pr_err("%s: Successfully initialized profile in jsys_execve\n", DEVICE_NAME);
 	
 	add_process_to_llist(this_process);
 	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
@@ -780,7 +782,7 @@ void pH_free_profile_storage(pH_profile *profile)
 {
     int i;
 
-	pr_err("%s: In pH_free_profile_storage\n", DEVICE_NAME);
+	pr_err("%s: In pH_free_profile_storage for %s\n", DEVICE_NAME, profile->filename);
 
     kfree(profile->filename);
     profile->filename = NULL;
@@ -847,7 +849,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
 
 void pH_free_profile(pH_profile *profile)
 {
-    pr_err("%s: In pH_free_profile\n", DEVICE_NAME);
+    pr_err("%s: In pH_free_profile for %s\n", DEVICE_NAME, profile->filename);
     
     if (!profile || profile == NULL) {
         err("no profile to free!");
@@ -873,7 +875,7 @@ void pH_free_profile(pH_profile *profile)
 int remove_process_from_llist(pH_task_struct* process) {
 	pH_task_struct *prev_task_struct, *cur_task_struct;
 	
-	pr_err("%s: In remove_process_from_llist\n", DEVICE_NAME);
+	pr_err("%s: In remove_process_from_llist for %s\n", DEVICE_NAME, profile->filename);
 
 	if (pH_task_struct_list == NULL) {
 		err("pH_task_struct_list is empty (NULL) when trying to free process %ld", process->process_id);
@@ -950,7 +952,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 		return;
 	}
 
-	pr_err("%s: In free_pH_task_struct\n", DEVICE_NAME);
+	pr_err("%s: In free_pH_task_struct for %ld\n", DEVICE_NAME, process->process_id);
 	//pr_err("%s: process = %p\n", DEVICE_NAME, process);
 	//pr_err("%s: process->seq = %p\n", DEVICE_NAME, process->seq);
 	
@@ -1396,7 +1398,7 @@ static int __init ebbchar_init(void){
 }
 
 // Perhaps the best way to remove the module is just to reboot?
-static void __exit ebbchar_exit(void){
+static void __exit ebbchar_exit(void) {
 	int i;
 	
 	// Set all booleans accordingly - this should be the first thing you do to prevent any more code from running
