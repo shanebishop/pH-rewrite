@@ -425,7 +425,7 @@ int process_syscall(long syscall) {
 	
 	if (!pH_task_struct_list || pH_task_struct_list == NULL) return 0;
 
-	pr_err("%s: In process_syscall\n", DEVICE_NAME);
+	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
@@ -434,7 +434,7 @@ int process_syscall(long syscall) {
 		return 0;
 	}
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
-	pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
+	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
 	
 	if (process) profile = process->profile; // Store process->profile in profile for shorter reference
 	else {
@@ -479,7 +479,7 @@ int process_syscall(long syscall) {
 	
 	if (process) process->count++;
 	if (process) pH_append_call(process->seq, syscall);
-	pr_err("%s: Successfully appended call\n", DEVICE_NAME);
+	//pr_err("%s: Successfully appended call\n", DEVICE_NAME);
 	
 	//pr_err("%s: process = %p %d\n", DEVICE_NAME, process, process != NULL);
 	//pr_err("%s: binary = %s\n", DEVICE_NAME, process->profile->filename);
@@ -499,7 +499,7 @@ int process_syscall(long syscall) {
 		pr_err("%s: ERROR: process is NULL\n", DEVICE_NAME);
 		return -1;
 	}
-	pr_err("%s: Trained process\n", DEVICE_NAME);
+	//pr_err("%s: Trained process\n", DEVICE_NAME);
 	
 	// Allocate space for new_syscall
 	new_syscall = kmalloc(sizeof(my_syscall), GFP_ATOMIC);
@@ -514,7 +514,7 @@ int process_syscall(long syscall) {
 	new_syscall->syscall_num = syscall;
 	add_to_my_syscall_llist(process, new_syscall);
 	
-	pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
+	//pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
 	
 	return 0;
 }
