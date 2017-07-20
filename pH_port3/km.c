@@ -855,9 +855,11 @@ void pH_free_profile(pH_profile *profile)
         return;
     }
     
-    spin_lock(&(profile->lock));
+    //spin_lock(&(profile->lock));
     if (pH_remove_profile_from_list(profile) != 0) {
-		pr_err("%s: pH_remove_profile_from_list was unsuccessful\n", DEVICE_NAME);
+		pr_err("%s: ERROR: pH_remove_profile_from_list was unsuccessful in pH_free_profile!\n", DEVICE_NAME);
+		//spin_unlock(&(profile->lock));
+		return;
 	}
 
     if (pH_aremonitoring) {
@@ -865,7 +867,7 @@ void pH_free_profile(pH_profile *profile)
     }
 
     pH_free_profile_storage(profile);
-    spin_unlock(&(profile->lock));
+    //spin_unlock(&(profile->lock));
     //mutex_destroy(&(profile->lock)); // Leave the mutex intact?
     vfree(profile);
     profile = NULL; // This is okay, because profile was removed from the linked list above
