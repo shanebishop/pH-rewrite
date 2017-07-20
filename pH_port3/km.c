@@ -354,7 +354,7 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 		return NULL;
 	}
 	
-	pr_err("%s: In llist_retrieve_process\n", DEVICE_NAME);
+	//pr_err("%s: In llist_retrieve_process\n", DEVICE_NAME);
 
 	if (pH_task_struct_list == NULL) {
 		return NULL;
@@ -362,13 +362,13 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 	
 	do {
 		if (iterator->process_id == process_id) {
-			pr_err("%s: Found it! Returning\n", DEVICE_NAME);
+			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
 			return iterator;
 		}
 		iterator = iterator->next;
 	} while (iterator);
 	
-	pr_err("%s: Process %d not found\n", DEVICE_NAME, process_id);
+	//pr_err("%s: Process %d not found\n", DEVICE_NAME, process_id);
 	return NULL;
 }
 
@@ -1622,7 +1622,6 @@ int pH_test_seq(pH_seq *s, pH_profile_data *data)
 
 	return mismatches;
 }
-
 
 inline void pH_train(pH_task_struct *s)
 {
