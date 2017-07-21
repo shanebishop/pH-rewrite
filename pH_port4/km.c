@@ -253,6 +253,7 @@ pH_task_struct* pH_task_struct_list = NULL;
 struct jprobe jprobes_array[num_syscalls];
 bool module_inserted_successfully = FALSE;
 spinlock_t pH_profile_list_sem;
+int profiles_created = 0;
 
 inline bool pH_monitoring(pH_task_struct* process) {
         return process->profile != NULL;
@@ -304,6 +305,9 @@ int new_profile(pH_profile* profile, char* filename) {
 		pr_err("%s: ERROR: NULL profile was passed to new_profile()\n", DEVICE_NAME);
 		return -1;
 	}
+
+	profiles_created++;
+	profile->identifier = profiles_created;
 
 	profile->normal = 0;  // We just started - not normal yet!
 	profile->frozen = 0;
@@ -510,7 +514,8 @@ int process_syscall(long syscall) {
 	//pr_err("%s: process = %p %d\n", DEVICE_NAME, process, process != NULL);
 	//pr_err("%s: binary = %s\n", DEVICE_NAME, process->profile->filename);
 	//pr_err("%s: profile = %p %d\n", DEVICE_NAME, profile, profile != NULL);
-	pr_err("%s: profile->lock = %p\n", DEVICE_NAME, profile->lock);
+	pr_err("%s: profile->identifer = %d\n", DEVICE_NAME, profile->identifier);
+	//pr_err("%s: profile->lock = %p\n", DEVICE_NAME, profile->lock);
 	spin_lock(profile->lock);
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
@@ -804,7 +809,7 @@ void pH_free_profile_storage(pH_profile *profile)
 {
     int i;
 
-	pr_err("%s: In pH_free_profile_storage\n", DEVICE_NAME);
+	pr_err("%s: In pH_free_profile_storage for %d\n", DEVICE_NAME, profile->identifier);
 
     kfree(profile->filename);
     profile->filename = NULL;
@@ -836,7 +841,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
 		return -1;
 	}
 
-    pr_err("%s: In pH_remove_profile_from_list\n", DEVICE_NAME);
+    pr_err("%s: In pH_remove_profile_from_list for %d\n", DEVICE_NAME, profile->identifier);
 	
 	/*
 	//spin_lock(&pH_profile_list_sem);
@@ -899,7 +904,7 @@ void pH_free_profile(pH_profile *profile)
 {
     int ret;
     
-    pr_err("%s: In pH_free_profile\n", DEVICE_NAME);
+    pr_err("%s: In pH_free_profile for %d\n", DEVICE_NAME, profile->identifier);
     
     if (!profile || profile == NULL) {
         err("no profile to free!");
