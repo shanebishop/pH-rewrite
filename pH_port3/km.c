@@ -824,15 +824,15 @@ int pH_remove_profile_from_list(pH_profile *profile)
 
     pr_err("%s: In pH_remove_profile_from_list for %s\n", DEVICE_NAME, profile->filename);
 
-	spin_lock(&pH_profile_list_sem);
+	//spin_lock(&pH_profile_list_sem);
     if (pH_profile_list == NULL) {
     	err("pH_profile_list is empty (NULL) when trying to free profile %s", profile->filename);
-    	spin_unlock(&pH_profile_list_sem);
+    	//spin_unlock(&pH_profile_list_sem);
     	return -1;
     }
     else if (pH_profile_list == profile) {
     	pH_profile_list = pH_profile_list->next;
-    	spin_unlock(&pH_profile_list_sem);
+    	//spin_unlock(&pH_profile_list_sem);
     	return 0;
     }
     else {
@@ -841,7 +841,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
     	while (cur_profile != NULL) {
     		if (cur_profile == profile) {
     			prev_profile->next = profile->next;
-    			spin_unlock(&pH_profile_list_sem);
+    			//spin_unlock(&pH_profile_list_sem);
     			return 0;
     		}
     		
@@ -850,13 +850,15 @@ int pH_remove_profile_from_list(pH_profile *profile)
     	}
     	
     	err("While freeing, couldn't find profile %s in pH_profile_list", profile->filename);
-    	spin_unlock(&pH_profile_list_sem);
+    	//spin_unlock(&pH_profile_list_sem);
     	return -1;
     }
 }
 
 void pH_free_profile(pH_profile *profile)
 {
+    int ret;
+    
     pr_err("%s: In pH_free_profile for %s\n", DEVICE_NAME, profile->filename);
     
     if (!profile || profile == NULL) {
@@ -865,7 +867,16 @@ void pH_free_profile(pH_profile *profile)
     }
     
     spin_lock(&(profile->lock));
-    if (pH_remove_profile_from_list(profile) != 0) {
+    if (spin_trylock(&profile_list_sem) == 0) {
+    	spin_unlock(&(profile->lock));
+    	spin_lock(&profile_list_sem);
+    	spin_lock(&(profile->lock));
+    }
+    
+    ret = pH_remove_profile_from_list(profile);
+    spin_unlock(&profile_list_sem);
+    
+    if (ret != 0) {	
 		pr_err("%s: ERROR: pH_remove_profile_from_list was unsuccessful in pH_free_profile!\n", DEVICE_NAME);
 		spin_unlock(&(profile->lock));
 		return;
