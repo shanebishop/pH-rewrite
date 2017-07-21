@@ -487,10 +487,18 @@ int process_syscall(long syscall) {
 	*/
 	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
+	if (!(profile->lock) || profile->lock == NULL) {
+		pr_err("%s: profile->lock is NULL in process_syscall\n", DEVICE_NAME);
+		return -1;
+	}
+	
+	spin_lock(profile->lock);
+	
 	if (process && (process->seq) == NULL) {
 		pH_seq* temp = (pH_seq*) kmalloc(sizeof(pH_seq), GFP_ATOMIC);
 		if (!temp) {
 			pr_err("%s: Unable to allocate memory for temp in process_syscall\n", DEVICE_NAME);
+			spin_unlock(profile->lock);
 			return -ENOMEM;
 		}
 
@@ -516,7 +524,7 @@ int process_syscall(long syscall) {
 	//pr_err("%s: profile = %p %d\n", DEVICE_NAME, profile, profile != NULL);
 	pr_err("%s: profile->identifer = %d\n", DEVICE_NAME, profile->identifier);
 	//pr_err("%s: profile->lock = %p\n", DEVICE_NAME, profile->lock);
-	spin_lock(profile->lock);
+	//spin_lock(profile->lock);
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
 	//pr_err("%s: profile->count = %d\n", DEVICE_NAME, profile->count);
@@ -827,6 +835,31 @@ void pH_free_profile_storage(pH_profile *profile)
     }
 }
 
+bool profile_list_contains_identifier(int identifier) {
+	pH_profile* iterator = pH_profile_list;
+	
+	if (pH_profile_list == NULL) {
+		return FALSE;
+	}
+	//pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
+	
+	
+	do {
+		if (iterator->identifier == identifier) {
+			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
+			
+			return TRUE;
+		}
+		
+		iterator = iterator->next;
+		//pr_err("%s: Iterating\n", DEVICE_NAME);
+	} while (iterator);
+	
+	
+	//pr_err("%s: No matching profile was found\n", DEVICE_NAME);
+	return FALSE;
+}
+
 // Returns 0 on success and anything else on failure
 // Calling functions (currently only pH_free_profile) MUST handle returned errors if possible
 // Currently does not hold any locks, and therefore calling functions must lock appropriately
@@ -919,6 +952,13 @@ void pH_free_profile(pH_profile *profile)
     }
     
     ret = pH_remove_profile_from_list(profile);
+    if (profile_list_contains_identifier(profile->identifier)) {
+    	pr_err("%s: ERROR: After removing profile, profile with identifer is still in list!\n", DEVICE_NAME);
+    	spin_unlock(profile->lock);
+    	// Cause an intentional crash
+    	panic("After removing profile, profile with identifer is still in list");
+    	return;
+    }
     spin_unlock(&pH_profile_list_sem);
     
     if (ret != 0) {
