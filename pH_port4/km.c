@@ -3,9 +3,13 @@ URL for cloning: https://github.com/shanebishop/pH-rewrite.git
 
 Notes:
 -Know when to use retreive_pH_profile_by_filename instead of retreive_pH_profile_by_pid
--When retrieving the PID of a process, use pid_vnr(task_tgid(tsk));, where tsk is the task_struct of the particular process
+-When retrieving the PID of a process, use pid_vnr(task_tgid(tsk));, where tsk is the task_struct of 
+the particular process
 -Make sure that syscalls are still processed even while waiting to hear back from the user
--Make sure to update filenames and stuff when done (including ebbchar_init, ebbchar_exit, and ebbchar_mutex)
+-Make sure to update filenames and stuff when done (including ebbchar_init, ebbchar_exit, and 
+ebbchar_mutex)
+-Never use booleans to stop code from running after a fatal error, instead use panic() with a detailed
+eror message
 */
 #include <linux/init.h>
 #include <linux/module.h>
@@ -849,7 +853,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
     	cur_profile = pH_profile_list->next;
     	while (cur_profile != NULL) {
     		if (cur_profile == profile) {
-    			prev_profile->next = profile->next;
+    			prev_profile->next = cur_profile->next;
     			//spin_unlock(&pH_profile_list_sem);
     			return 0;
     		}
