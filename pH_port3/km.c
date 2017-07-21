@@ -867,14 +867,14 @@ void pH_free_profile(pH_profile *profile)
     }
     
     spin_lock(&(profile->lock));
-    if (spin_trylock(&profile_list_sem) == 0) {
+    if (spin_trylock(&pH_profile_list_sem) == 0) {
     	spin_unlock(&(profile->lock));
-    	spin_lock(&profile_list_sem);
+    	spin_lock(&pH_profile_list_sem);
     	spin_lock(&(profile->lock));
     }
     
     ret = pH_remove_profile_from_list(profile);
-    spin_unlock(&profile_list_sem);
+    spin_unlock(&pH_profile_list_sem);
     
     if (ret != 0) {	
 		pr_err("%s: ERROR: pH_remove_profile_from_list was unsuccessful in pH_free_profile!\n", DEVICE_NAME);
