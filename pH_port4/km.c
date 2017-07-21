@@ -487,8 +487,10 @@ int process_syscall(long syscall) {
 	*/
 	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
-	if (!(profile->lock) || profile->lock == NULL) {
+	if (!pH_profile_in_use(profile) || !(profile->lock) || profile->lock == NULL) {
 		pr_err("%s: profile->lock is NULL in process_syscall\n", DEVICE_NAME);
+		vfree(profile);
+		profile = NULL;
 		return -1;
 	}
 	
@@ -647,6 +649,8 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 			path_to_binary = NULL;
 		}
 	}
+	
+	pH_refcount_inc(profile);
 	
 	this_process->profile = profile;
 
@@ -977,8 +981,8 @@ void pH_free_profile(pH_profile *profile)
     spin_unlock(profile->lock);
     kfree(profile->lock);
     profile->lock = NULL;
-    //vfree(profile); // For now, don't free any profiles
-    //profile = NULL; // This is okay, because profile was removed from the linked list above
+    vfree(profile); // For now, don't free any profiles
+    profile = NULL; // This is okay, because profile was removed from the linked list above
     //pr_err("%s: Freed pH_profile (end of function)\n", DEVICE_NAME);
 }
 
@@ -1091,7 +1095,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 		profile = process->profile;
 	
 		if (profile != NULL) {
-			atomic_dec(&(profile->refcount));
+			pH_refcount_dec(profile);
 	
 			if (profile->refcount.counter < 1) {
 				profile->refcount.counter = 0;
