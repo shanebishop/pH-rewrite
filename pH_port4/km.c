@@ -888,8 +888,8 @@ void pH_free_profile(pH_profile *profile)
     if (ret != 0) {
     	pr_err("%s: ERROR: pH_remove_profile_from_list was unsuccessful in pH_free_profile!\n", DEVICE_NAME);
     	spin_unlock(profile->lock);
-    	void* p;
-    	*p = 1;
+    	// Cause an intentional crash
+    	panic("pH_remove_profile_from_list was unsuccessful in pH_free_profile");
     	return;
     }
 
