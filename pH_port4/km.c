@@ -823,7 +823,8 @@ void pH_free_profile_storage(pH_profile *profile)
 }
 
 // Returns 0 on success and anything else on failure
-// Calling functions MUST handle returned errors if possible
+// Calling functions (currently only pH_free_profile) MUST handle returned errors if possible
+// Currently does not hold any locks, and therefore calling functions must lock appropriately
 int pH_remove_profile_from_list(pH_profile *profile)
 {
     pH_profile *prev_profile, *cur_profile;
@@ -836,7 +837,8 @@ int pH_remove_profile_from_list(pH_profile *profile)
 	}
 
     pr_err("%s: In pH_remove_profile_from_list\n", DEVICE_NAME);
-
+	
+	/*
 	//spin_lock(&pH_profile_list_sem);
     if (pH_profile_list == NULL) {
     	err("pH_profile_list is empty (NULL) when trying to free profile %s", profile->filename);
@@ -865,6 +867,31 @@ int pH_remove_profile_from_list(pH_profile *profile)
     	err("While freeing, couldn't find profile %s in pH_profile_list", profile->filename);
     	//spin_unlock(&pH_profile_list_sem);
     	return -1;
+    }
+    */
+    
+    if (pH_profile_list == profile) {
+            pH_profile_list = profile->next;
+            return 0;
+    } else if (pH_profile_list == NULL) {
+            err("pH_profile_list is NULL when trying to free profile %s",
+                profile->filename);
+            return -1;
+    } else {
+            prev_profile = pH_profile_list;
+            cur_profile = prev_profile->next;
+            while ((cur_profile != profile) && (cur_profile != NULL)) {
+                    prev_profile = cur_profile;
+                    cur_profile = prev_profile->next;
+            }
+            if (cur_profile == profile) {
+                    prev_profile->next = cur_profile->next;
+                    return 0;
+            } else {
+                    err("while freeing, couldn't find profile %s in "
+                        "pH_profile_list", profile->filename);
+                    return -1;
+            }
     }
 }
 
