@@ -1061,7 +1061,7 @@ void pH_free_profile(pH_profile *profile)
 int remove_process_from_llist(pH_task_struct* process) {
 	pH_task_struct *prev_task_struct, *cur_task_struct;
 	
-	pr_err("%s: In remove_process_from_llist\n", DEVICE_NAME);
+	//pr_err("%s: In remove_process_from_llist\n", DEVICE_NAME);
 
 	if (pH_task_struct_list == NULL) {
 		err("pH_task_struct_list is empty (NULL) when trying to free process %ld", process->process_id);
@@ -1069,7 +1069,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 	}
 	else if (pH_task_struct_list == process) {
 		pH_task_struct_list = pH_task_struct_list->next;
-		pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
+		//pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
 		return 0;
 	}
 	else {
@@ -1078,7 +1078,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 		while (cur_task_struct != NULL) {
 			if (cur_task_struct == process) {
 				prev_task_struct->next = process->next;
-				pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
+				//pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
 				return 0;
 			}
 			
