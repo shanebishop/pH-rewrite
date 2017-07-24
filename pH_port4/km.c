@@ -629,26 +629,36 @@ void add_process_to_llist(pH_task_struct* t) {
 }
 
 pH_profile* retrieve_pH_profile_by_filename(char* filename) {
-	pH_profile* iterator = pH_profile_list;
+	pH_task_struct* process_list_iterator;
+	pH_profile* profile_list_iterator = pH_profile_list;
 	
-	if (pH_profile_list == NULL) {
+	if (pH_task_struct_list == NULL || pH_profile_list == NULL) {
 		return NULL;
 	}
 	//pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
 	
+	// Search through profile list
 	spin_lock(&pH_profile_list_sem);
 	do {
-		if (strcmp(filename, iterator->filename) == 0) {
+		if (strcmp(filename, profile_list_iterator->filename) == 0) {
 			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
 			spin_unlock(&pH_profile_list_sem);
-			return iterator;
+			return profile_list_iterator;
 		}
 		
-		iterator = iterator->next;
+		profile_list_iterator = profile_list_iterator->next;
 		//pr_err("%s: Iterating\n", DEVICE_NAME);
-	} while (iterator);
-	
+	} while (profile_list_iterator);
 	spin_unlock(&pH_profile_list_sem);
+	
+	// If searching through profile list fails, search through process list
+	process_list_iterator = pH_task_struct_list;
+	do {
+		if (strcmp(filename, process_list_iterator->profile->filename) == 0) {
+			return process_list_iterator->profile;
+		}
+	} while (process_list_iterator);
+	
 	//pr_err("%s: No matching profile was found\n", DEVICE_NAME);
 	return NULL;
 }
