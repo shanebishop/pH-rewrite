@@ -1075,8 +1075,8 @@ void pH_free_profile(pH_profile *profile)
     kfree(profile->lock);
     profile->lock = NULL;
     pr_err("%s: Freed profile->lock\n", DEVICE_NAME);
-    vfree(profile);
-    profile = NULL; // This is okay, because profile was removed from the linked list above
+    //vfree(profile); // For now, don't free any profiles
+    //profile = NULL; // This is okay, because profile was removed from the linked list above
     pr_err("%s: Freed pH_profile (end of function)\n", DEVICE_NAME);
 }
 
