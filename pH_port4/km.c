@@ -765,10 +765,10 @@ static long jsys_execve(const char __user *filename,
 	copy_from_user(path_to_binary, filename, sizeof(char) * 4000);
 	//pr_err("%s: path_to_binary = %s\n", DEVICE_NAME, path_to_binary);
 	
-	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 2 || 
+	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
 		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
 	{
-		pr_err("%s: In jsys_execve with corrupted path_to_binary: %s\n", DEVICE_NAME, path_to_binary);
+		pr_err("%s: In jsys_execve with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
 		goto corrupted_path_to_binary;
 	}
 	
@@ -860,10 +860,10 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	
 	path_to_binary = profile->filename;
 	
-	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 2 || 
+	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
 		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
 	{
-		pr_err("%s: In fork_handler with corrupted path_to_binary\n", DEVICE_NAME);
+		pr_err("%s: In fork_handler with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
 		return -1;
 	}
 	
@@ -1178,7 +1178,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 		return;
 	}
 
-	//pr_err("%s: In free_pH_task_struct\n", DEVICE_NAME);
+	pr_err("%s: In free_pH_task_struct for %d %s\n", DEVICE_NAME, process->process_id, process->profile->filename);
 	//pr_err("%s: process = %p\n", DEVICE_NAME, process);
 	//pr_err("%s: process->seq = %p\n", DEVICE_NAME, process->seq);
 	
