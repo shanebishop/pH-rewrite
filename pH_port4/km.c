@@ -254,6 +254,7 @@ struct jprobe jprobes_array[num_syscalls];
 bool module_inserted_successfully = FALSE;
 spinlock_t pH_profile_list_sem;
 int profiles_created = 0;
+int successful_jsys_execves = 0;
 
 inline bool pH_monitoring(pH_task_struct* process) {
         return process->profile != NULL;
@@ -771,6 +772,8 @@ static long jsys_execve(const char __user *filename,
 	
 	process_syscall(59);
 	//pr_err("%s: Back in jsys_execve after processing syscall\n", DEVICE_NAME);
+	
+	successful_jsys_execves++;
 	
 	jprobe_return();
 	return 0;
@@ -1727,6 +1730,8 @@ static void __exit ebbchar_exit(void){
 	
 	// Print lengths of lists
 	pr_err("%s: At time of module removal, pH was monitoring %d processes and had %d profiles in memory\n", DEVICE_NAME, profiles_freed, pH_task_structs_freed);
+	pr_err("%s: During the uptime of the module, %d profiles were created\n", DEVICE_NAME, profiles_created);
+	pr_err("%s: During the uptime of the module, there were %d successful jsys_execves\n", DEVICE_NAME, successful_jsys_execves);
 	
 	pr_err("%s: %s successfully removed\n", DEVICE_NAME, DEVICE_NAME);
 }
