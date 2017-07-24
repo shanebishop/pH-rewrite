@@ -279,6 +279,34 @@ inline void pH_refcount_init(pH_profile *profile, int i)
         profile->refcount.counter = i;
 }
 
+int pH_profile_list_length(void) {
+	pH_profile iterator;
+	int i;
+	
+	for (i = 0, iterator = pH_profile_list; 
+		iterator != NULL; 
+		i++, iterator = iterator->next) 
+	{
+		;
+	}
+	
+	return i;
+}
+
+int pH_task_struct_list_length(void) {
+	pH_task_struct iterator;
+	int i;
+	
+	for (i = 0, iterator = pH_task_struct_list; 
+		iterator != NULL; 
+		i++, iterator = iterator->next) 
+	{
+		;
+	}
+	
+	return i;
+}
+
 void add_to_profile_llist(pH_profile* p) {
 	if (!p || p == NULL) {
 		pr_err("%s: In add_to_profile_llist with a NULL profile\n", DEVICE_NAME);
@@ -1599,7 +1627,7 @@ static int __init ebbchar_init(void){
 
 // Perhaps the best way to remove the module is just to reboot?
 static void __exit ebbchar_exit(void){
-	int i;
+	int i, length_of_profile_list, length_of_process_list;
 	
 	// Set all booleans accordingly - this should be the first thing you do to prevent any more code from running
 	pH_aremonitoring = 0;
@@ -1628,6 +1656,10 @@ static void __exit ebbchar_exit(void){
 	unregister_kretprobe(&exit_kretprobe);
 	pr_err("%s: Missed probing %d instances of exit\n", DEVICE_NAME, exit_kretprobe.nmissed);
 	
+	// Determine lengths of lists
+	length_of_profile_list = pH_profile_list_length();
+	length_of_process_list = pH_task_struct_list_length();
+	
 	pr_err("%s: Freeing profiles...\n", DEVICE_NAME);
 	free_profiles();
 	pr_err("%s: Freeing pH_task_structs...\n", DEVICE_NAME);
@@ -1638,6 +1670,10 @@ static void __exit ebbchar_exit(void){
 	class_unregister(ebbcharClass);
 	class_destroy(ebbcharClass);
 	unregister_chrdev(majorNumber, DEVICE_NAME);
+	
+	// Print lengths of lists
+	pr_err("%s: At time of module removal, pH was monitoring %d processes and had %d profiles in memory\n", DEVICE_NAME, length_of_profile_list, length_of_process_list);
+	
 	pr_err("%s: %s successfully removed\n", DEVICE_NAME, DEVICE_NAME);
 }
 
