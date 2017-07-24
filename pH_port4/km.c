@@ -1103,7 +1103,20 @@ void free_syscalls(pH_task_struct* t) {
 	}
 }
 
+bool profile_has_matching_process(pH_profile* profile) {
+	pH_task_struct* iterator;
+	
+	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
+		if (iterator->profile == profile) {
+			return TRUE;
+		}
+	}
+	
+	return FALSE;
+}
+
 int free_profiles(void) {
+	int profiles_with_no_matching_process = 0;
 	int ret = 0;
 	
 	/* // Old implementation
@@ -1123,9 +1136,12 @@ int free_profiles(void) {
 	// New implementation
 	while (pH_profile_list != NULL) {
 		pH_profile_list->refcount.counter = 0;
+		if (!profile_has_matching_process(pH_profile_list)) profiles_with_no_matching_process++;
 		pH_free_profile(pH_profile_list);
 		ret++;
 	}
+	
+	pr_err("%s: There are %d profiles with no matching processes\n", DEVICE_NAME);
 	
 	return ret;
 }
@@ -1141,7 +1157,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 		return;
 	}
 
-	pr_err("%s: In free_pH_task_struct\n", DEVICE_NAME);
+	//pr_err("%s: In free_pH_task_struct\n", DEVICE_NAME);
 	//pr_err("%s: process = %p\n", DEVICE_NAME, process);
 	//pr_err("%s: process->seq = %p\n", DEVICE_NAME, process->seq);
 	
@@ -1161,12 +1177,12 @@ void free_pH_task_struct(pH_task_struct* process) {
 		//pr_err("%s: After stack_pop(process);\n", DEVICE_NAME);
 		i++;
 	}
-	pr_err("%s: Emptied stack of pH_seqs\n", DEVICE_NAME);
-	stack_print(process);
+	//pr_err("%s: Emptied stack of pH_seqs\n", DEVICE_NAME);
+	//stack_print(process); // Don't bother printing right now
 	//mutex_destroy(&(process->pH_seq_stack_sem)); // Leave the mutex intact?
 	
 	free_syscalls(process);
-	pr_err("%s: Freed syscalls\n", DEVICE_NAME);
+	//pr_err("%s: Freed syscalls\n", DEVICE_NAME);
 	
 	// This boolean test is required for when this function is called when the module is being removed
 	if (module_inserted_successfully) {
@@ -1181,7 +1197,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 				// Free profile
 				pH_free_profile(profile);
 				profile = NULL; // Okay because the profile is removed from llist in pH_free_profile
-				pr_err("%s: Freed profile\n", DEVICE_NAME);
+				//pr_err("%s: Freed profile\n", DEVICE_NAME);
 			}
 		}
 		else {
@@ -1193,7 +1209,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 	remove_process_from_llist(process);
 	kfree(process);
 	process = NULL; // Okay because process is removed from llist above
-	pr_err("%s: Freed process (end of function)\n", DEVICE_NAME);
+	//pr_err("%s: Freed process (end of function)\n", DEVICE_NAME);
 }
 
 static long jsys_exit(int error_code) {
@@ -1228,7 +1244,7 @@ not_inserted:
 }
 
 void stack_print(pH_task_struct* process) {
-	pr_err("%s: In stack print\n", DEVICE_NAME);
+	//pr_err("%s: In stack print\n", DEVICE_NAME);
 	
 	if (!process || process == NULL) {
 		pr_err("%s: In stack_print with NULL process\n", DEVICE_NAME);
@@ -1242,7 +1258,7 @@ void stack_print(pH_task_struct* process) {
 	
 	int i;
 	pH_seq* iterator = process->seq;
-	pr_err("%s: Got through variable declaration\n", DEVICE_NAME);
+	//pr_err("%s: Got through variable declaration\n", DEVICE_NAME);
 	
 	if (process->seq == NULL) {
 		if (process->profile != NULL && module_inserted_successfully) {
@@ -1257,7 +1273,7 @@ void stack_print(pH_task_struct* process) {
 	
 	i = 0;
 	
-	pr_err("%s: process->seq = %p, iterator = %p\n", DEVICE_NAME, process->seq, iterator);
+	//pr_err("%s: process->seq = %p, iterator = %p\n", DEVICE_NAME, process->seq, iterator);
 	
 	if (process->profile != NULL && process->profile->filename != NULL) {
 		pr_err("%s: Printing stack for process %s...\n", DEVICE_NAME, process->profile->filename);
@@ -1305,7 +1321,7 @@ void stack_pop(pH_task_struct* process) {
 	pH_seq* temp;
 	//pH_seq* top = process->seq;
 	
-	pr_err("%s: In stack_pop\n", DEVICE_NAME);
+	//pr_err("%s: In stack_pop\n", DEVICE_NAME);
 	//pr_err("%s: top = %p\n", DEVICE_NAME, top);
 
 	if (process->seq == NULL) {
@@ -1325,7 +1341,7 @@ void stack_pop(pH_task_struct* process) {
 	//pr_err("%s: Freed temp\n", DEVICE_NAME);
 	temp = NULL;
 	//mutex_unlock(&(process->pH_seq_stack_sem));
-	pr_err("%s: Done stack_pop\n", DEVICE_NAME);
+	//pr_err("%s: Done stack_pop\n", DEVICE_NAME);
 }
 
 pH_seq* stack_peek(pH_task_struct* process) {
