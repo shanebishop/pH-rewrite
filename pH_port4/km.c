@@ -280,11 +280,17 @@ inline void pH_refcount_init(pH_profile *profile, int i)
 }
 
 void add_to_profile_llist(pH_profile* p) {
+	if (!p || p == NULL) {
+		pr_err("%s: In add_to_profile_llist with a NULL profile\n", DEVICE_NAME);
+		return;
+	}
+	
 	if (pH_profile_list == NULL) {
 		pH_profile_list = p;
 		p->next = NULL;
 	}
 	else {
+		/* // Old implementation
 		pH_profile* iterator = pH_profile_list;
 		
 		spin_lock(&pH_profile_list_sem);
@@ -293,6 +299,10 @@ void add_to_profile_llist(pH_profile* p) {
 		
 		iterator->next = p;
 		p->next = NULL;
+		*/
+		
+		p->next = pH_profile_list;
+		pH_profile->list = p;
 	}
 }
 
@@ -366,12 +376,17 @@ void add_to_my_syscall_llist(pH_task_struct* t, my_syscall* s) {
 		s->next = NULL;
 	}
 	else {
+		/* // Old implementation
 		my_syscall* iterator = t->syscall_llist;
 		
 		while (iterator->next) iterator = iterator->next;
 		
 		iterator->next = s;
 		s->next = NULL;
+		*/
+		
+		s->next = t->syscall_llist;
+		t->syscall_llist = s;
 	}
 }
 
@@ -561,17 +576,27 @@ int process_syscall(long syscall) {
 }
 
 void add_process_to_llist(pH_task_struct* t) {
+	if (!t || t == NULL) {
+		pr_err("%s: Received NULL pH_task_struct in add_process-to_llist\n", DEVICE_NAME);
+		return void;
+	}
+	
 	if (pH_task_struct_list == NULL) {
 		pH_task_struct_list = t;
 		t->next = NULL;
 	}
 	else {
+		/* // Old implementation
 		pH_task_struct* iterator = pH_task_struct_list;
 		
 		while (iterator->next) iterator = iterator->next;
 		
 		iterator->next = t;
 		t->next = NULL;
+		*/
+		
+		t->next = pH_task_struct_list;
+		pH_task_struct_list = t;
 	}
 }
 
@@ -1091,23 +1116,21 @@ void free_pH_task_struct(pH_task_struct* process) {
 	free_syscalls(process);
 	pr_err("%s: Freed syscalls\n", DEVICE_NAME);
 	
-	if (module_inserted_successfully) {
-		profile = process->profile;
+	profile = process->profile;
+
+	if (profile != NULL) {
+		pH_refcount_dec(profile);
+
+		if (profile->refcount.counter < 1) {
+			profile->refcount.counter = 0;
 	
-		if (profile != NULL) {
-			pH_refcount_dec(profile);
-	
-			if (profile->refcount.counter < 1) {
-				profile->refcount.counter = 0;
-		
-				// Free profile
-				pH_free_profile(profile);
-				profile = NULL; // Okay because the profile is removed from llist in pH_free_profile
-				pr_err("%s: Freed profile\n", DEVICE_NAME);
-			}
+			// Free profile
+			pH_free_profile(profile);
+			profile = NULL; // Okay because the profile is removed from llist in pH_free_profile
+			pr_err("%s: Freed profile\n", DEVICE_NAME);
 		}
-		//pr_err("%s: Made it through if\n", DEVICE_NAME);
 	}
+	//pr_err("%s: Made it through if\n", DEVICE_NAME);
 	
 	// When everything else is done, remove process from llist, kfree process
 	remove_process_from_llist(process);
@@ -1807,7 +1830,7 @@ inline void pH_train(pH_task_struct *s)
 	//pr_err("%s: In pH_train\n", DEVICE_NAME);
 
     train->train_count++;
-    if (pH_test_seq(seq, train)) { 
+    if (pH_test_seq(seq, train)) {
             if (profile->frozen) {
                     profile->frozen = 0;
                     action("%d (%s) normal cancelled", current->pid, profile->filename);
