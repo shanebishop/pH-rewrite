@@ -280,7 +280,7 @@ inline void pH_refcount_init(pH_profile *profile, int i)
 }
 
 int pH_profile_list_length(void) {
-	pH_profile iterator;
+	pH_profile* iterator;
 	int i;
 	
 	for (i = 0, iterator = pH_profile_list; 
@@ -294,7 +294,7 @@ int pH_profile_list_length(void) {
 }
 
 int pH_task_struct_list_length(void) {
-	pH_task_struct iterator;
+	pH_task_struct* iterator;
 	int i;
 	
 	for (i = 0, iterator = pH_task_struct_list; 
