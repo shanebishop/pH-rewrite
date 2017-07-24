@@ -288,7 +288,9 @@ int pH_profile_list_length(void) {
 		iterator != NULL; 
 		i++, iterator = iterator->next) 
 	{
-		;
+		if (sizeof(*iterator) == sizeof(pH_profile)) {
+			pr_err("%s: Found object in pH_profile_list that is not a profile\n", DEVICE_NAME);
+		}
 	}
 	
 	return i;
@@ -1736,7 +1738,7 @@ static void __exit ebbchar_exit(void){
 	unregister_chrdev(majorNumber, DEVICE_NAME);
 	
 	// Print lengths of lists
-	pr_err("%s: At time of module removal, pH was monitoring %d processes and had %d profiles in memory\n", DEVICE_NAME, profiles_freed, pH_task_structs_freed);
+	pr_err("%s: At time of module removal, pH was monitoring %d processes and had %d profiles in memory\n", DEVICE_NAME, pH_task_structs_freed, profiles_freed);
 	pr_err("%s: During the uptime of the module, %d profiles were created\n", DEVICE_NAME, profiles_created);
 	pr_err("%s: During the uptime of the module, there were %d successful jsys_execves\n", DEVICE_NAME, successful_jsys_execves);
 	
