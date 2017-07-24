@@ -320,21 +320,19 @@ void add_to_profile_llist(pH_profile* p) {
 		p->next = NULL;
 	}
 	else {
-		// Old implementation
+		/* // Old implementation
 		pH_profile* iterator = pH_profile_list;
 		
-		//spin_lock(&pH_profile_list_sem);
+		spin_lock(&pH_profile_list_sem);
 		while (iterator->next) iterator = iterator->next;
-		//spin_unlock(&pH_profile_list_sem);
+		spin_unlock(&pH_profile_list_sem);
 		
 		iterator->next = p;
 		p->next = NULL;
+		*/
 		
-		
-		/* // New implementation
 		p->next = pH_profile_list;
 		pH_profile_list = p;
-		*/
 	}
 	spin_unlock(&pH_profile_list_sem);
 }
@@ -1133,6 +1131,7 @@ bool profile_has_matching_process(pH_profile* profile) {
 	return FALSE;
 }
 
+/*
 int free_profiles(void) {
 	int profiles_with_no_matching_process = 0;
 	int ret = 0;
@@ -1151,6 +1150,7 @@ int free_profiles(void) {
 	spin_unlock(&pH_profile_list_sem);
 	*/
 	
+	/*
 	// New implementation
 	while (pH_profile_list != NULL) {
 		pH_profile_list->refcount.counter = 0;
@@ -1163,6 +1163,7 @@ int free_profiles(void) {
 	
 	return ret - 1; // For some reason just returning ret is incorrect
 }
+*/
 
 void stack_pop(pH_task_struct*);
 
@@ -1203,7 +1204,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 	//pr_err("%s: Freed syscalls\n", DEVICE_NAME);
 	
 	// This boolean test is required for when this function is called when the module is being removed
-	if (module_inserted_successfully) {
+	//if (module_inserted_successfully) {
 		profile = process->profile;
 
 		if (profile != NULL) {
@@ -1221,7 +1222,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 		else {
 			panic("%s: Corrupt process in free_pH_task_struct: No profile\n", DEVICE_NAME);
 		}
-	}
+	//}
 	
 	// When everything else is done, remove process from llist, kfree process
 	remove_process_from_llist(process);
@@ -1721,8 +1722,10 @@ static void __exit ebbchar_exit(void){
 	unregister_kretprobe(&exit_kretprobe);
 	pr_err("%s: Missed probing %d instances of exit\n", DEVICE_NAME, exit_kretprobe.nmissed);
 	
-	pr_err("%s: Freeing profiles...\n", DEVICE_NAME);
-	profiles_freed = free_profiles();
+	profiles_freed = pH_profile_list_length();
+	
+	//pr_err("%s: Freeing profiles...\n", DEVICE_NAME);
+	//profiles_freed = free_profiles();
 	pr_err("%s: Freeing pH_task_structs...\n", DEVICE_NAME);
 	pH_task_structs_freed = free_pH_task_structs();
 	
