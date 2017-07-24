@@ -314,6 +314,7 @@ void add_to_profile_llist(pH_profile* p) {
 		return;
 	}
 	
+	spin_lock(&pH_profile_list_sem);
 	if (pH_profile_list == NULL) {
 		pH_profile_list = p;
 		p->next = NULL;
@@ -333,6 +334,7 @@ void add_to_profile_llist(pH_profile* p) {
 		p->next = pH_profile_list;
 		pH_profile_list = p;
 	}
+	spin_unlock(&pH_profile_list_sem);
 }
 
 // Makes a new pH_profile and stores it in profile
@@ -689,13 +691,13 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	this_process->count = 0;
 	//pr_err("%s: Initialized process\n", DEVICE_NAME);
 	
-	if (profile == NULL) {
+	if (!profile || profile == NULL) {
 		// Retrieve the corresponding profile
 		profile = retrieve_pH_profile_by_filename(path_to_binary);
 		//pr_err("%s: Attempted to retrieve profile\n", DEVICE_NAME);
 		
 		// If there is no corresponding profile, make a new one
-		if (!profile) {
+		if (!profile || profile == NULL) {
 			profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
 			if (!profile) {
 				pr_err("%s: Unable to allocate memory for profile in handle_new_process\n", DEVICE_NAME);
@@ -705,7 +707,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 			new_profile(profile, path_to_binary);
 			pr_err("%s: Made new profile for %s\n", DEVICE_NAME, path_to_binary);
 			
-			if (!profile) {
+			if (!profile || profile == NULL) {
 				pr_err("%s: new_profile() made a corrupted or NULL profile\n", DEVICE_NAME);
 			}
 		}
@@ -1157,7 +1159,7 @@ int free_profiles(void) {
 	
 	pr_err("%s: There are %d profiles with no matching processes\n", DEVICE_NAME, profiles_with_no_matching_process);
 	
-	return ret;
+	return ret - 1; // For some reason just returning ret is incorrect
 }
 
 void stack_pop(pH_task_struct*);
