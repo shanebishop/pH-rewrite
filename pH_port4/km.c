@@ -320,19 +320,21 @@ void add_to_profile_llist(pH_profile* p) {
 		p->next = NULL;
 	}
 	else {
-		/* // Old implementation
+		// Old implementation
 		pH_profile* iterator = pH_profile_list;
 		
-		spin_lock(&pH_profile_list_sem);
+		//spin_lock(&pH_profile_list_sem);
 		while (iterator->next) iterator = iterator->next;
-		spin_unlock(&pH_profile_list_sem);
+		//spin_unlock(&pH_profile_list_sem);
 		
 		iterator->next = p;
 		p->next = NULL;
-		*/
 		
+		
+		/* // New implementation
 		p->next = pH_profile_list;
 		pH_profile_list = p;
+		*/
 	}
 	spin_unlock(&pH_profile_list_sem);
 }
