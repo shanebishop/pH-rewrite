@@ -781,7 +781,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	
 	if (!module_inserted_successfully) return 0;
 	
-	pr_err("%s: In fork_handler\n", DEVICE_NAME);
+	//pr_err("%s: In fork_handler\n", DEVICE_NAME);
 	
 	retval = regs_return_value(regs);
 	now = ktime_get();
@@ -791,13 +791,13 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	// Retrieve binary by using current to retrieve PID, and then grab the task struct then binary from there
 	parent_process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	if (!parent_process || parent_process == NULL) {
-		pr_err("%s: In fork_handler with NULL parent_process\n", DEVICE_NAME);
+		//pr_err("%s: In fork_handler with NULL parent_process\n", DEVICE_NAME);
 		return -1;
 	}
 	
 	profile = parent_process->profile;
 	if (!profile || profile == NULL) {
-		pr_err("%s: In fork_handler with NULL parent_process->profile\n", DEVICE_NAME);
+		//pr_err("%s: In fork_handler with NULL parent_process->profile\n", DEVICE_NAME);
 		return -1;
 	}
 	
@@ -820,13 +820,13 @@ static int exit_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	
 	if (!module_inserted_successfully) return 0;
 	
-	pr_err("%s: In exit_handler for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
+	//pr_err("%s: In exit_handler for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
 	
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	
 	if (process == NULL) return 0;
 	
-	pr_err("%s: In exit_handler for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
+	//pr_err("%s: In exit_handler for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
 	
 	retval = regs_return_value(regs);
 	now = ktime_get();
@@ -1144,16 +1144,16 @@ static long jsys_exit(int error_code) {
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
-	pr_err("%s: In jsys_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
+	//pr_err("%s: In jsys_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
 	
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	
 	if (process == NULL) goto not_monitoring;
 	
-	pr_err("%s: In jsys_exit for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
+	//pr_err("%s: In jsys_exit for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
 	
 	process_syscall(73); // Process this syscall before calling free_pH_task_struct on process
-	pr_err("%s: Back in jsys_exit after processing syscall\n", DEVICE_NAME);
+	//pr_err("%s: Back in jsys_exit after processing syscall\n", DEVICE_NAME);
 	
 	free_pH_task_struct(process);
 	
@@ -1282,7 +1282,7 @@ static void jhandle_signal(struct ksignal* ksig, struct pt_regs* regs) {
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
-	pr_err("%s: In jhandle_signal\n", DEVICE_NAME);
+	//pr_err("%s: In jhandle_signal\n", DEVICE_NAME);
 	
 	// Will this retrieve the process that the signal is being sent to, or will it retrieve the
 	// process that is sending the signal?
@@ -1305,7 +1305,7 @@ static void jdo_signal(struct pt_regs* regs) {
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
-	pr_err("%s: In jdo_signal\n", DEVICE_NAME);
+	//pr_err("%s: In jdo_signal\n", DEVICE_NAME);
 	
 	// Will this retrieve the process that the signal is being sent to, or will it retrieve the
 	// process that is sending the signal?
@@ -1315,7 +1315,7 @@ static void jdo_signal(struct pt_regs* regs) {
 		make_and_push_new_pH_seq(process);
 	}
 	
-	pr_err("%s: Exiting jdo_signal\n", DEVICE_NAME);
+	//pr_err("%s: Exiting jdo_signal\n", DEVICE_NAME);
 	
 	jprobe_return();
 	return;
