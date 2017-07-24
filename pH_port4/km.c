@@ -302,7 +302,7 @@ void add_to_profile_llist(pH_profile* p) {
 		*/
 		
 		p->next = pH_profile_list;
-		pH_profile->list = p;
+		pH_profile_list = p;
 	}
 }
 
@@ -578,7 +578,7 @@ int process_syscall(long syscall) {
 void add_process_to_llist(pH_task_struct* t) {
 	if (!t || t == NULL) {
 		pr_err("%s: Received NULL pH_task_struct in add_process-to_llist\n", DEVICE_NAME);
-		return void;
+		return;
 	}
 	
 	if (pH_task_struct_list == NULL) {
