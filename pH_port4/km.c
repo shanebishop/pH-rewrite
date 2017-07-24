@@ -749,6 +749,13 @@ static long jsys_execve(const char __user *filename,
 	copy_from_user(path_to_binary, filename, sizeof(char) * 4000);
 	//pr_err("%s: path_to_binary = %s\n", DEVICE_NAME, path_to_binary);
 	
+	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 2 || 
+		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
+	{
+		pr_err("%s: In jsys_execve with corrupted path_to_binary\n", DEVICE_NAME);
+		goto corrupted_path_to_binary;
+	}
+	
 	handle_new_process(path_to_binary, NULL, current_process_id);
 	
 	process_syscall(59);
@@ -773,6 +780,10 @@ not_inserted:
 	
 not_monitoring:
 	//pr_err("%s: Not monitoring\n", DEVICE_NAME);
+	jprobe_return();
+	return 0;
+
+corrupted_path_to_binary:
 	jprobe_return();
 	return 0;
 }
@@ -830,6 +841,14 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	}
 	
 	path_to_binary = profile->filename;
+	
+	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 2 || 
+		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
+	{
+		pr_err("%s: In fork_handler with corrupted path_to_binary\n", DEVICE_NAME);
+		return -1;
+	}
+	
 	handle_new_process(path_to_binary, profile, retval);
 	
 	return 0;
@@ -1084,7 +1103,9 @@ void free_syscalls(pH_task_struct* t) {
 	}
 }
 
-void free_profiles(void) {
+int free_profiles(void) {
+	int ret = 0;
+	
 	/* // Old implementation
 	pH_profile* current_profile;
 	pH_profile* iterator = pH_profile_list;
@@ -1103,7 +1124,10 @@ void free_profiles(void) {
 	while (pH_profile_list != NULL) {
 		pH_profile_list->refcount.counter = 0;
 		pH_free_profile(pH_profile_list);
+		ret++;
 	}
+	
+	return ret;
 }
 
 void stack_pop(pH_task_struct*);
@@ -1160,7 +1184,9 @@ void free_pH_task_struct(pH_task_struct* process) {
 				pr_err("%s: Freed profile\n", DEVICE_NAME);
 			}
 		}
-		//pr_err("%s: Made it through if\n", DEVICE_NAME);
+		else {
+			panic("%s: Corrupt process in free_pH_task_struct: No profile\n", DEVICE_NAME);
+		}
 	}
 	
 	// When everything else is done, remove process from llist, kfree process
@@ -1382,10 +1408,15 @@ not_inserted:
 }
 */
 
-void free_pH_task_structs(void) {
+int free_pH_task_structs(void) {
+	int ret = 0;
+	
 	while (pH_task_struct_list != NULL) {
 		free_pH_task_struct(pH_task_struct_list);
+		ret++;
 	}
+	
+	return ret;
 }
 
 static int __init ebbchar_init(void){
@@ -1627,7 +1658,7 @@ static int __init ebbchar_init(void){
 
 // Perhaps the best way to remove the module is just to reboot?
 static void __exit ebbchar_exit(void){
-	int i, length_of_profile_list, length_of_process_list;
+	int i, profiles_freed, pH_task_structs_freed;
 	
 	// Set all booleans accordingly - this should be the first thing you do to prevent any more code from running
 	pH_aremonitoring = 0;
@@ -1656,14 +1687,10 @@ static void __exit ebbchar_exit(void){
 	unregister_kretprobe(&exit_kretprobe);
 	pr_err("%s: Missed probing %d instances of exit\n", DEVICE_NAME, exit_kretprobe.nmissed);
 	
-	// Determine lengths of lists
-	length_of_profile_list = pH_profile_list_length();
-	length_of_process_list = pH_task_struct_list_length();
-	
 	pr_err("%s: Freeing profiles...\n", DEVICE_NAME);
-	free_profiles();
+	profiles_freed = free_profiles();
 	pr_err("%s: Freeing pH_task_structs...\n", DEVICE_NAME);
-	free_pH_task_structs();
+	pH_task_structs_freed = free_pH_task_structs();
 	
 	mutex_destroy(&ebbchar_mutex);
 	device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
@@ -1672,7 +1699,7 @@ static void __exit ebbchar_exit(void){
 	unregister_chrdev(majorNumber, DEVICE_NAME);
 	
 	// Print lengths of lists
-	pr_err("%s: At time of module removal, pH was monitoring %d processes and had %d profiles in memory\n", DEVICE_NAME, length_of_profile_list, length_of_process_list);
+	pr_err("%s: At time of module removal, pH was monitoring %d processes and had %d profiles in memory\n", DEVICE_NAME, profiles_freed, pH_task_structs_freed);
 	
 	pr_err("%s: %s successfully removed\n", DEVICE_NAME, DEVICE_NAME);
 }
