@@ -1141,7 +1141,7 @@ int free_profiles(void) {
 		ret++;
 	}
 	
-	pr_err("%s: There are %d profiles with no matching processes\n", DEVICE_NAME);
+	pr_err("%s: There are %d profiles with no matching processes\n", DEVICE_NAME, profiles_with_no_matching_process);
 	
 	return ret;
 }
