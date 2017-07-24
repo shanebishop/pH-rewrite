@@ -657,6 +657,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 		if (strcmp(filename, process_list_iterator->profile->filename) == 0) {
 			return process_list_iterator->profile;
 		}
+		process_list_iterator = process_list_iterator->next;
 	} while (process_list_iterator);
 	
 	//pr_err("%s: No matching profile was found\n", DEVICE_NAME);
