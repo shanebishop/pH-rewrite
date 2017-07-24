@@ -9,7 +9,7 @@ the particular process
 -Make sure to update filenames and stuff when done (including ebbchar_init, ebbchar_exit, and 
 ebbchar_mutex)
 -Never use booleans to stop code from running after a fatal error, instead use panic() with a detailed
-eror message
+eror message (code should ONLY stop running on panic or rmmod)
 */
 #include <linux/init.h>
 #include <linux/module.h>
@@ -768,7 +768,7 @@ static long jsys_execve(const char __user *filename,
 	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 2 || 
 		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
 	{
-		pr_err("%s: In jsys_execve with corrupted path_to_binary\n", DEVICE_NAME);
+		pr_err("%s: In jsys_execve with corrupted path_to_binary: %s\n", DEVICE_NAME, path_to_binary);
 		goto corrupted_path_to_binary;
 	}
 	
