@@ -768,7 +768,7 @@ static long jsys_execve(const char __user *filename,
 	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
 		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
 	{
-		pr_err("%s: In jsys_execve with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
+		//pr_err("%s: In jsys_execve with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
 		goto corrupted_path_to_binary;
 	}
 	
@@ -918,15 +918,17 @@ void pH_free_profile_storage(pH_profile *profile)
     pr_err("%s: Freed profile->filename\n", DEVICE_NAME);
     
     for (i = 0; i < PH_NUM_SYSCALLS; i++) {
-            if (profile->train.entry[i]) {
-            	kfree(profile->train.entry[i]);
-            	profile->train.entry[i] = NULL;
-            }
-            if (profile->test.entry[i]) {
-            	kfree(profile->test.entry[i]);
-            	profile->test.entry[i] = NULL;
-            }
+        if (profile->train.entry[i]) {
+        	kfree(profile->train.entry[i]);
+        	profile->train.entry[i] = NULL;
+        }
+        if (profile->test.entry[i]) {
+        	kfree(profile->test.entry[i]);
+        	profile->test.entry[i] = NULL;
+        }
     }
+    
+    pr_err("%s: Exiting pH_free_profile_storage\n", DEVICE_NAME);
 }
 
 bool profile_list_contains_identifier(int identifier) {
@@ -1069,11 +1071,13 @@ void pH_free_profile(pH_profile *profile)
 
     pH_free_profile_storage(profile);
     spin_unlock(profile->lock);
+    pr_err("%s: Back in pH_free_profile after pH_free_profile_storage\n", DEVICE_NAME);
     kfree(profile->lock);
     profile->lock = NULL;
-    vfree(profile); // For now, don't free any profiles
+    pr_err("%s: Freed profile->lock\n", DEVICE_NAME);
+    vfree(profile);
     profile = NULL; // This is okay, because profile was removed from the linked list above
-    //pr_err("%s: Freed pH_profile (end of function)\n", DEVICE_NAME);
+    pr_err("%s: Freed pH_profile (end of function)\n", DEVICE_NAME);
 }
 
 int remove_process_from_llist(pH_task_struct* process) {
