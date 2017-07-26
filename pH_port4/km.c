@@ -942,7 +942,6 @@ bool profile_list_contains_identifier(int identifier) {
 	}
 	//pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
 	
-	
 	do {
 		if (iterator->identifier == identifier) {
 			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
@@ -1086,7 +1085,7 @@ void pH_free_profile(pH_profile *profile)
 int remove_process_from_llist(pH_task_struct* process) {
 	pH_task_struct *prev_task_struct, *cur_task_struct;
 	
-	//pr_err("%s: In remove_process_from_llist\n", DEVICE_NAME);
+	pr_err("%s: In remove_process_from_llist\n", DEVICE_NAME);
 
 	if (pH_task_struct_list == NULL) {
 		err("pH_task_struct_list is empty (NULL) when trying to free process %ld", process->process_id);
@@ -1094,7 +1093,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 	}
 	else if (pH_task_struct_list == process) {
 		pH_task_struct_list = pH_task_struct_list->next;
-		//pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
+		pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
 		return 0;
 	}
 	else {
@@ -1103,7 +1102,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 		while (cur_task_struct != NULL) {
 			if (cur_task_struct == process) {
 				prev_task_struct->next = process->next;
-				//pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
+				pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
 				return 0;
 			}
 			
@@ -1186,8 +1185,8 @@ void free_pH_task_struct(pH_task_struct* process) {
 	}
 
 	pr_err("%s: In free_pH_task_struct for %d %s\n", DEVICE_NAME, process->process_id, process->profile->filename);
-	//pr_err("%s: process = %p\n", DEVICE_NAME, process);
-	//pr_err("%s: process->seq = %p\n", DEVICE_NAME, process->seq);
+	pr_err("%s: process = %p\n", DEVICE_NAME, process);
+	pr_err("%s: process->seq = %p\n", DEVICE_NAME, process->seq);
 	
 	if (pH_aremonitoring) {
 		stack_print(process);
@@ -1205,12 +1204,12 @@ void free_pH_task_struct(pH_task_struct* process) {
 		//pr_err("%s: After stack_pop(process);\n", DEVICE_NAME);
 		i++;
 	}
-	//pr_err("%s: Emptied stack of pH_seqs\n", DEVICE_NAME);
+	pr_err("%s: Emptied stack of pH_seqs\n", DEVICE_NAME);
 	//stack_print(process); // Don't bother printing right now
 	//mutex_destroy(&(process->pH_seq_stack_sem)); // Leave the mutex intact?
 	
 	free_syscalls(process);
-	//pr_err("%s: Freed syscalls\n", DEVICE_NAME);
+	pr_err("%s: Freed syscalls\n", DEVICE_NAME);
 	
 	// This boolean test is required for when this function is called when the module is being removed
 	//if (module_inserted_successfully) {
@@ -1225,7 +1224,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 				// Free profile
 				pH_free_profile(profile);
 				profile = NULL; // Okay because the profile is removed from llist in pH_free_profile
-				//pr_err("%s: Freed profile\n", DEVICE_NAME);
+				pr_err("%s: Freed profile\n", DEVICE_NAME);
 			}
 		}
 		else {
@@ -1237,7 +1236,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 	remove_process_from_llist(process);
 	kfree(process);
 	process = NULL; // Okay because process is removed from llist above
-	//pr_err("%s: Freed process (end of function)\n", DEVICE_NAME);
+	pr_err("%s: Freed process (end of function)\n", DEVICE_NAME);
 }
 
 static long jsys_exit(int error_code) {
