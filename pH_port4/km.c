@@ -491,7 +491,7 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 // Function prototypes for process_syscall()
 inline void pH_append_call(pH_seq*, int);
 inline void pH_train(pH_task_struct*);
-void stack_print(pH_task_struct*);
+//void stack_print(pH_task_struct*);
 
 int process_syscall(long syscall) {
 	pH_task_struct* process;
@@ -809,6 +809,7 @@ corrupted_path_to_binary:
 	return 0;
 }
 
+/*
 void print_llist(void) {
 	pH_task_struct* iterator = pH_task_struct_list;
 	
@@ -823,6 +824,7 @@ void print_llist(void) {
 		iterator = iterator->next;
 	} while (iterator);
 }
+*/
 
 // Struct required for all kretprobe structs
 struct my_kretprobe_data {
@@ -952,7 +954,6 @@ bool profile_list_contains_identifier(int identifier) {
 		iterator = iterator->next;
 		//pr_err("%s: Iterating\n", DEVICE_NAME);
 	} while (iterator);
-	
 	
 	//pr_err("%s: No matching profile was found\n", DEVICE_NAME);
 	return FALSE;
@@ -1189,7 +1190,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 	pr_err("%s: process->seq = %p\n", DEVICE_NAME, process->seq);
 	
 	if (pH_aremonitoring) {
-		stack_print(process);
+		//stack_print(process);
 	}
 	
 	while (process->seq != NULL) {
@@ -1270,6 +1271,7 @@ not_inserted:
 	return 0;
 }
 
+/*
 void stack_print(pH_task_struct* process) {
 	//pr_err("%s: In stack print\n", DEVICE_NAME);
 	
@@ -1317,6 +1319,7 @@ void stack_print(pH_task_struct* process) {
 	
 	pr_err("%s: Stack has length %d\n", DEVICE_NAME, i);
 }
+*/
 
 void stack_push(pH_task_struct* process, pH_seq* new_node) {
 	//pH_seq* top = process->seq;
@@ -1769,6 +1772,11 @@ static int dev_release(struct inode *inodep, struct file *filep){
 
 inline void pH_append_call(pH_seq* s, int new_value) {
 	if (s->last < 0) { pr_err("%s: s->last is not initialized!\n", DEVICE_NAME); return; }
+	if (s->length == 0) {
+		pr_err("%s: In pH_append_call with s->length = 0. This will cause a division error.\n", DEVICE_NAME);
+		panic("In pH_append_call with s->length = 0");
+		return;
+	}
 	
 	s->last = (s->last + 1) % (s->length);
 	s->data[s->last] = new_value;
@@ -1827,6 +1835,12 @@ void pH_add_seq(pH_seq *s, pH_profile_data *data)
 		pr_err("%s: ERROR: data is NULL in pH_add_seq\n", DEVICE_NAME);
 		return;
 	}
+	
+	if (seqlen == 0) {
+		pr_err("%s: In pH_add_seq with s->length = 0\n", DEVICE_NAME);
+		panic("In pH_add_seq with s->length = 0");
+		return;
+	}
 
 	cur_idx = s->last;
 	cur_call = seqdata[cur_idx];
@@ -1847,7 +1861,6 @@ void pH_add_seq(pH_seq *s, pH_profile_data *data)
 		//pr_err("%s: Set prev_call to %d\n", DEVICE_NAME, prev_call);
 		
 		//pr_err("%s: The range for cur_call is %p to %p\n", DEVICE_NAME, &(data->entry[cur_call]), &(data->entry[cur_call][PH_NUM_SYSCALLS-1]));
-		
 		
 		if (cur_call < 0 || cur_call > PH_NUM_SYSCALLS) {
 			pr_err("%s: cur_call is out of bounds\n", DEVICE_NAME);
@@ -1912,6 +1925,12 @@ int pH_test_seq(pH_seq *s, pH_profile_data *data)
 	u8 *seqdata = s->data;
 	int seqlen = s->length;
 	int mismatches = 0;
+
+	if (seqlen == 0) {
+		pr_err("%s: In pH_test_seq with s->length = 0\n", DEVICE_NAME);
+		panic("In pH_test_seq with s->length = 0");
+		return;
+	}
 
 	cur_idx = s->last;
 	cur_call = seqdata[cur_idx];
