@@ -610,7 +610,7 @@ int process_syscall(long syscall) {
 
 void add_process_to_llist(pH_task_struct* t) {
 	if (!t || t == NULL) {
-		pr_err("%s: Received NULL pH_task_struct in add_process-to_llist\n", DEVICE_NAME);
+		pr_err("%s: Received NULL pH_task_struct in add_process_to_llist\n", DEVICE_NAME);
 		return;
 	}
 	
@@ -802,6 +802,9 @@ not_monitoring:
 	return 0;
 
 corrupted_path_to_binary:
+	kfree(path_to_binary);
+	path_to_binary = NULL;
+	
 	jprobe_return();
 	return 0;
 }
