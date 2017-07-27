@@ -249,37 +249,43 @@ int pH_suspend_execve_time = 3600 * 24 * 2;  /* time to suspend execve's */
 int pH_normal_wait = 7 * 24 * 3600;/* seconds before putting normal to work */
 
 // My global variables
-pH_task_struct* pH_task_struct_list = NULL;
-struct jprobe jprobes_array[num_syscalls];
+pH_task_struct* pH_task_struct_list = NULL; // List of processes currently being monitored
+struct jprobe jprobes_array[num_syscalls];  // Array of jprobes (is this obsolete?)
 bool module_inserted_successfully = FALSE;
-spinlock_t pH_profile_list_sem;
-int profiles_created = 0;
-int successful_jsys_execves = 0;
+spinlock_t pH_profile_list_sem;             // Lock for list of profiles
+int profiles_created = 0;                   // Number of profiles that have been created
+int successful_jsys_execves = 0;            // Number of successful jsys_execves
 
+// Returns true if the process is being monitored, false otherwise
 inline bool pH_monitoring(pH_task_struct* process) {
         return process->profile != NULL;
 }
 
+// Returns true if the profile is in use, false otherwise
 inline bool pH_profile_in_use(pH_profile *profile)
 {
         return (atomic_read(&(profile->refcount)) > 0);
 }
 
+// Increments the profile's reference count
 inline void pH_refcount_inc(pH_profile *profile)
 {
         atomic_inc(&(profile->refcount));
 }
 
+// Decrements the profile's reference count
 inline void pH_refcount_dec(pH_profile *profile)
 {
         atomic_dec(&(profile->refcount));
 }
 
+// Initializes the profile's reference count
 inline void pH_refcount_init(pH_profile *profile, int i)
 {
         profile->refcount.counter = i;
 }
 
+// Returns the length of the profile list
 int pH_profile_list_length(void) {
 	pH_profile* iterator;
 	int i;
@@ -296,6 +302,7 @@ int pH_profile_list_length(void) {
 	return i;
 }
 
+// Returns the length of the process list
 int pH_task_struct_list_length(void) {
 	pH_task_struct* iterator;
 	int i;
@@ -310,7 +317,9 @@ int pH_task_struct_list_length(void) {
 	return i;
 }
 
+// Adds an alloc'd profile to the profile list
 void add_to_profile_llist(pH_profile* p) {
+	// Checks for adding a NULL profile
 	if (!p || p == NULL) {
 		pr_err("%s: In add_to_profile_llist with a NULL profile\n", DEVICE_NAME);
 		return;
@@ -344,11 +353,13 @@ void add_to_profile_llist(pH_profile* p) {
 int new_profile(pH_profile* profile, char* filename) {
 	int i;
 
+	// Checks for NULL
 	if (!profile || profile == NULL) {
 		pr_err("%s: ERROR: NULL profile was passed to new_profile()\n", DEVICE_NAME);
 		return -1;
 	}
 
+	// Increments profiles_created, and stores it as the identifier
 	profiles_created++;
 	profile->identifier = profiles_created;
 
@@ -359,6 +370,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	profile->length = pH_default_looklen;
 	profile->count = 0;
 
+	// Allocates memory for the lock
 	profile->lock = kmalloc(sizeof(spinlock_t), GFP_ATOMIC);
 	if (!(profile->lock) || profile->lock == NULL) {
 		pr_err("%s: Unable to allocate memory for profile->lock in new_profile()\n", DEVICE_NAME);
@@ -372,6 +384,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	//profile->train.current_page = 0;
 	//profile->train.count_page = 0;
 
+	// Initializes entry array to NULL
 	for (i=0; i<PH_NUM_SYSCALLS; i++) {
 	    profile->train.entry[i] = NULL;
 	}
@@ -401,6 +414,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	return 0;
 }
 
+// Adds a syscall to the linked list in its pH_task_struct
 void add_to_my_syscall_llist(pH_task_struct* t, my_syscall* s) {
 	//pr_err("%s: In add_to_my_syscall_llist\n", DEVICE_NAME);
 	
@@ -428,6 +442,7 @@ void add_to_my_syscall_llist(pH_task_struct* t, my_syscall* s) {
 pH_task_struct* llist_retrieve_process(int process_id) {
 	pH_task_struct* iterator = pH_task_struct_list;
 	
+	// Checks to see if this function can execute in this instance
 	if (!module_inserted_successfully || !pH_aremonitoring) {
 		pr_err("%s: ERROR: llist_retrieve_process called before module has been inserted correctly\n", DEVICE_NAME);
 		return NULL;
@@ -453,10 +468,12 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 
 void stack_push(pH_task_struct*, pH_seq*);
 
+// Initializes a new pH_seq and then adds it to the stack of pH_seqs
 int make_and_push_new_pH_seq(pH_task_struct* process) {
 	pH_profile* profile;
 	pH_seq* new_sequence;
 	
+	// Checks for NULL process
 	if (!process || process == NULL) {
 		pr_err("%s: process is NULL in make_and_push_new_pH_seq\n", DEVICE_NAME);
 		return 0;
@@ -464,17 +481,20 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	
 	profile = process->profile;
 	
+	// Checks for NULL profile
 	if (!profile || profile == NULL) {
 		pr_err("%s: profile is NULL in make_and_push_new_pH_seq\n", DEVICE_NAME);
 		return -1;
 	}
 	
+	// Allocates space for the new pH_seq
 	new_sequence = kmalloc(sizeof(pH_seq), GFP_ATOMIC);
 	if (!new_sequence || new_sequence == NULL) {
 		pr_err("%s: Unable to allocate space for new_sequence in make_and_push_new_pH_seq\n", DEVICE_NAME);
 		return -ENOMEM;
 	}
 	
+	// Initialize the new pH_seq and push it onto the stack
 	//pr_err("%s: Initializing new_sequence in make_and_push_new_pH_seq...\n", DEVICE_NAME);
 	new_sequence->next = NULL;
 	//pr_err("%s: Set new_sequence->next to NULL\n", DEVICE_NAME);
@@ -493,11 +513,13 @@ inline void pH_append_call(pH_seq*, int);
 inline void pH_train(pH_task_struct*);
 //void stack_print(pH_task_struct*);
 
+// Processes a system call
 int process_syscall(long syscall) {
 	pH_task_struct* process;
 	my_syscall* new_syscall;
 	pH_profile* profile;
 	
+	// Boolean checks
 	if (!module_inserted_successfully) return 0;
 	
 	if (!pH_aremonitoring) return 0;
@@ -535,6 +557,7 @@ int process_syscall(long syscall) {
 	*/
 	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
+	// Check to see if this profile is still in use
 	if (!pH_profile_in_use(profile) || !(profile->lock) || profile->lock == NULL) {
 		pr_err("%s: profile->lock is NULL in process_syscall\n", DEVICE_NAME);
 		vfree(profile);
@@ -542,7 +565,7 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	
-	spin_lock(profile->lock);
+	spin_lock(profile->lock); // Grabs the lock to this profile
 	
 	if (process && (process->seq) == NULL) {
 		pH_seq* temp = (pH_seq*) kmalloc(sizeof(pH_seq), GFP_ATOMIC);
@@ -608,7 +631,9 @@ int process_syscall(long syscall) {
 	return 0;
 }
 
+// Adds a process to the linked list of processes
 void add_process_to_llist(pH_task_struct* t) {
+	// Checks for NULL
 	if (!t || t == NULL) {
 		pr_err("%s: Received NULL pH_task_struct in add_process_to_llist\n", DEVICE_NAME);
 		return;
@@ -633,6 +658,7 @@ void add_process_to_llist(pH_task_struct* t) {
 	}
 }
 
+// Returns a pH_profile, given a filename
 pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	pH_task_struct* process_list_iterator;
 	pH_profile* profile_list_iterator = pH_profile_list;
@@ -657,6 +683,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	spin_unlock(&pH_profile_list_sem);
 	
 	// If searching through profile list fails, search through process list
+	// (this should be removed, as this should never need to happen)
 	process_list_iterator = pH_task_struct_list;
 	do {
 		if (strcmp(filename, process_list_iterator->profile->filename) == 0) {
@@ -671,6 +698,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 
 void free_pH_task_struct(pH_task_struct*);
 
+// Helper function for jsys_execve and fork_handler, as both instances require similar code
 int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id) {
 	pH_task_struct* this_process;
 	
@@ -719,11 +747,11 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 		}
 	}
 	
-	pH_refcount_inc(profile);
+	pH_refcount_inc(profile); // Increment refcount
 	
-	this_process->profile = profile;
+	this_process->profile = profile; // Put this profile in the pH_task_struct struct
 
-	add_process_to_llist(this_process);
+	add_process_to_llist(this_process); // Add this process to the list of processes
 	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
 	return 0;
@@ -739,6 +767,7 @@ no_memory:
 	return -ENOMEM;
 }
 
+// Handler function for execves
 static long jsys_execve(const char __user *filename,
 	const char __user *const __user *argv,
 	const char __user *const __user *envp)
@@ -746,13 +775,14 @@ static long jsys_execve(const char __user *filename,
 	char* path_to_binary;
 	int current_process_id;
 
+	// Boolean checks
 	if (!module_inserted_successfully) goto not_inserted;
 	
 	if (!pH_aremonitoring) goto not_monitoring;
 
 	//pr_err("%s: In jsys_execve\n", DEVICE_NAME);
 	
-	current_process_id = pid_vnr(task_tgid(current));
+	current_process_id = pid_vnr(task_tgid(current)); // Grab the process ID right now
 	
 	// Allocate space for path_to_binary
 	path_to_binary = kmalloc(sizeof(char) * 4000, GFP_ATOMIC);
@@ -765,6 +795,7 @@ static long jsys_execve(const char __user *filename,
 	copy_from_user(path_to_binary, filename, sizeof(char) * 4000);
 	//pr_err("%s: path_to_binary = %s\n", DEVICE_NAME, path_to_binary);
 	
+	// Checks to see if path_to_binary is okay - perhaps move this to handle_new_process()
 	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
 		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
 	{
@@ -772,12 +803,13 @@ static long jsys_execve(const char __user *filename,
 		goto corrupted_path_to_binary;
 	}
 	
+	// Handle the new process
 	handle_new_process(path_to_binary, NULL, current_process_id);
 	
-	process_syscall(59);
+	process_syscall(59); // Process this system call
 	//pr_err("%s: Back in jsys_execve after processing syscall\n", DEVICE_NAME);
 	
-	successful_jsys_execves++;
+	successful_jsys_execves++; // Increment successful_jsys_execves
 	
 	jprobe_return();
 	return 0;
@@ -841,6 +873,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	char* path_to_binary;
 	pH_profile* profile;
 	
+	// Boolean check
 	if (!module_inserted_successfully) return 0;
 	
 	//pr_err("%s: In fork_handler\n", DEVICE_NAME);
@@ -865,6 +898,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	
 	path_to_binary = profile->filename;
 	
+	// Checks to see if path_to_binary is okay - perhaps move this to handle_new_process()
 	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
 		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
 	{
@@ -872,6 +906,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 		return -1;
 	}
 	
+	// Handle the new process
 	handle_new_process(path_to_binary, profile, retval);
 	
 	return 0;
@@ -912,16 +947,19 @@ static struct kretprobe exit_kretprobe = {
 	.maxactive = 20,
 };
 
+// Frees profile storage
 void pH_free_profile_storage(pH_profile *profile)
 {
     int i;
 
 	pr_err("%s: In pH_free_profile_storage for %d\n", DEVICE_NAME, profile->identifier);
 
+	// Free profile->filename
     kfree(profile->filename);
     profile->filename = NULL;
     pr_err("%s: Freed profile->filename\n", DEVICE_NAME);
     
+    // Free entries
     for (i = 0; i < PH_NUM_SYSCALLS; i++) {
         if (profile->train.entry[i]) {
         	kfree(profile->train.entry[i]);
@@ -936,6 +974,7 @@ void pH_free_profile_storage(pH_profile *profile)
     pr_err("%s: Exiting pH_free_profile_storage\n", DEVICE_NAME);
 }
 
+// Returns true if the list contains a given identifier
 bool profile_list_contains_identifier(int identifier) {
 	pH_profile* iterator = pH_profile_list;
 	
@@ -966,8 +1005,10 @@ int pH_remove_profile_from_list(pH_profile *profile)
 {
     pH_profile *prev_profile, *cur_profile;
     
+    // NULL check
 	if (!profile || profile == NULL) return 0;
 	
+	// Only remove a profile if the refcount == 0
 	if (atomic_read(&(profile->refcount)) != 0) {
 		pr_err("%s: ERROR: Trying to remove a profile that is in use\n", DEVICE_NAME);
 		return -1;
@@ -1032,17 +1073,20 @@ int pH_remove_profile_from_list(pH_profile *profile)
     }
 }
 
+// Destructor for pH_profiles
 void pH_free_profile(pH_profile *profile)
 {
     int ret;
     
     pr_err("%s: In pH_free_profile for %d\n", DEVICE_NAME, profile->identifier);
     
+    // Checks for NULL
     if (!profile || profile == NULL) {
         err("no profile to free!");
         return;
     }
     
+    // Deals with nasty locking stuff
     spin_lock(profile->lock);
     if (spin_trylock(&pH_profile_list_sem) == 0) {
     	spin_unlock(profile->lock);
@@ -1083,6 +1127,7 @@ void pH_free_profile(pH_profile *profile)
     pr_err("%s: Freed pH_profile (end of function)\n", DEVICE_NAME);
 }
 
+// Removes a process from the list of processes
 int remove_process_from_llist(pH_task_struct* process) {
 	pH_task_struct *prev_task_struct, *cur_task_struct;
 	
@@ -1116,6 +1161,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 	}
 }
 
+// Frees all of the syscalls that are stored in a process
 void free_syscalls(pH_task_struct* t) {
 	my_syscall* current_syscall;
 	my_syscall* iterator = t->syscall_llist;
@@ -1128,6 +1174,7 @@ void free_syscalls(pH_task_struct* t) {
 	}
 }
 
+// Returns true if a given profile has at least one process that matches it
 bool profile_has_matching_process(pH_profile* profile) {
 	pH_task_struct* iterator;
 	
@@ -1176,10 +1223,12 @@ int free_profiles(void) {
 
 void stack_pop(pH_task_struct*);
 
+// Destructor for pH_task_structs
 void free_pH_task_struct(pH_task_struct* process) {
 	pH_profile* profile;
 	int i = 0;
 	
+	// Checks for NULL
 	if (!process || process == NULL) {
 		pr_err("%s: process is NULL in free_pH_task_struct\n", DEVICE_NAME);
 		return;
@@ -1193,6 +1242,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 		//stack_print(process);
 	}
 	
+	// Emtpies stack of pH_seqs
 	while (process->seq != NULL) {
 		if (i > 1000) {
 			pr_err("%s: Been in this loop for quite some time... Exiting\n", DEVICE_NAME);
@@ -1209,7 +1259,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 	//stack_print(process); // Don't bother printing right now
 	//mutex_destroy(&(process->pH_seq_stack_sem)); // Leave the mutex intact?
 	
-	free_syscalls(process);
+	free_syscalls(process); // Frees syscalls
 	pr_err("%s: Freed syscalls\n", DEVICE_NAME);
 	
 	// This boolean test is required for when this function is called when the module is being removed
@@ -1321,6 +1371,7 @@ void stack_print(pH_task_struct* process) {
 }
 */
 
+// Pushes a new pH_seq onto the stack
 void stack_push(pH_task_struct* process, pH_seq* new_node) {
 	//pH_seq* top = process->seq;
 	
@@ -1454,6 +1505,7 @@ not_inserted:
 }
 */
 
+// Frees all of the pH_task_structs in one go
 int free_pH_task_structs(void) {
 	int ret = 0;
 	
@@ -1465,6 +1517,7 @@ int free_pH_task_structs(void) {
 	return ret;
 }
 
+// Function responsible for module insertion
 static int __init ebbchar_init(void){
 	int ret, i, j;
 	
@@ -1692,10 +1745,11 @@ static int __init ebbchar_init(void){
 	}
 	pr_err("%s: Registered all syscall probes\n", DEVICE_NAME);
 	
-	spin_lock_init(&pH_profile_list_sem);
+	spin_lock_init(&pH_profile_list_sem); // Initializes the profile list lock
 	
 	pr_err("%s: Successfully initialized %s\n", DEVICE_NAME, DEVICE_NAME);
 	
+	// Set booleans accordingly, now that initialization is complete
 	module_inserted_successfully = TRUE;
 	pH_aremonitoring = 1;
 
@@ -1740,6 +1794,7 @@ static void __exit ebbchar_exit(void){
 	pr_err("%s: Freeing pH_task_structs...\n", DEVICE_NAME);
 	pH_task_structs_freed = free_pH_task_structs();
 	
+	// Miscellaneous cleanup
 	mutex_destroy(&ebbchar_mutex);
 	device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
 	class_unregister(ebbcharClass);
