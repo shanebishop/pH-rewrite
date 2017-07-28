@@ -1296,7 +1296,7 @@ static long jsys_exit(int error_code) {
 	
 	//pr_err("%s: In jsys_exit for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
 	
-	process_syscall(72); // Process this syscall before calling free_pH_task_struct on process
+	//process_syscall(72); // Process this syscall before calling free_pH_task_struct on process
 	//pr_err("%s: Back in jsys_exit after processing syscall\n", DEVICE_NAME);
 	
 	free_pH_task_struct(process);
@@ -1327,7 +1327,7 @@ static long jsys_exit_group(int error_code) {
 	
 	pr_err("%s: In jsys_exit_group for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
 	
-	process_syscall(73); // Process this syscall before calling free_pH_task_struct on process
+	//process_syscall(73); // Process this syscall before calling free_pH_task_struct on process
 	pr_err("%s: Back in jsys_exit_group after processing syscall\n", DEVICE_NAME);
 	
 	free_pH_task_struct(process);
