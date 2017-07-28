@@ -406,8 +406,6 @@ int new_profile(pH_profile* profile, char* filename) {
 	// Add this new profile to the hashtable
 	//hash_add(profile_hashtable, &profile->hlist, pid_vnr(task_tgid(current)));
 	
-	//mutex_unlock(&(profile->lock));
-	
 	// Add this new profile to the llist
 	add_to_profile_llist(profile);
 
@@ -560,8 +558,8 @@ int process_syscall(long syscall) {
 	// Check to see if this profile is still in use
 	if (!pH_profile_in_use(profile) || !(profile->lock) || profile->lock == NULL) {
 		pr_err("%s: profile->lock is NULL in process_syscall\n", DEVICE_NAME);
-		vfree(profile);
-		profile = NULL;
+		//vfree(profile); // Don't bother freeing, since this is the only remaining pointer
+		//profile = NULL;
 		return -1;
 	}
 	
@@ -592,12 +590,6 @@ int process_syscall(long syscall) {
 	if (process) pH_append_call(process->seq, syscall);
 	//pr_err("%s: Successfully appended call %d\n", DEVICE_NAME, syscall);
 	
-	//pr_err("%s: process = %p %d\n", DEVICE_NAME, process, process != NULL);
-	//pr_err("%s: binary = %s\n", DEVICE_NAME, process->profile->filename);
-	//pr_err("%s: profile = %p %d\n", DEVICE_NAME, profile, profile != NULL);
-	//pr_err("%s: profile->identifer = %d\n", DEVICE_NAME, profile->identifier);
-	//pr_err("%s: profile->lock = %p\n", DEVICE_NAME, profile->lock);
-	//spin_lock(profile->lock);
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
 	//pr_err("%s: profile->count = %d\n", DEVICE_NAME, profile->count);
