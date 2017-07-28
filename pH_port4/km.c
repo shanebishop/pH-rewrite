@@ -1303,8 +1303,39 @@ static long jsys_exit(int error_code) {
 	
 	//pr_err("%s: In jsys_exit for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
 	
-	process_syscall(73); // Process this syscall before calling free_pH_task_struct on process
+	process_syscall(72); // Process this syscall before calling free_pH_task_struct on process
 	//pr_err("%s: Back in jsys_exit after processing syscall\n", DEVICE_NAME);
+	
+	free_pH_task_struct(process);
+	
+	jprobe_return();
+	return 0;
+	
+not_monitoring:
+	//pr_err("%s: %d had no pH_task_struct associated with it\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
+	jprobe_return();
+	return 0;
+	
+not_inserted:
+	jprobe_return();
+	return 0;
+}
+
+static long jsys_exit_group(int error_code) {
+	pH_task_struct* process;
+	
+	if (!module_inserted_successfully) goto not_inserted;
+	
+	pr_err("%s: In jsys_exit_group for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
+	
+	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
+	
+	if (process == NULL) goto not_monitoring;
+	
+	pr_err("%s: In jsys_exit_group for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
+	
+	process_syscall(73); // Process this syscall before calling free_pH_task_struct on process
+	pr_err("%s: Back in jsys_exit_group after processing syscall\n", DEVICE_NAME);
 	
 	free_pH_task_struct(process);
 	
@@ -1643,7 +1674,6 @@ static int __init ebbchar_init(void){
 		return PTR_ERR(ebbcharDevice);
 	}
 	
-	
 	// Register fork_kretprobe
 	fork_kretprobe.kp.symbol_name = "_do_fork";
 	ret = register_kretprobe(&fork_kretprobe);
@@ -1689,7 +1719,6 @@ static int __init ebbchar_init(void){
 		return PTR_ERR(ebbcharDevice);
 	}
 	pr_err("%s: Found symbol 'do_exit'\n", DEVICE_NAME);
-	
 	
 	ret = register_kretprobe(&exit_kretprobe);
 	if (ret < 0) {
