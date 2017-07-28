@@ -1639,19 +1639,19 @@ static int __init ebbchar_init(void){
 	}
 	*/
 	
-	if (!kallsyms_lookup_name("sys_rt_sigreturn") != 0) {
+	if (kallsyms_lookup_name("sys_rt_sigreturn") != 0) {
 		pr_err("%s: Found sys_rt_sigreturn\n", DEVICE_NAME);
 	}
-	if (!kallsyms_lookup_name("sys32_x32_rt_sigreturn") != 0) {
+	if (kallsyms_lookup_name("sys32_x32_rt_sigreturn") != 0) {
 		pr_err("%s: Found sys32_x32_rt_sigreturn\n", DEVICE_NAME);
 	}
-	if (!kallsyms_lookup_name("sys32_sigreturn") != 0) {
+	if (kallsyms_lookup_name("sys32_sigreturn") != 0) {
 		pr_err("%s: Found sys32_sigreturn\n", DEVICE_NAME);
 	}
-	if (!kallsyms_lookup_name("sys32_rt_sigreturn") != 0) {
+	if (kallsyms_lookup_name("sys32_rt_sigreturn") != 0) {
 		pr_err("%s: Found sys32_rt_sigreturn\n", DEVICE_NAME);
 	}
-	if (!kallsyms_lookup_name("ptregs_sys_rt_sigreturn") != 0) {
+	if (kallsyms_lookup_name("ptregs_sys_rt_sigreturn") != 0) {
 		pr_err("%s: Found ptregs_sys_rt_sigreturn\n", DEVICE_NAME);
 	}
 	
