@@ -1658,10 +1658,11 @@ static int __init ebbchar_init(void){
 	if (kallsyms_lookup_name("sys_sigreturn") == 0) {
 		pr_err("%s: Failed to find symbol 'sys_sigreturn'\n", DEVICE_NAME);
 		
-		sys_sigreturn_jprobe.kp.symbol_name = "sys_sigreturn";
+		//sys_sigreturn_jprobe.kp.symbol_name = "sys_sigreturn";
 	}
 	pr_err("%s: Found symbol 'sys_sigreturn'\n", DEVICE_NAME);
 	
+	/*
 	ret = register_jprobe(&sys_sigreturn_jprobe);
 	if (ret < 0) {
 		pr_err("%s: register_jprobe failed (sys_sigreturn_jprobe), returned %d\n", DEVICE_NAME, ret);
@@ -1679,7 +1680,7 @@ static int __init ebbchar_init(void){
 		
 		return PTR_ERR(ebbcharDevice);
 	}
-	
+	*/
 	
 	// Register do_signal_jprobe
 	do_signal_jprobe.kp.addr = kallsyms_lookup_name("do_signal");
