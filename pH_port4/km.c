@@ -1332,22 +1332,33 @@ not_inserted:
 	return 0;
 }
 
-static long jsys_exit_group(int error_code) {
+static long jdo_group_exit(int error_code) {
 	pH_task_struct* process;
+	struct task_struct* p;
+	struct task_struct* t;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
-	pr_err("%s: In jsys_exit_group for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
+	p = current;
 	
-	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
+	pr_err("%s: In jdo_group_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(p)));
 	
+	process = llist_retrieve_process(pid_vnr(task_tgid(p)));
 	if (process == NULL) goto not_monitoring;
 	
-	pr_err("%s: In jsys_exit_group for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
+	pr_err("%s: In jdo_group_exit for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(p)), process->profile->filename);
 	
-	//process_syscall(73); // Process this syscall before calling free_pH_task_struct on process
-	//pr_err("%s: Back in jsys_exit_group after processing syscall\n", DEVICE_NAME);
-	
+	t = p;
+	while_each_thread(p, t) {
+		if (t->exit_state) continue;
+		
+		process = llist_retrieve_process(pid_vnr(task_tgid(t)));
+		
+		if (process != NULL) {
+			free_pH_task_struct(process);
+		}
+	}
+	process = llist_retrieve_process(pid_vnr(task_tgid(p)));
 	free_pH_task_struct(process);
 	
 	jprobe_return();
@@ -1628,20 +1639,26 @@ static int __init ebbchar_init(void){
 	}
 	*/
 	
-	/*
+	if (!kallsyms_lookup_name("sys_rt_sigreturn") != 0) {
+		pr_err("%s: Found sys_rt_sigreturn\n", DEVICE_NAME);
+	}
+	if (!kallsyms_lookup_name("sys32_x32_rt_sigreturn") != 0) {
+		pr_err("%s: Found sys32_x32_rt_sigreturn\n", DEVICE_NAME);
+	}
+	if (!kallsyms_lookup_name("sys32_sigreturn") != 0) {
+		pr_err("%s: Found sys32_sigreturn\n", DEVICE_NAME);
+	}
+	if (!kallsyms_lookup_name("sys32_rt_sigreturn") != 0) {
+		pr_err("%s: Found sys32_rt_sigreturn\n", DEVICE_NAME);
+	}
+	if (!kallsyms_lookup_name("ptregs_sys_rt_sigreturn") != 0) {
+		pr_err("%s: Found ptregs_sys_rt_sigreturn\n", DEVICE_NAME);
+	}
+	
 	if (kallsyms_lookup_name("sys_sigreturn") == 0) {
 		pr_err("%s: Failed to find symbol 'sys_sigreturn'\n", DEVICE_NAME);
 		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);	
+		sys_sigreturn_jprobe.kp.symbol_name = "sys_sigreturn";
 	}
 	pr_err("%s: Found symbol 'sys_sigreturn'\n", DEVICE_NAME);
 	
@@ -1662,7 +1679,7 @@ static int __init ebbchar_init(void){
 		
 		return PTR_ERR(ebbcharDevice);
 	}
-	*/
+	
 	
 	// Register do_signal_jprobe
 	do_signal_jprobe.kp.addr = kallsyms_lookup_name("do_signal");
