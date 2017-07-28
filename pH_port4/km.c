@@ -563,7 +563,7 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	
-	pr_err("%s: Locking profile->lock\n", DEVICE_NAME);
+	//pr_err("%s: Locking profile->lock\n", DEVICE_NAME);
 	spin_lock(profile->lock); // Grabs the lock to this profile
 	
 	if (process && (process->seq) == NULL) {
