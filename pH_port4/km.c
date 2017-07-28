@@ -319,6 +319,8 @@ int pH_task_struct_list_length(void) {
 
 // Adds an alloc'd profile to the profile list
 void add_to_profile_llist(pH_profile* p) {
+	pr_err("%s: In add_to_profile_llist\n", DEVICE_NAME);
+	
 	// Checks for adding a NULL profile
 	if (!p || p == NULL) {
 		pr_err("%s: In add_to_profile_llist with a NULL profile\n", DEVICE_NAME);
@@ -334,9 +336,7 @@ void add_to_profile_llist(pH_profile* p) {
 		/* // Old implementation
 		pH_profile* iterator = pH_profile_list;
 		
-		spin_lock(&pH_profile_list_sem);
 		while (iterator->next) iterator = iterator->next;
-		spin_unlock(&pH_profile_list_sem);
 		
 		iterator->next = p;
 		p->next = NULL;
@@ -563,6 +563,7 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	
+	pr_err("%s: Locking profile->lock\n", DEVICE_NAME);
 	spin_lock(profile->lock); // Grabs the lock to this profile
 	
 	if (process && (process->seq) == NULL) {
@@ -658,7 +659,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	if (pH_task_struct_list == NULL || pH_profile_list == NULL) {
 		return NULL;
 	}
-	//pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
+	pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
 	
 	// Search through profile list
 	spin_lock(&pH_profile_list_sem);
