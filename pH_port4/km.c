@@ -1423,6 +1423,35 @@ not_inserted:
 	return 0;
 }
 
+static int jwait_task_zombie(struct wait_opts *wo, struct task_struct *p) {
+	pH_task_struct* process;
+	
+	if (!module_inserted_successfully) goto not_inserted;
+	
+	pr_err("%s: In jwait_task_zombie\n", DEVICE_NAME);
+	
+	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
+	if (process != NULL) {
+		pr_err("%s: Freeing process\n", DEVICE_NAME);
+	}
+	else {
+		pr_err("%s: No process to free\n", DEVICE_NAME);
+	}
+	
+	free_pH_task_struct(process);
+	
+	jprobe_return();
+	return 0;
+
+not_inserted:
+	jprobe_return();
+	return 0;
+}
+
+struct jprobe wait_task_zombie_jprobe = {
+	.entry = jwait_task_zombie,
+};
+
 /*
 void stack_print(pH_task_struct* process) {
 	//pr_err("%s: In stack print\n", DEVICE_NAME);
@@ -1792,6 +1821,27 @@ static int __init ebbchar_init(void) {
 		
 		return PTR_ERR(ebbcharDevice);
 	}
+	
+	wait_task_zombie_jprobe.kp.addr = kallsyms_lookup_name("wait_task_zombie");
+	ret = register_jprobe(&wait_task_zombie_jprobe);
+	if (ret < 0) {
+		pr_err("%s: register_jprobe failed (wait_task_zombie_jprobe), returned %d\n", DEVICE_NAME, ret);
+		
+		//unregister_jprobe(&handle_signal_jprobe);
+		//unregister_jprobe(&sys_sigreturn_jprobe);
+		
+		mutex_destroy(&ebbchar_mutex);
+		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
+		class_unregister(ebbcharClass);
+		class_destroy(ebbcharClass);
+		unregister_chrdev(majorNumber, DEVICE_NAME);
+		
+		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
+		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
+		
+		return PTR_ERR(ebbcharDevice);
+	}
+	pr_err("%s: Successfully registered wait_task_zombie_jprobe\n", DEVICE_NAME);
 	
 	sys_rt_sigreturn_kretprobe.kp.symbol_name = "sys_rt_sigreturn";
 	ret = register_kretprobe(&sys_rt_sigreturn_kretprobe);
