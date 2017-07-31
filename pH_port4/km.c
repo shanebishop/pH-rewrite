@@ -1823,6 +1823,10 @@ static int __init ebbchar_init(void) {
 	}
 	
 	wait_task_zombie_jprobe.kp.addr = kallsyms_lookup_name("wait_task_zombie");
+	if (kallsyms_lookup_name("wait_task_zombie") == 0) {
+		pr_err("%s: Unable to find symbol wait_task_zombie\n", DEVICE_NAME);
+	}
+	
 	ret = register_jprobe(&wait_task_zombie_jprobe);
 	if (ret < 0) {
 		pr_err("%s: register_jprobe failed (wait_task_zombie_jprobe), returned %d\n", DEVICE_NAME, ret);
