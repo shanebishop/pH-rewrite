@@ -538,10 +538,10 @@ void clean_processes(void) {
 	char* string_to_compare;
 	char* temp;
 	
-	pr_err("%s: In clean_process\n", DEVICE_NAME);
+	//pr_err("%s: In clean_process\n", DEVICE_NAME);
 	
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
-		pr_err("%s: In for\n", DEVICE_NAME);
+		//pr_err("%s: In for\n", DEVICE_NAME);
 		if (iterator->profile == NULL) continue;
 		
 		for (string_to_compare = iterator->profile->filename; 
@@ -580,7 +580,7 @@ int process_syscall(long syscall) {
 	
 	if (!pH_task_struct_list || pH_task_struct_list == NULL) return 0;
 
-	pr_err("%s: In process_syscall\n", DEVICE_NAME);
+	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
 	// Check to see if a process went out of use
 	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
