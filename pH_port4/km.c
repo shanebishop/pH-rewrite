@@ -979,6 +979,14 @@ static int sys_rt_sigreturn_handler(struct kretprobe_instance* ri, struct pt_reg
 		free_pH_task_struct(process);
 	}
 	
+	if (sigismember(&current->pending.signal, SIGKILL)) {
+		pr_err("%s: Freeing task_struct...\n", DEVICE_NAME);
+		free_pH_task_struct(process);
+	}
+	else {
+		pr_err("%s: SIGKILL is not a member of current->pending.signal\n", DEVICE_NAME);
+	}
+	
 	return 0;
 }
 
