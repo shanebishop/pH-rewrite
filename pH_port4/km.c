@@ -1610,17 +1610,25 @@ static long jsys_rt_sigreturn(void) {
 	
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	
+	if (current->exit_state == EXIT_DEAD || current->exit_state == EXIT_ZOMBIE || current->state == TASK_DEAD) {
+		pr_err("%s: Freeing task_struct...\n", DEVICE_NAME);
+		free_pH_task_struct(process);
+	}
+	
+	if (sigismember(&current->pending.signal, SIGKILL)) {
+		pr_err("%s: Freeing task_struct...\n", DEVICE_NAME);
+		free_pH_task_struct(process);
+	}
+	else {
+		pr_err("%s: SIGKILL is not a member of current->pending.signal\n", DEVICE_NAME);
+	}
+	
 	if (!process || process == NULL) goto not_inserted;
 	
 	stack_pop(process);
 	
 	//process_syscall(383); // Currently not 
 	//pr_err("%s: Back in jsys_rt_sigreturn after processing syscall\n", DEVICE_NAME);
-
-	if (current->exit_state) {
-		pr_err("%s: Freeing task_struct...\n", DEVICE_NAME);
-		free_pH_task_struct(process);
-	}
 	
 	jprobe_return();
 	return 0;
