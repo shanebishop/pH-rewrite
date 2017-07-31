@@ -218,6 +218,12 @@ struct jprobe sys_sigreturn_jprobe = {
 };
 */
 
+static long jsys_rt_sigreturn(void);
+
+struct jprobe sys_sigreturn_jprobe = {
+	.entry = jsys_rt_sigreturn,
+};
+
 static void jdo_signal(struct pt_regs* regs);
 
 struct jprobe do_signal_jprobe = {
@@ -1558,6 +1564,35 @@ not_inserted:
 }
 */
 
+// Finish implementing me! And also finish cleaning up the new additions to ebbchar_init!
+static long jsys_rt_sigreturn(void) {
+	pH_task_struct* process;
+	
+	if (!module_inserted_successfully) goto not_inserted;
+	
+	pr_err("%s: In jsys_rt_sigreturn\n", DEVICE_NAME);
+	
+	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
+	
+	if (!process || process == NULL) goto not_inserted;
+	
+	stack_pop(process);
+	
+	//process_syscall(383); // Currently not 
+	//pr_err("%s: Back in jsys_rt_sigreturn after processing syscall\n", DEVICE_NAME);
+
+	if (current->exit_state) {
+		free_pH_task_struct(process);
+	}
+	
+	jprobe_return();
+	return 0;
+
+not_inserted:
+	jprobe_return();
+	return 0;
+}
+
 // Frees all of the pH_task_structs in one go
 int free_pH_task_structs(void) {
 	int ret = 0;
@@ -1571,7 +1606,7 @@ int free_pH_task_structs(void) {
 }
 
 // Function responsible for module insertion
-static int __init ebbchar_init(void){
+static int __init ebbchar_init(void) {
 	int ret, i, j;
 	
 	pr_info("%s: Initializing the EBBChar LKM\n", DEVICE_NAME);
@@ -1662,9 +1697,9 @@ static int __init ebbchar_init(void){
 	}
 	pr_err("%s: Found symbol 'sys_sigreturn'\n", DEVICE_NAME);
 	
-	/*
+	sys_sigreturn_jprobe.kp.addr = kallsyms_lookup_name("sys_rt_sigreturn");
 	ret = register_jprobe(&sys_sigreturn_jprobe);
-	if (ret < 0) {
+	if (sys_sigreturn_jprobe.kp.addr && ret < 0) {
 		pr_err("%s: register_jprobe failed (sys_sigreturn_jprobe), returned %d\n", DEVICE_NAME, ret);
 		
 		//unregister_jprobe(&handle_signal_jprobe);
@@ -1680,7 +1715,7 @@ static int __init ebbchar_init(void){
 		
 		return PTR_ERR(ebbcharDevice);
 	}
-	*/
+	pr_err("%s: Successfully registered sys_sigreturn_jprobe\n", DEVICE_NAME);
 	
 	// Register do_signal_jprobe
 	do_signal_jprobe.kp.addr = kallsyms_lookup_name("do_signal");
