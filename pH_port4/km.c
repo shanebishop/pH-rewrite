@@ -957,8 +957,6 @@ static struct kretprobe exit_kretprobe = {
 };
 
 static int sys_rt_sigreturn_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
-	int retval;
-	ktime_t now;
 	pH_task_struct* process;
 	
 	if (!module_inserted_successfully) return 0;
@@ -967,10 +965,7 @@ static int sys_rt_sigreturn_handler(struct kretprobe_instance* ri, struct pt_reg
 	
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	
-	if (process == NULL) return 0;
-	
-	retval = regs_return_value(regs);
-	now = ktime_get();
+	//if (process == NULL) return 0;
 	
 	// Perhaps I should look at TASK_WAKEKILL as well
 	// Can a zombie process be unzombified?
