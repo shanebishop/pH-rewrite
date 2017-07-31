@@ -956,6 +956,38 @@ static struct kretprobe exit_kretprobe = {
 	.maxactive = 20,
 };
 
+static int sys_rt_sigreturn_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
+	int retval;
+	ktime_t now;
+	pH_task_struct* process;
+	
+	if (!module_inserted_successfully) return 0;
+	
+	pr_err("%s: In sys_rt_sigreturn_handler for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
+	
+	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
+	
+	if (process == NULL) return 0;
+	
+	retval = regs_return_value(regs);
+	now = ktime_get();
+	
+	// Perhaps I should look at TASK_WAKEKILL as well
+	// Can a zombie process be unzombified?
+	if (current->exit_state == EXIT_DEAD || current->exit_state == EXIT_ZOMBIE || current->state == TASK_DEAD) {
+		pr_err("%s: Freeing task_struct...\n", DEVICE_NAME);
+		free_pH_task_struct(process);
+	}
+	
+	return 0;
+}
+
+static struct kretprobe sys_rt_sigreturn_kretprobe = {
+	.handler = sys_rt_sigreturn_handler,
+	.data_size = sizeof(struct my_kretprobe_data),
+	.maxactive = 20,
+};
+
 // Frees profile storage
 void pH_free_profile_storage(pH_profile *profile)
 {
@@ -1565,6 +1597,7 @@ not_inserted:
 */
 
 // Finish implementing me! And also finish cleaning up the new additions to ebbchar_init!
+// Try me with a kretprobe as well
 static long jsys_rt_sigreturn(void) {
 	pH_task_struct* process;
 	
@@ -1582,6 +1615,7 @@ static long jsys_rt_sigreturn(void) {
 	//pr_err("%s: Back in jsys_rt_sigreturn after processing syscall\n", DEVICE_NAME);
 
 	if (current->exit_state) {
+		pr_err("%s: Freeing task_struct...\n", DEVICE_NAME);
 		free_pH_task_struct(process);
 	}
 	
@@ -1737,6 +1771,28 @@ static int __init ebbchar_init(void) {
 		
 		return PTR_ERR(ebbcharDevice);
 	}
+	
+	sys_rt_sigreturn_kretprobe.kp.symbol_name = "sys_rt_sigreturn";
+	ret = register_kretprobe(&sys_rt_sigreturn_kretprobe);
+	if (ret < 0) {
+		pr_err("%s: Failed to register sys_rt_sigreturn_kretprobe, returned %d\n", DEVICE_NAME, ret);
+		
+		//unregister_jprobe(&handle_signal_jprobe);
+		//unregister_jprobe(&sys_sigreturn_jprobe);
+		unregister_jprobe(&do_signal_jprobe);
+		
+		mutex_destroy(&ebbchar_mutex);
+		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
+		class_unregister(ebbcharClass);
+		class_destroy(ebbcharClass);
+		unregister_chrdev(majorNumber, DEVICE_NAME);
+		
+		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
+		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
+		
+		return PTR_ERR(ebbcharDevice);
+	}
+	pr_err("%s: Successfully registered sys_rt_sigreturn_kretprobe\n", DEVICE_NAME);
 	
 	// Register fork_kretprobe
 	fork_kretprobe.kp.symbol_name = "_do_fork";
