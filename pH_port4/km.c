@@ -519,6 +519,9 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	return 0;
 }
 
+void free_pH_task_struct(pH_task_struct*);
+
+/*
 bool comm_matches(char* comm_from_pH_task_struct) {
 	struct task_struct* t;
 	
@@ -528,8 +531,6 @@ bool comm_matches(char* comm_from_pH_task_struct) {
 	
 	return FALSE;
 }
-
-void free_pH_task_struct(pH_task_struct*);
 
 void clean_processes(void) {
 	pH_task_struct* iterator;
@@ -550,6 +551,7 @@ void clean_processes(void) {
 		if (!comm_matches(string_to_compare)) free_pH_task_struct(iterator);
 	}
 }
+*/
 
 // Function prototypes for process_syscall()
 inline void pH_append_call(pH_seq*, int);
@@ -572,7 +574,7 @@ int process_syscall(long syscall) {
 	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
 	// Check to see if a process went out of use
-	clean_processes();
+	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
