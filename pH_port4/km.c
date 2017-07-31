@@ -961,6 +961,7 @@ static struct kretprobe fork_kretprobe = {
 	.maxactive = 20,
 };
 
+/*
 static int exit_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	int retval;
 	ktime_t now;
@@ -985,7 +986,7 @@ static int exit_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 }
 
 static struct kretprobe exit_kretprobe = {
-	.handler = /*(kprobe_opcode_t*)*/ exit_handler,
+	.handler = exit_handler,
 	.data_size = sizeof(struct my_kretprobe_data),
 	.maxactive = 20,
 };
@@ -1031,6 +1032,7 @@ static struct kretprobe sys_rt_sigreturn_kretprobe = {
 	.data_size = sizeof(struct my_kretprobe_data),
 	.maxactive = 20,
 };
+*/
 
 // Frees profile storage
 void pH_free_profile_storage(pH_profile *profile)
@@ -1456,6 +1458,7 @@ not_inserted:
 	return 0;
 }
 
+/*
 static int jwait_consider_task(struct wait_opts *wo, int ptrace, struct task_struct *p) {
 	pH_task_struct* process;
 	int exit_state = ACCESS_ONCE(p->exit_state);
@@ -1488,6 +1491,7 @@ not_inserted:
 struct jprobe wait_consider_task_jprobe = {
 	.entry = jwait_consider_task,
 };
+*/
 
 /*
 void stack_print(pH_task_struct* process) {
@@ -1795,6 +1799,7 @@ static int __init ebbchar_init(void) {
 	}
 	*/
 	
+	/*
 	if (kallsyms_lookup_name("sys_rt_sigreturn") != 0) {
 		pr_err("%s: Found sys_rt_sigreturn\n", DEVICE_NAME);
 	}
@@ -1817,6 +1822,7 @@ static int __init ebbchar_init(void) {
 		//sys_sigreturn_jprobe.kp.symbol_name = "sys_sigreturn";
 	}
 	pr_err("%s: Found symbol 'sys_sigreturn'\n", DEVICE_NAME);
+	*/
 	
 	sys_sigreturn_jprobe.kp.addr = kallsyms_lookup_name("sys_rt_sigreturn");
 	ret = register_jprobe(&sys_sigreturn_jprobe);
@@ -1859,6 +1865,7 @@ static int __init ebbchar_init(void) {
 		return PTR_ERR(ebbcharDevice);
 	}
 	
+	/*
 	wait_consider_task_jprobe.kp.addr = kallsyms_lookup_name("wait_consider_task");
 	if (kallsyms_lookup_name("wait_consider_task") == 0) {
 		pr_err("%s: Unable to find symbol wait_consider_task\n", DEVICE_NAME);
@@ -1905,6 +1912,7 @@ static int __init ebbchar_init(void) {
 		return PTR_ERR(ebbcharDevice);
 	}
 	pr_err("%s: Successfully registered sys_rt_sigreturn_kretprobe\n", DEVICE_NAME);
+	*/
 	
 	// Register fork_kretprobe
 	fork_kretprobe.kp.symbol_name = "_do_fork";
@@ -1928,6 +1936,7 @@ static int __init ebbchar_init(void) {
 		return PTR_ERR(ebbcharDevice);
 	}
 	
+	/*
 	// Regiser exit_kretprobe
 	exit_kretprobe.kp.addr = (kprobe_opcode_t*) kallsyms_lookup_name("do_exit");
 	
@@ -1973,6 +1982,7 @@ static int __init ebbchar_init(void) {
 		return PTR_ERR(ebbcharDevice);
 	}
 	pr_err("%s: Registered exit_kretprobe\n", DEVICE_NAME);
+	*/
 
 	//pr_err("%s: num_syscalls = %d\n", DEVICE_NAME, num_syscalls);
 	for (i = 0; i < num_syscalls; i++) {
@@ -1984,7 +1994,7 @@ static int __init ebbchar_init(void) {
 			//unregister_jprobe(&sys_sigreturn_jprobe);
 			unregister_jprobe(&do_signal_jprobe);
 			unregister_kretprobe(&fork_kretprobe);
-			unregister_kretprobe(&exit_kretprobe);
+			//unregister_kretprobe(&exit_kretprobe);
 			
 			// Should it be j <= i?
 			for (j = 0; j < i; j++) {
@@ -2045,9 +2055,11 @@ static void __exit ebbchar_exit(void){
 	unregister_kretprobe(&fork_kretprobe);
 	pr_err("%s: Missed probing %d instances of fork\n", DEVICE_NAME, fork_kretprobe.nmissed);
 	
+	/*
 	// Unregister exit_kretprobe
 	unregister_kretprobe(&exit_kretprobe);
 	pr_err("%s: Missed probing %d instances of exit\n", DEVICE_NAME, exit_kretprobe.nmissed);
+	*/
 	
 	profiles_freed = pH_profile_list_length();
 	
