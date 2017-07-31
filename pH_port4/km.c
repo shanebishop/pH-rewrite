@@ -262,6 +262,7 @@ spinlock_t pH_profile_list_sem;             // Lock for list of profiles
 spinlock_t pH_task_struct_list_sem;         // Lock for process list
 int profiles_created = 0;                   // Number of profiles that have been created
 int successful_jsys_execves = 0;            // Number of successful jsys_execves
+struct task_struct* last_task_struct_in_sigreturn = NULL;
 
 // Returns true if the process is being monitored, false otherwise
 inline bool pH_monitoring(pH_task_struct* process) {
@@ -961,6 +962,13 @@ static int sys_rt_sigreturn_handler(struct kretprobe_instance* ri, struct pt_reg
 	
 	if (!module_inserted_successfully) return 0;
 	
+	if (current == last_task_struct_in_sigreturn) {
+		pr_err("%s: The task structs are the same\n", DEVICE_NAME);
+	}
+	else {
+		pr_err("%s: The task structs are different\n", DEVICE_NAME);
+	}
+	
 	pr_err("%s: In sys_rt_sigreturn_handler for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
 	
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
@@ -1605,6 +1613,8 @@ static long jsys_rt_sigreturn(void) {
 	pH_task_struct* process;
 	
 	if (!module_inserted_successfully) goto not_inserted;
+	
+	last_task_struct_in_sigreturn = current;
 	
 	pr_err("%s: In jsys_rt_sigreturn\n", DEVICE_NAME);
 	
