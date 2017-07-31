@@ -519,6 +519,38 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	return 0;
 }
 
+bool comm_matches(char* comm_from_pH_task_struct) {
+	struct task_struct* t;
+	
+	for_each_process(t) {
+		if (strcmp(t->comm, comm_from_pH_task_struct)) return TRUE;
+	}
+	
+	return FALSE;
+}
+
+void free_pH_task_struct(pH_task_struct*);
+
+void clean_processes(void) {
+	pH_task_struct* iterator;
+	char* string_to_compare;
+	char* temp;
+	
+	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
+		if (iterator->profile == NULL) continue;
+		
+		for (string_to_compare = iterator->profile->filename; 
+			string_to_compare != '\0';
+			string_to_compare = string_to_compare++)
+		{
+			if (*string_to_compare == '/') temp = string_to_compare + 1;
+		}
+		string_to_compare = temp;
+		
+		if (!comm_matches(string_to_compare)) free_pH_task_struct(iterator);
+	}
+}
+
 // Function prototypes for process_syscall()
 inline void pH_append_call(pH_seq*, int);
 inline void pH_train(pH_task_struct*);
@@ -538,6 +570,9 @@ int process_syscall(long syscall) {
 	if (!pH_task_struct_list || pH_task_struct_list == NULL) return 0;
 
 	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
+	
+	// Check to see if a process went out of use
+	clean_processes();
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
@@ -705,8 +740,6 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	//pr_err("%s: No matching profile was found\n", DEVICE_NAME);
 	return NULL;
 }
-
-void free_pH_task_struct(pH_task_struct*);
 
 // Helper function for jsys_execve and fork_handler, as both instances require similar code
 int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id) {
