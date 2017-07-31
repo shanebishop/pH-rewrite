@@ -823,7 +823,7 @@ static long jsys_execve(const char __user *filename,
 	
 	if (!pH_aremonitoring) goto not_monitoring;
 
-	//pr_err("%s: In jsys_execve\n", DEVICE_NAME);
+	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
 	
 	current_process_id = pid_vnr(task_tgid(current)); // Grab the process ID right now
 	
@@ -867,16 +867,17 @@ no_memory:
 	return 0;
 	
 not_inserted:
-	//pr_err("%s: Module was not inserted successfully\n", DEVICE_NAME);
+	pr_err("%s: Module was not inserted successfully\n", DEVICE_NAME);
 	jprobe_return();
 	return 0;
 	
 not_monitoring:
-	//pr_err("%s: Not monitoring\n", DEVICE_NAME);
+	pr_err("%s: Not monitoring\n", DEVICE_NAME);
 	jprobe_return();
 	return 0;
 
 corrupted_path_to_binary:
+	pr_err("%s: Corrupted path_to_binary\n", DEVICE_NAME);
 	kfree(path_to_binary);
 	path_to_binary = NULL;
 	
