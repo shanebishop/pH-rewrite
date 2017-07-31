@@ -188,6 +188,7 @@ typedef struct my_syscall {
 
 typedef struct pH_task_struct { // My own version of a pH_task_state
 	struct pH_task_struct* next; // For linked lists
+	struct pH_task_struct* prev;
 	my_syscall* syscall_llist;
 	long process_id;
 	pH_locality alf;
@@ -521,7 +522,7 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 
 void free_pH_task_struct(pH_task_struct*);
 
-/*
+
 bool comm_matches(char* comm_from_pH_task_struct) {
 	struct task_struct* t;
 	
@@ -548,10 +549,12 @@ void clean_processes(void) {
 		}
 		string_to_compare = temp;
 		
-		if (!comm_matches(string_to_compare)) free_pH_task_struct(iterator);
+		if (!comm_matches(string_to_compare)) {
+			free_pH_task_struct(iterator);
+			iterator = iterator->prev;
+		}
 	}
 }
-*/
 
 // Function prototypes for process_syscall()
 inline void pH_append_call(pH_seq*, int);
@@ -686,6 +689,7 @@ void add_process_to_llist(pH_task_struct* t) {
 	if (pH_task_struct_list == NULL) {
 		pH_task_struct_list = t;
 		t->next = NULL;
+		t->prev = NULL;
 	}
 	else {
 		/* // Old implementation
@@ -699,6 +703,8 @@ void add_process_to_llist(pH_task_struct* t) {
 		
 		t->next = pH_task_struct_list;
 		pH_task_struct_list = t;
+		pH_task_struct_list->prev = NULL;
+		pH_task_struct_list->next->prev = pH_task_struct_list;
 	}
 	spin_unlock(&pH_task_struct_list_sem);
 }
@@ -1231,6 +1237,8 @@ int remove_process_from_llist(pH_task_struct* process) {
 	}
 	else if (pH_task_struct_list == process) {
 		pH_task_struct_list = pH_task_struct_list->next;
+		pH_task_struct_list->prev = NULL;
+		pH_task_struct_list->next->prev = pH_task_struct_list;
 		pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
 		spin_unlock(&pH_task_struct_list_sem);
 		return 0;
@@ -1241,6 +1249,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 		while (cur_task_struct != NULL) {
 			if (cur_task_struct == process) {
 				prev_task_struct->next = process->next;
+				cur_task_struct->next->prev = prev_task_struct;
 				pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
 				spin_unlock(&pH_task_struct_list_sem);
 				return 0;
