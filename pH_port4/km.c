@@ -568,20 +568,26 @@ void clean_processes(void) {
 void clean_processes(void) {
 	pH_task_struct* iterator;
 	
-	pr_err("%s: In clean_process\n", DEVICE_NAME);
+	//pr_err("%s: In clean_process\n", DEVICE_NAME);
 	
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		if (iterator->task_struct == NULL) {
 			if (iterator == pH_task_struct_list) {
+				pr_err("%s: Got here 1\n", DEVICE_NAME);
 				free_pH_task_struct(iterator);
+				pr_err("%s: Got here 2\n", DEVICE_NAME);
 				iterator = pH_task_struct_list;
+				pr_err("%s: Got here 3\n", DEVICE_NAME);
 				if (iterator == NULL) {
 					return;
 				}
 			}
 			else {
+				pr_err("%s: Got here 4\n", DEVICE_NAME);
 				iterator = iterator->prev;
+				pr_err("%s: Got here 5\n", DEVICE_NAME);
 				free_pH_task_struct(iterator->next);
+				pr_err("%s: Got here 6\n", DEVICE_NAME);
 			}
 		}
 	}
