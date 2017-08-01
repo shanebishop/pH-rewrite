@@ -568,7 +568,7 @@ void clean_processes(void) {
 void clean_processes(void) {
 	pH_task_struct* iterator;
 	
-	//pr_err("%s: In clean_process\n", DEVICE_NAME);
+	pr_err("%s: In clean_process\n", DEVICE_NAME);
 	
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		if (iterator->task_struct == NULL) {
@@ -590,7 +590,21 @@ void clean_processes(void) {
 				pr_err("%s: Got here 6\n", DEVICE_NAME);
 			}
 		}
+		else {
+			pr_err("%s: comm is %s\n", DEVICE_NAME, iterator->task_struct->comm);
+		}
 	}
+}
+
+int process_list_length(void) {
+	pH_task_struct* iterator;
+	int i = 0;
+	
+	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
+		i++;
+	}
+	
+	return i;
 }
 
 // Function prototypes for process_syscall()
@@ -614,8 +628,8 @@ int process_syscall(long syscall) {
 	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
 	// Check to see if a process went out of use
-	clean_processes(); // Temporarily commented out since the module isn't working at the moment
-	return 0; // Temp return
+	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
+	//return 0; // Temp return
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
@@ -864,6 +878,7 @@ static long jsys_execve(const char __user *filename,
 {
 	char* path_to_binary;
 	int current_process_id;
+	int list_length;
 
 	// Boolean checks
 	if (!module_inserted_successfully) goto not_inserted;
@@ -873,6 +888,11 @@ static long jsys_execve(const char __user *filename,
 	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
 	
 	current_process_id = pid_vnr(task_tgid(current)); // Grab the process ID right now
+	
+	pr_err("%s: List length at start is %d\n", DEVICE_NAME, process_list_length());
+	
+	clean_processes();
+	pr_err("%s: Back from clean_processes()\n", DEVICE_NAME);
 	
 	// Allocate space for path_to_binary
 	path_to_binary = kmalloc(sizeof(char) * 4000, GFP_ATOMIC);
@@ -898,6 +918,9 @@ static long jsys_execve(const char __user *filename,
 	
 	process_syscall(59); // Process this system call
 	//pr_err("%s: Back in jsys_execve after processing syscall\n", DEVICE_NAME);
+	
+	list_length = process_list_length();
+	pr_err("%s: List length at end is %d\n", DEVICE_NAME, list_length);
 	
 	successful_jsys_execves++; // Increment successful_jsys_execves
 	
