@@ -1244,7 +1244,9 @@ int remove_process_from_llist(pH_task_struct* process) {
 	else if (pH_task_struct_list == process) {
 		pr_err("%s: pH_task_struct_list == process\n", DEVICE_NAME);
 		pH_task_struct_list = pH_task_struct_list->next;
+		pr_err("%s: Got here 1\n", DEVICE_NAME);
 		pH_task_struct_list->prev = NULL;
+		pr_err("%s: Got here 2\n", DEVICE_NAME);
 		pH_task_struct_list->next->prev = pH_task_struct_list;
 		pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
 		spin_unlock(&pH_task_struct_list_sem);
