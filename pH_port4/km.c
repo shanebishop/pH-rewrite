@@ -1587,7 +1587,7 @@ static void jfree_pid(struct pid* pid) {
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
-	pr_err("%s: In jfree_pid\n", DEVICE_NAME);
+	//pr_err("%s: In jfree_pid\n", DEVICE_NAME);
 	
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		if (iterator->pid == pid) {
@@ -1598,7 +1598,7 @@ static void jfree_pid(struct pid* pid) {
 				pr_err("%s: Got here 3\n", DEVICE_NAME);
 				iterator = pH_task_struct_list;
 				pr_err("%s: Got here 4\n", DEVICE_NAME);
-				if (iterator == NULL) return;
+				if (iterator == NULL) goto exit;
 			}
 			else {
 				pr_err("%s: Got here 5\n", DEVICE_NAME);
@@ -1614,6 +1614,10 @@ static void jfree_pid(struct pid* pid) {
 	return;
 
 not_inserted:
+	jprobe_return();
+	return;
+
+exit:
 	jprobe_return();
 	return;
 }
