@@ -1242,6 +1242,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 		return -1;
 	}
 	else if (pH_task_struct_list == process) {
+		pr_err("%s: pH_task_struct_list == process\n", DEVICE_NAME);
 		pH_task_struct_list = pH_task_struct_list->next;
 		pH_task_struct_list->prev = NULL;
 		pH_task_struct_list->next->prev = pH_task_struct_list;
@@ -1250,12 +1251,14 @@ int remove_process_from_llist(pH_task_struct* process) {
 		return 0;
 	}
 	else {
+		pr_err("%s: In else of remove_process_from_llist\n", DEVICE_NAME);
 		prev_task_struct = pH_task_struct_list;
 		cur_task_struct = pH_task_struct_list->next;
 		while (cur_task_struct != NULL) {
 			if (cur_task_struct == process) {
+				pr_err("%s: cur_task_struct == process\n", DEVICE_NAME);
 				prev_task_struct->next = process->next;
-				cur_task_struct->next->prev = prev_task_struct;
+				prev_task_struct->next->prev = prev_task_struct;
 				pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
 				spin_unlock(&pH_task_struct_list_sem);
 				return 0;
