@@ -583,7 +583,7 @@ int process_syscall(long syscall) {
 	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
 	// Check to see if a process went out of use
-	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
+	clean_processes(); // Temporarily commented out since the module isn't working at the moment
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
