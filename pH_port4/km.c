@@ -198,6 +198,7 @@ typedef struct pH_task_struct { // My own version of a pH_task_state
 	unsigned long count;
 	pH_profile* profile; // Pointer to appropriate profile
 	struct task_struct* task_struct; // Pointer to corresponding task_struct
+	struct pid* pid; // Pointer to corresponding struct pid
 } pH_task_struct;
 
 static void jhandle_signal(struct ksignal*, struct pt_regs*);
@@ -565,6 +566,7 @@ void clean_processes(void) {
 }
 */
 
+/*
 void clean_processes(void) {
 	pH_task_struct* iterator;
 	
@@ -595,6 +597,7 @@ void clean_processes(void) {
 		}
 	}
 }
+*/
 
 int process_list_length(void) {
 	pH_task_struct* iterator;
@@ -816,6 +819,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	
 	// Initialize this process - check with Anil to see if these are the right values to initialize it to
 	this_process->task_struct = current;
+	this_process->pid = task_pid(current); // Perhaps I am calling the wrong function here
 	this_process->process_id = process_id;
 	//pH_reset_ALF(this_process);
 	this_process->seq = NULL;
@@ -891,8 +895,8 @@ static long jsys_execve(const char __user *filename,
 	
 	pr_err("%s: List length at start is %d\n", DEVICE_NAME, process_list_length());
 	
-	clean_processes();
-	pr_err("%s: Back from clean_processes()\n", DEVICE_NAME);
+	//clean_processes();
+	//pr_err("%s: Back from clean_processes()\n", DEVICE_NAME);
 	
 	// Allocate space for path_to_binary
 	path_to_binary = kmalloc(sizeof(char) * 4000, GFP_ATOMIC);
@@ -1579,9 +1583,39 @@ struct jprobe wait_consider_task_jprobe = {
 */
 
 static void jfree_pid(struct pid* pid) {
+	pH_task_struct* iterator;
+	
+	if (!module_inserted_successfully) goto not_inserted;
+	
 	pr_err("%s: In jfree_pid\n", DEVICE_NAME);
 	
+	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
+		if (iterator->pid == pid) {
+			pr_err("%s: Got here 1\n", DEVICE_NAME);
+			if (iterator == pH_task_struct_list) {
+				pr_err("%s: Got here 2\n", DEVICE_NAME);
+				free_pH_task_struct(iterator);
+				pr_err("%s: Got here 3\n", DEVICE_NAME);
+				iterator = pH_task_struct_list;
+				pr_err("%s: Got here 4\n", DEVICE_NAME);
+				if (iterator == NULL) return;
+			}
+			else {
+				pr_err("%s: Got here 5\n", DEVICE_NAME);
+				iterator = iterator->prev;
+				pr_err("%s: Got here 6\n", DEVICE_NAME);
+				free_pH_task_struct(iterator->next);
+				pr_err("%s: Got here 7\n", DEVICE_NAME);
+			}
+		}
+	}
+	
 	jprobe_return();
+	return;
+
+not_inserted:
+	jprobe_return();
+	return;
 }
 
 struct jprobe free_pid_jprobe = {
