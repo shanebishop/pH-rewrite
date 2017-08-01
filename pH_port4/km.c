@@ -318,14 +318,14 @@ int pH_task_struct_list_length(void) {
 	pH_task_struct* iterator;
 	int i;
 	
-	//spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_task_struct_list_sem);
 	for (i = 0, iterator = pH_task_struct_list; 
 		iterator != NULL; 
 		i++, iterator = iterator->next) 
 	{
 		;
 	}
-	//spin_unlock(&pH_task_struct_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
 	
 	return i;
 }
@@ -465,16 +465,16 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 		return NULL;
 	}
 	
-	//spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_task_struct_list_sem);
 	do {
 		if (iterator->process_id == process_id) {
 			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
-			//spin_unlock(&pH_task_struct_list_sem);
+			spin_unlock(&pH_task_struct_list_sem);
 			return iterator;
 		}
 		iterator = iterator->next;
 	} while (iterator);
-	//spin_unlock(&pH_task_struct_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
 	
 	//pr_err("%s: Process %d not found\n", DEVICE_NAME, process_id);
 	return NULL;
@@ -603,9 +603,11 @@ int process_list_length(void) {
 	pH_task_struct* iterator;
 	int i = 0;
 	
+	spin_lock(&pH_task_struct_list);
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		i++;
 	}
+	spin_unlock(&pH_task_struct_list);
 	
 	return i;
 }
@@ -740,7 +742,7 @@ void add_process_to_llist(pH_task_struct* t) {
 		return;
 	}
 	
-	//spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_task_struct_list_sem);
 	if (pH_task_struct_list == NULL) {
 		pH_task_struct_list = t;
 		t->next = NULL;
@@ -761,7 +763,7 @@ void add_process_to_llist(pH_task_struct* t) {
 		t->prev = NULL;
 		t->next->prev = t;
 	}
-	//spin_unlock(&pH_task_struct_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
 }
 
 // Returns a pH_profile, given a filename
@@ -1295,10 +1297,10 @@ int remove_process_from_llist(pH_task_struct* process) {
 	
 	pr_err("%s: In remove_process_from_llist\n", DEVICE_NAME);
 
-	//spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_task_struct_list_sem);
 	if (pH_task_struct_list == NULL) {
 		err("pH_task_struct_list is empty (NULL) when trying to free process %ld", process->process_id);
-		//spin_unlock(&pH_task_struct_list_sem);
+		spin_unlock(&pH_task_struct_list_sem);
 		return -1;
 	}
 	else if (pH_task_struct_list == process) {
@@ -1313,7 +1315,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 			}
 		}
 		pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
-		//spin_unlock(&pH_task_struct_list_sem);
+		spin_unlock(&pH_task_struct_list_sem);
 		return 0;
 	}
 	else {
@@ -1328,7 +1330,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 					prev_task_struct->next->prev = prev_task_struct;
 				}
 				pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
-				//spin_unlock(&pH_task_struct_list_sem);
+				spin_unlock(&pH_task_struct_list_sem);
 				return 0;
 			}
 			
@@ -1337,7 +1339,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 		}
 		
 		err("While freeing, couldn't find process %ld in pH_task_struct_list", process->process_id);
-		//spin_unlock(&pH_task_struct_list_sem);
+		spin_unlock(&pH_task_struct_list_sem);
 		return -1;
 	}
 }
@@ -1359,15 +1361,15 @@ void free_syscalls(pH_task_struct* t) {
 bool profile_has_matching_process(pH_profile* profile) {
 	pH_task_struct* iterator;
 	
-	//spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_task_struct_list_sem);
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		if (iterator->profile == profile) {
-			//spin_unlock(&pH_task_struct_list_sem);
+			spin_unlock(&pH_task_struct_list_sem);
 			return TRUE;
 		}
 	}
 	
-	//spin_unlock(&pH_task_struct_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
 	return FALSE;
 }
 
@@ -1589,6 +1591,7 @@ static void jfree_pid(struct pid* pid) {
 	
 	//pr_err("%s: In jfree_pid\n", DEVICE_NAME);
 	
+	spin_lock(&pH_task_struct_list);
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		if (iterator->pid == pid) {
 			pr_err("%s: Got here 1\n", DEVICE_NAME);
@@ -1598,7 +1601,10 @@ static void jfree_pid(struct pid* pid) {
 				pr_err("%s: Got here 3\n", DEVICE_NAME);
 				iterator = pH_task_struct_list;
 				pr_err("%s: Got here 4\n", DEVICE_NAME);
-				if (iterator == NULL) goto exit;
+				if (iterator == NULL) {
+					spin_unlock(&pH_task_struct_list);
+					goto exit;
+				}
 			}
 			else {
 				pr_err("%s: Got here 5\n", DEVICE_NAME);
@@ -1609,6 +1615,7 @@ static void jfree_pid(struct pid* pid) {
 			}
 		}
 	}
+	spin_unlock(&pH_task_struct_list);
 	
 	jprobe_return();
 	return;
@@ -2170,7 +2177,7 @@ static int __init ebbchar_init(void) {
 	pr_err("%s: Registered all syscall probes\n", DEVICE_NAME);
 	
 	spin_lock_init(&pH_profile_list_sem);
-	//spin_lock_init(&pH_task_struct_list_sem);
+	spin_lock_init(&pH_task_struct_list_sem);
 	
 	pr_err("%s: Successfully initialized %s\n", DEVICE_NAME, DEVICE_NAME);
 	
