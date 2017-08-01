@@ -1578,6 +1578,16 @@ struct jprobe wait_consider_task_jprobe = {
 };
 */
 
+static void jfree_pid(struct pid* pid) {
+	pr_err("%s: In jfree_pid\n", DEVICE_NAME);
+	
+	jprobe_return();
+}
+
+struct jprobe free_pid_jprobe = {
+	.entry = jfree_pid,
+};
+
 /*
 void stack_print(pH_task_struct* process) {
 	//pr_err("%s: In stack print\n", DEVICE_NAME);
@@ -1908,6 +1918,26 @@ static int __init ebbchar_init(void) {
 	}
 	pr_err("%s: Found symbol 'sys_sigreturn'\n", DEVICE_NAME);
 	*/
+	
+	free_pid_jprobe.kp.addr = kallsyms_lookup_name("free_pid");
+	ret = register_jprobe(&free_pid_jprobe);
+	if (ret < 0) {
+		pr_err("%s: register_jprobe failed (free_pid_jprobe), returned %d\n", DEVICE_NAME, ret);
+		
+		//unregister_jprobe(&handle_signal_jprobe);
+		
+		mutex_destroy(&ebbchar_mutex);
+		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
+		class_unregister(ebbcharClass);
+		class_destroy(ebbcharClass);
+		unregister_chrdev(majorNumber, DEVICE_NAME);
+		
+		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
+		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
+		
+		return PTR_ERR(ebbcharDevice);
+	}
+	pr_err("%s: Successfully registered free_pid_jprobe\n", DEVICE_NAME);
 	
 	sys_sigreturn_jprobe.kp.addr = kallsyms_lookup_name("sys_rt_sigreturn");
 	ret = register_jprobe(&sys_sigreturn_jprobe);
