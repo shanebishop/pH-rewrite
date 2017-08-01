@@ -197,6 +197,7 @@ typedef struct pH_task_struct { // My own version of a pH_task_state
 	int delay;
 	unsigned long count;
 	pH_profile* profile; // Pointer to appropriate profile
+	struct task_struct* task_struct; // Pointer to corresponding task_struct
 } pH_task_struct;
 
 static void jhandle_signal(struct ksignal*, struct pt_regs*);
@@ -522,7 +523,7 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 
 void free_pH_task_struct(pH_task_struct*);
 
-
+/*
 bool comm_matches(char* comm_from_pH_task_struct) {
 	struct task_struct* t;
 	
@@ -559,6 +560,29 @@ void clean_processes(void) {
 			pr_err("%s: Got here 1\n", DEVICE_NAME);
 			iterator = iterator->prev;
 			pr_err("%s: Got here 2\n", DEVICE_NAME);
+		}
+	}
+}
+*/
+
+void clean_processes(void) {
+	pH_task_struct* iterator;
+	
+	pr_err("%s: In clean_process\n", DEVICE_NAME);
+	
+	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
+		if (iterator->task_struct == NULL) {
+			if (iterator == pH_task_struct_list) {
+				free_pH_task_struct(iterator);
+				iterator = pH_task_struct_list;
+				if (iterator == NULL) {
+					return;
+				}
+			}
+			else {
+				iterator = iterator->prev;
+				free_pH_task_struct(iterator->next);
+			}
 		}
 	}
 }
@@ -771,6 +795,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	}
 	
 	// Initialize this process - check with Anil to see if these are the right values to initialize it to
+	this_process->task_struct = current;
 	this_process->process_id = process_id;
 	//pH_reset_ALF(this_process);
 	this_process->seq = NULL;
