@@ -1815,7 +1815,7 @@ static long jsys_rt_sigreturn(void) {
 	
 	last_task_struct_in_sigreturn = current;
 	
-	pr_err("%s: In jsys_rt_sigreturn\n", DEVICE_NAME);
+	//pr_err("%s: In jsys_rt_sigreturn\n", DEVICE_NAME);
 	
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	
@@ -1829,7 +1829,7 @@ static long jsys_rt_sigreturn(void) {
 		free_pH_task_struct(process);
 	}
 	else {
-		pr_err("%s: SIGKILL is not a member of current->pending.signal\n", DEVICE_NAME);
+		//pr_err("%s: SIGKILL is not a member of current->pending.signal\n", DEVICE_NAME);
 	}
 	
 	if (!process || process == NULL) goto not_inserted;
