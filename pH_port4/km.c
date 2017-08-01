@@ -262,7 +262,7 @@ pH_task_struct* pH_task_struct_list = NULL; // List of processes currently being
 struct jprobe jprobes_array[num_syscalls];  // Array of jprobes (is this obsolete?)
 bool module_inserted_successfully = FALSE;
 spinlock_t pH_profile_list_sem;             // Lock for list of profiles
-//spinlock_t pH_task_struct_list_sem;         // Lock for process list
+spinlock_t pH_task_struct_list_sem;         // Lock for process list
 int profiles_created = 0;                   // Number of profiles that have been created
 int successful_jsys_execves = 0;            // Number of successful jsys_execves
 struct task_struct* last_task_struct_in_sigreturn = NULL;
@@ -603,11 +603,11 @@ int process_list_length(void) {
 	pH_task_struct* iterator;
 	int i = 0;
 	
-	spin_lock(&pH_task_struct_list);
+	spin_lock(&pH_task_struct_list_sem);
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		i++;
 	}
-	spin_unlock(&pH_task_struct_list);
+	spin_unlock(&pH_task_struct_list_sem);
 	
 	return i;
 }
@@ -1591,7 +1591,7 @@ static void jfree_pid(struct pid* pid) {
 	
 	//pr_err("%s: In jfree_pid\n", DEVICE_NAME);
 	
-	spin_lock(&pH_task_struct_list);
+	spin_lock(&pH_task_struct_list_sem);
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		if (iterator->pid == pid) {
 			pr_err("%s: Got here 1\n", DEVICE_NAME);
@@ -1602,7 +1602,7 @@ static void jfree_pid(struct pid* pid) {
 				iterator = pH_task_struct_list;
 				pr_err("%s: Got here 4\n", DEVICE_NAME);
 				if (iterator == NULL) {
-					spin_unlock(&pH_task_struct_list);
+					spin_unlock(&pH_task_struct_list_sem);
 					goto exit;
 				}
 			}
@@ -1615,7 +1615,7 @@ static void jfree_pid(struct pid* pid) {
 			}
 		}
 	}
-	spin_unlock(&pH_task_struct_list);
+	spin_unlock(&pH_task_struct_list_sem);
 	
 	jprobe_return();
 	return;
