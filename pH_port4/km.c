@@ -332,7 +332,7 @@ int pH_task_struct_list_length(void) {
 
 // Adds an alloc'd profile to the profile list
 void add_to_profile_llist(pH_profile* p) {
-	pr_err("%s: In add_to_profile_llist\n", DEVICE_NAME);
+	//pr_err("%s: In add_to_profile_llist\n", DEVICE_NAME);
 	
 	// Checks for adding a NULL profile
 	if (!p || p == NULL) {
@@ -772,7 +772,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	if (pH_task_struct_list == NULL || pH_profile_list == NULL) {
 		return NULL;
 	}
-	pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
+	//pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
 	
 	// Search through profile list
 	spin_lock(&pH_profile_list_sem);
@@ -860,7 +860,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	this_process->profile = profile; // Put this profile in the pH_task_struct struct
 
 	add_process_to_llist(this_process); // Add this process to the list of processes
-	pr_err("%s: Added this process to llist\n", DEVICE_NAME);
+	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
 	return 0;
 
@@ -1479,13 +1479,13 @@ static long jsys_exit(int error_code) {
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
-	pr_err("%s: In jsys_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
+	//pr_err("%s: In jsys_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
 	
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	
 	if (process == NULL) goto not_monitoring;
 	
-	pr_err("%s: In jsys_exit for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
+	//pr_err("%s: In jsys_exit for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(current)), process->profile->filename);
 	
 	//process_syscall(72); // Process this syscall before calling free_pH_task_struct on process
 	//pr_err("%s: Back in jsys_exit after processing syscall\n", DEVICE_NAME);
@@ -1514,7 +1514,7 @@ static long jdo_group_exit(int error_code) {
 	
 	p = current;
 	
-	pr_err("%s: In jdo_group_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(p)));
+	//pr_err("%s: In jdo_group_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(p)));
 	
 	process = llist_retrieve_process(pid_vnr(task_tgid(p)));
 	if (process == NULL) goto not_monitoring;
