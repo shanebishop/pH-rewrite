@@ -1119,6 +1119,30 @@ static struct kretprobe do_execveat_common_kretprobe = {
 	.maxactive = 20,
 };
 
+static int do_execve_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
+	int retval;
+	pH_task_struct* process;
+	
+	if (!module_inserted_successfully) return 0;
+	
+	retval = regs_return_value(regs);
+	
+	if (retval < 0) {
+		process = llist_retrieve_process(pid_vnr(task_tgid(current)));
+		free_pH_task_struct(process);
+		process = NULL;
+		return retval;
+	}
+	
+	return 0;
+}
+
+static struct kretprobe do_execve_kretprobe = {
+	.handler = do_execve_handler,
+	.data_size = sizeof(struct my_kretprobe_data),
+	.maxactive = 20,
+};
+
 static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	pH_task_struct* process;
 	pH_profile* profile;
@@ -2006,6 +2030,7 @@ static int __init ebbchar_init(void) {
 	pr_err("%s: Found symbol 'sys_sigreturn'\n", DEVICE_NAME);
 	*/
 	
+	/* // Maybe I am unable to probe do_execveat_common? Returns -22 on registration.
 	do_execveat_common_kretprobe.kp.addr = kallsyms_lookup_name("do_execveat_common");
 	ret = register_kretprobe(&do_execveat_common_kretprobe);
 	if (ret < 0) {
@@ -2025,6 +2050,27 @@ static int __init ebbchar_init(void) {
 		return PTR_ERR(ebbcharDevice);
 	}
 	pr_err("%s: Successfully registered do_execveat_common_kretprobe\n", DEVICE_NAME);
+	*/
+	
+	do_execve_kretprobe.kp.addr = kallsyms_lookup_name("do_execve");
+	ret = register_kretprobe(&do_execve_kretprobe);
+	if (ret < 0) {
+		pr_err("%s: register_kretprobe failed (do_execve_kretprobe), returned %d\n", DEVICE_NAME, ret);
+		
+		//unregister_jprobe(&handle_signal_jprobe);
+		
+		mutex_destroy(&ebbchar_mutex);
+		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
+		class_unregister(ebbcharClass);
+		class_destroy(ebbcharClass);
+		unregister_chrdev(majorNumber, DEVICE_NAME);
+		
+		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
+		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
+		
+		return PTR_ERR(ebbcharDevice);
+	}
+	pr_err("%s: Successfully registered do_execve_kretprobe\n", DEVICE_NAME);
 	
 	sys_execve_kretprobe.kp.addr = kallsyms_lookup_name("sys_execve");
 	ret = register_kretprobe(&sys_execve_kretprobe);
