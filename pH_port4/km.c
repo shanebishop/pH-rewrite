@@ -1314,7 +1314,7 @@ void pH_free_profile(pH_profile *profile)
     	pr_err("%s: ERROR: After removing profile, profile with identifer is still in list!\n", DEVICE_NAME);
     	spin_unlock(profile->lock);
     	// Cause an intentional crash
-    	panic("After removing profile, profile with identifer is still in list");
+    	//panic("After removing profile, profile with identifer is still in list");
     	return;
     }
     spin_unlock(&pH_profile_list_sem);
@@ -1323,7 +1323,7 @@ void pH_free_profile(pH_profile *profile)
     	pr_err("%s: ERROR: pH_remove_profile_from_list was unsuccessful in pH_free_profile!\n", DEVICE_NAME);
     	spin_unlock(profile->lock);
     	// Cause an intentional crash
-    	panic("pH_remove_profile_from_list was unsuccessful in pH_free_profile");
+    	//panic("pH_remove_profile_from_list was unsuccessful in pH_free_profile");
     	return;
     }
 
@@ -1518,7 +1518,9 @@ void free_pH_task_struct(pH_task_struct* process) {
 			}
 		}
 		else {
-			panic("%s: Corrupt process in free_pH_task_struct: No profile\n", DEVICE_NAME);
+			pr_err("%s: ERROR: Corrupt process in free_pH_task_struct: No profile\n", DEVICE_NAME);
+			//panic("%s: Corrupt process in free_pH_task_struct: No profile\n", DEVICE_NAME);
+			return;
 		}
 	//}
 	
@@ -1648,7 +1650,9 @@ static void jfree_pid(struct pid* pid) {
 	//spin_lock(&pH_task_struct_list_sem);
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		if (i > 10000) {
-			panic("Got stuck in jfree_pid for loop");
+			pr_err("%s: ERROR: Got stuck in jfree_pid for loop\n", DEVICE_NAME);
+			//panic("Got stuck in jfree_pid for loop");
+			return;
 		}
 		if (iterator->pid == pid) {
 			free_pH_task_struct(iterator);
@@ -2392,8 +2396,8 @@ static int dev_release(struct inode *inodep, struct file *filep){
 inline void pH_append_call(pH_seq* s, int new_value) {
 	if (s->last < 0) { pr_err("%s: s->last is not initialized!\n", DEVICE_NAME); return; }
 	if (s->length == 0) {
-		pr_err("%s: In pH_append_call with s->length = 0. This will cause a division error.\n", DEVICE_NAME);
-		panic("In pH_append_call with s->length = 0");
+		pr_err("%s: ERROR: In pH_append_call with s->length = 0. This will cause a division error.\n", DEVICE_NAME);
+		//panic("In pH_append_call with s->length = 0");
 		return;
 	}
 	
@@ -2456,8 +2460,8 @@ void pH_add_seq(pH_seq *s, pH_profile_data *data)
 	}
 	
 	if (seqlen == 0) {
-		pr_err("%s: In pH_add_seq with s->length = 0\n", DEVICE_NAME);
-		panic("In pH_add_seq with s->length = 0");
+		pr_err("%s: ERROR: In pH_add_seq with s->length = 0\n", DEVICE_NAME);
+		//panic("In pH_add_seq with s->length = 0");
 		return;
 	}
 
@@ -2546,8 +2550,8 @@ int pH_test_seq(pH_seq *s, pH_profile_data *data)
 	int mismatches = 0;
 
 	if (seqlen == 0) {
-		pr_err("%s: In pH_test_seq with s->length = 0\n", DEVICE_NAME);
-		panic("In pH_test_seq with s->length = 0");
+		pr_err("%s: ERROR: In pH_test_seq with s->length = 0\n", DEVICE_NAME);
+		//panic("In pH_test_seq with s->length = 0");
 		return;
 	}
 
