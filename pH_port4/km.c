@@ -1575,6 +1575,7 @@ struct jprobe wait_consider_task_jprobe = {
 
 static void jfree_pid(struct pid* pid) {
 	pH_task_struct* iterator;
+	int i = 0;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
@@ -1582,6 +1583,9 @@ static void jfree_pid(struct pid* pid) {
 	
 	//spin_lock(&pH_task_struct_list_sem);
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
+		if (i > 10000) {
+			panic("Got stuck in jfree_pid for loop");
+		}
 		if (iterator->pid == pid) {
 			free_pH_task_struct(iterator);
 			iterator = NULL;
@@ -1611,6 +1615,7 @@ static void jfree_pid(struct pid* pid) {
 			}
 			*/
 		}
+		i++;
 	}
 	//spin_unlock(&pH_task_struct_list_sem);
 	
