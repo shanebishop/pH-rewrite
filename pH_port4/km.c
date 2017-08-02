@@ -2200,12 +2200,14 @@ static void __exit ebbchar_exit(void){
 	//unregister_jprobe(&sys_sigreturn_jprobe);
 	unregister_jprobe(&do_signal_jprobe);
 	
+	/* // Temporarily commented out to debug this function
 	// Unregister jprobes - it seems this was working just fine before, but Anil said its okay
 	// if I don't bother with unregistering them
 	for (i = 0; i < num_syscalls; i++) {
 		unregister_jprobe(&jprobes_array[i]);
 	}
 	pr_err("%s: Unregistered syscall jprobes\n", DEVICE_NAME);
+	*/
 
 	// Unregister fork_kretprobe
 	unregister_kretprobe(&fork_kretprobe);
