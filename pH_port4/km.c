@@ -599,19 +599,6 @@ void clean_processes(void) {
 }
 */
 
-int process_list_length(void) {
-	pH_task_struct* iterator;
-	int i = 0;
-	
-	spin_lock(&pH_task_struct_list_sem);
-	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
-		i++;
-	}
-	spin_unlock(&pH_task_struct_list_sem);
-	
-	return i;
-}
-
 // Function prototypes for process_syscall()
 inline void pH_append_call(pH_seq*, int);
 inline void pH_train(pH_task_struct*);
@@ -895,7 +882,7 @@ static long jsys_execve(const char __user *filename,
 	
 	current_process_id = pid_vnr(task_tgid(current)); // Grab the process ID right now
 	
-	pr_err("%s: List length at start is %d\n", DEVICE_NAME, process_list_length());
+	pr_err("%s: List length at start is %d\n", DEVICE_NAME, pH_task_struct_list_length());
 	
 	//clean_processes();
 	//pr_err("%s: Back from clean_processes()\n", DEVICE_NAME);
@@ -925,7 +912,7 @@ static long jsys_execve(const char __user *filename,
 	process_syscall(59); // Process this system call
 	//pr_err("%s: Back in jsys_execve after processing syscall\n", DEVICE_NAME);
 	
-	list_length = process_list_length();
+	list_length = pH_task_struct_list_length();
 	pr_err("%s: List length at end is %d\n", DEVICE_NAME, list_length);
 	
 	successful_jsys_execves++; // Increment successful_jsys_execves
@@ -1357,6 +1344,7 @@ void free_syscalls(pH_task_struct* t) {
 	}
 }
 
+/*
 // Returns true if a given profile has at least one process that matches it
 bool profile_has_matching_process(pH_profile* profile) {
 	pH_task_struct* iterator;
@@ -1372,6 +1360,7 @@ bool profile_has_matching_process(pH_profile* profile) {
 	spin_unlock(&pH_task_struct_list_sem);
 	return FALSE;
 }
+*/
 
 /*
 int free_profiles(void) {
@@ -1594,6 +1583,12 @@ static void jfree_pid(struct pid* pid) {
 	spin_lock(&pH_task_struct_list_sem);
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		if (iterator->pid == pid) {
+			free_pH_task_struct(iterator);
+			iterator = NULL;
+			pr_err("%s: Done in jfree_pid\n", DEVICE_NAME);
+			goto exit;
+			
+			/*
 			pr_err("%s: Got here 1\n", DEVICE_NAME);
 			if (iterator == pH_task_struct_list) {
 				pr_err("%s: Got here 2\n", DEVICE_NAME);
@@ -1613,6 +1608,7 @@ static void jfree_pid(struct pid* pid) {
 				free_pH_task_struct(iterator->next);
 				pr_err("%s: Got here 7\n", DEVICE_NAME);
 			}
+			*/
 		}
 	}
 	spin_unlock(&pH_task_struct_list_sem);
