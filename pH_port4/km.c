@@ -1650,6 +1650,9 @@ void free_pH_task_struct(pH_task_struct* process) {
 	free_syscalls(process); // Frees syscalls
 	pr_err("%s: Freed syscalls\n", DEVICE_NAME);
 	
+	/* // For now, don't free any profiles - later, implement freeing profiles every ten seconds
+	   // (every ten seconds userspace should send a "free profiles" message, where the profile list
+	   // should be locked so that no profiles can be added or removed until they are all freed)
 	// This boolean test is required for when this function is called when the module is being removed
 	//if (module_inserted_successfully) {
 		profile = process->profile;
@@ -1672,6 +1675,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 			return;
 		}
 	//}
+	*/
 	
 	// When everything else is done, remove process from llist, kfree process
 	remove_process_from_llist(process);
