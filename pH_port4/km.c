@@ -915,6 +915,11 @@ static long jsys_execve(const char __user *filename,
 	
 	if (!pH_aremonitoring) goto not_monitoring;
 	
+	if (&pH_task_struct_list_sem == NULL || &pH_profile_list_sem == NULL) {
+		pr_err("%s: ERROR: One of the list locks is NULL\n", DEVICE_NAME);
+		return -1;
+	}
+	
 	spin_lock(&pH_task_struct_list_sem);
 	spin_lock(&pH_profile_list_sem);
 
