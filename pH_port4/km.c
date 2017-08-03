@@ -318,16 +318,14 @@ int pH_task_struct_list_length(void) {
 	pH_task_struct* iterator;
 	int i;
 	
-	spin_lock(&pH_profile_list_sem);
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	for (i = 0, iterator = pH_task_struct_list; 
 		iterator != NULL; 
 		i++, iterator = iterator->next) 
 	{
 		;
 	}
-	spin_unlock(&pH_task_struct_list_sem);
-	spin_unlock(&pH_profile_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	
 	return i;
 }
@@ -342,7 +340,7 @@ void add_to_profile_llist(pH_profile* p) {
 		return;
 	}
 	
-	spin_lock(&pH_profile_list_sem);
+	//spin_lock(&pH_profile_list_sem);
 	if (pH_profile_list == NULL) {
 		pH_profile_list = p;
 		p->next = NULL;
@@ -360,7 +358,7 @@ void add_to_profile_llist(pH_profile* p) {
 		p->next = pH_profile_list;
 		pH_profile_list = p;
 	}
-	spin_unlock(&pH_profile_list_sem);
+	//spin_unlock(&pH_profile_list_sem);
 }
 
 // Makes a new pH_profile and stores it in profile
@@ -467,8 +465,7 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 		return NULL;
 	}
 	
-	spin_lock(&pH_profile_list_sem);
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	do {
 		if (iterator->process_id == process_id) {
 			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
@@ -478,8 +475,7 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 		}
 		iterator = iterator->next;
 	} while (iterator);
-	spin_unlock(&pH_task_struct_list_sem);
-	spin_unlock(&pH_profile_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	
 	//pr_err("%s: Process %d not found\n", DEVICE_NAME, process_id);
 	return NULL;
@@ -751,6 +747,9 @@ int process_syscall(long syscall) {
 	ret = 0;
 
 exit:
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+
 	return ret;
 }
 
@@ -762,8 +761,7 @@ void add_process_to_llist(pH_task_struct* t) {
 		return;
 	}
 	
-	spin_lock(&pH_profile_list_sem);
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	if (pH_task_struct_list == NULL) {
 		pH_task_struct_list = t;
 		t->next = NULL;
@@ -784,8 +782,7 @@ void add_process_to_llist(pH_task_struct* t) {
 		t->prev = NULL;
 		t->next->prev = t;
 	}
-	spin_unlock(&pH_task_struct_list_sem);
-	spin_unlock(&pH_profile_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 }
 
 // Returns a pH_profile, given a filename
@@ -1413,6 +1410,7 @@ void pH_free_profile(pH_profile *profile)
     	spin_unlock(profile->lock);
     	return;
     }
+    /*
     if (spin_trylock(&pH_profile_list_sem) == 0) {
     	if (profile->lock == NULL) {
 			return;
@@ -1425,6 +1423,7 @@ void pH_free_profile(pH_profile *profile)
 			return;
 		}
     }
+    */
     
     ret = pH_remove_profile_from_list(profile);
     if (profile_list_contains_identifier(profile->identifier)) {
