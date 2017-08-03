@@ -318,14 +318,14 @@ int pH_task_struct_list_length(void) {
 	pH_task_struct* iterator;
 	int i;
 	
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	for (i = 0, iterator = pH_task_struct_list; 
 		iterator != NULL; 
 		i++, iterator = iterator->next) 
 	{
 		;
 	}
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	
 	return i;
 }
@@ -340,7 +340,7 @@ void add_to_profile_llist(pH_profile* p) {
 		return;
 	}
 	
-	spin_lock(&pH_profile_list_sem);
+	//spin_lock(&pH_profile_list_sem);
 	if (pH_profile_list == NULL) {
 		pH_profile_list = p;
 		p->next = NULL;
@@ -358,7 +358,7 @@ void add_to_profile_llist(pH_profile* p) {
 		p->next = pH_profile_list;
 		pH_profile_list = p;
 	}
-	spin_unlock(&pH_profile_list_sem);
+	//spin_unlock(&pH_profile_list_sem);
 }
 
 // Makes a new pH_profile and stores it in profile
@@ -465,16 +465,15 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 		return NULL;
 	}
 	
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	do {
 		if (iterator->process_id == process_id) {
 			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
-			spin_unlock(&pH_task_struct_list_sem);
+			//spin_unlock(&pH_task_struct_list_sem);
 			return iterator;
 		}
 		iterator = iterator->next;
 	} while (iterator);
-	spin_unlock(&pH_task_struct_list_sem);
 	
 	//pr_err("%s: Process %d not found\n", DEVICE_NAME, process_id);
 	return NULL;
@@ -609,6 +608,7 @@ int process_syscall(long syscall) {
 	pH_task_struct* process;
 	my_syscall* new_syscall;
 	pH_profile* profile;
+	int ret;
 	
 	// Boolean checks
 	if (!module_inserted_successfully) return 0;
@@ -616,6 +616,9 @@ int process_syscall(long syscall) {
 	if (!pH_aremonitoring) return 0;
 	
 	if (!pH_task_struct_list || pH_task_struct_list == NULL) return 0;
+	
+	spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_profile_list_sem);
 
 	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
@@ -627,7 +630,8 @@ int process_syscall(long syscall) {
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	if (!process) {
 		// Ignore this syscall
-		return 0;
+		ret = 0;
+		goto exit;
 	}
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
 	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
@@ -635,12 +639,14 @@ int process_syscall(long syscall) {
 	if (process) profile = process->profile; // Store process->profile in profile for shorter reference
 	else {
 		pr_err("%s: ERROR: process is NULL\n", DEVICE_NAME);
-		return -1;
+		ret = -1;
+		goto exit;
 	}
 	
 	if (!profile || profile == NULL) {
 		pr_err("%s: pH_task_struct corrupted: No profile\n", DEVICE_NAME);
-		return -1;
+		ret = 1;
+		goto exit;
 	}
 	/*
 	if (profile->filename == NULL) {
@@ -657,7 +663,8 @@ int process_syscall(long syscall) {
 		pr_err("%s: profile->lock is NULL in process_syscall\n", DEVICE_NAME);
 		//vfree(profile); // Don't bother freeing, since this is the only remaining pointer
 		//profile = NULL;
-		return -1;
+		ret = -1;
+		goto exit;
 	}
 	
 	//pr_err("%s: Locking profile->lock\n", DEVICE_NAME);
@@ -668,7 +675,8 @@ int process_syscall(long syscall) {
 		if (!temp) {
 			pr_err("%s: Unable to allocate memory for temp in process_syscall\n", DEVICE_NAME);
 			spin_unlock(profile->lock);
-			return -ENOMEM;
+			ret = -ENOMEM;
+			goto exit;
 		}
 
 		temp->next = NULL;
@@ -699,7 +707,8 @@ int process_syscall(long syscall) {
 	if (process) pH_train(process);
 	else {
 		pr_err("%s: ERROR: process is NULL\n", DEVICE_NAME);
-		return -1;
+		ret = -1;
+		goto exit;
 	}
 	//pr_err("%s: Trained process\n", DEVICE_NAME);
 	
@@ -708,7 +717,8 @@ int process_syscall(long syscall) {
 	if (!new_syscall) {
 		pr_err("%s: Unable to allocate space for new_syscall\n", DEVICE_NAME);
 		kfree(process->seq);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto exit;
 	}
 	//pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
 	
@@ -718,7 +728,12 @@ int process_syscall(long syscall) {
 	
 	//pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
 	
-	return 0;
+	ret = 0;
+
+exit:
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	return ret;
 }
 
 // Adds a process to the linked list of processes
@@ -729,7 +744,7 @@ void add_process_to_llist(pH_task_struct* t) {
 		return;
 	}
 	
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	if (pH_task_struct_list == NULL) {
 		pH_task_struct_list = t;
 		t->next = NULL;
@@ -750,7 +765,7 @@ void add_process_to_llist(pH_task_struct* t) {
 		t->prev = NULL;
 		t->next->prev = t;
 	}
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 }
 
 // Returns a pH_profile, given a filename
@@ -764,18 +779,18 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	//pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
 	
 	// Search through profile list
-	spin_lock(&pH_profile_list_sem);
+	//spin_lock(&pH_profile_list_sem);
 	do {
 		if (strcmp(filename, profile_list_iterator->filename) == 0) {
 			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
-			spin_unlock(&pH_profile_list_sem);
+			//spin_unlock(&pH_profile_list_sem);
 			return profile_list_iterator;
 		}
 		
 		profile_list_iterator = profile_list_iterator->next;
 		//pr_err("%s: Iterating\n", DEVICE_NAME);
 	} while (profile_list_iterator);
-	spin_unlock(&pH_profile_list_sem);
+	//spin_unlock(&pH_profile_list_sem);
 	
 	/*
 	// If searching through profile list fails, search through process list
@@ -877,6 +892,9 @@ static long jsys_execve(const char __user *filename,
 	if (!module_inserted_successfully) goto not_inserted;
 	
 	if (!pH_aremonitoring) goto not_monitoring;
+	
+	spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_profile_list_sem);
 
 	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
 	
@@ -914,6 +932,9 @@ static long jsys_execve(const char __user *filename,
 	
 	successful_jsys_execves++; // Increment successful_jsys_execves
 	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return 0;
 	
@@ -923,23 +944,38 @@ no_memory:
 	kfree(path_to_binary);
 	path_to_binary = NULL;
 	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return 0;
 	
 not_inserted:
 	pr_err("%s: Module was not inserted successfully\n", DEVICE_NAME);
+	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return 0;
 	
 not_monitoring:
 	pr_err("%s: Not monitoring\n", DEVICE_NAME);
+	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return 0;
 
 corrupted_path_to_binary:
 	pr_err("%s: Corrupted path_to_binary\n", DEVICE_NAME);
+	
 	kfree(path_to_binary);
 	path_to_binary = NULL;
+	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
 	
 	jprobe_return();
 	return 0;
@@ -976,28 +1012,38 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	pH_task_struct* parent_process;
 	char* path_to_binary;
 	pH_profile* profile;
+	int ret;
 	
 	// Boolean check
 	if (!module_inserted_successfully) return 0;
+	
+	spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_profile_list_sem);
 	
 	//pr_err("%s: In fork_handler\n", DEVICE_NAME);
 	
 	retval = regs_return_value(regs);
 	now = ktime_get();
 	
-	if (retval < 0) return 0; // fork() returned error - did not create child process
+	if (retval < 0) {
+		// fork() returned error - did not create child process
+		ret = 0;
+		goto exit;
+	}
 	
 	// Retrieve binary by using current to retrieve PID, and then grab the task struct then binary from there
 	parent_process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	if (!parent_process || parent_process == NULL) {
 		//pr_err("%s: In fork_handler with NULL parent_process\n", DEVICE_NAME);
-		return -1;
+		ret = -1;
+		goto exit;
 	}
 	
 	profile = parent_process->profile;
 	if (!profile || profile == NULL) {
 		//pr_err("%s: In fork_handler with NULL parent_process->profile\n", DEVICE_NAME);
-		return -1;
+		ret = -1;
+		goto exit;
 	}
 	
 	path_to_binary = profile->filename;
@@ -1007,13 +1053,23 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
 	{
 		pr_err("%s: In fork_handler with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
-		return -1;
+		ret = -1;
+		goto exit;
 	}
 	
 	// Handle the new process
 	handle_new_process(path_to_binary, profile, retval);
 	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	return 0;
+
+exit:
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
+	return ret;
 }
 
 static struct kretprobe fork_kretprobe = {
@@ -1101,14 +1157,24 @@ static int do_execveat_common_handler(struct kretprobe_instance* ri, struct pt_r
 	
 	if (!module_inserted_successfully) return 0;
 	
+	spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_profile_list_sem);
+	
 	retval = regs_return_value(regs);
 	
 	if (retval < 0) {
 		process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 		free_pH_task_struct(process);
 		process = NULL;
+		
+		spin_unlock(&pH_profile_list_sem);
+		spin_unlock(&pH_task_struct_list_sem);
+		
 		return retval;
 	}
+	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
 	
 	return 0;
 }
@@ -1125,14 +1191,24 @@ static int do_execve_handler(struct kretprobe_instance* ri, struct pt_regs* regs
 	
 	if (!module_inserted_successfully) return 0;
 	
+	spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_profile_list_sem);
+	
 	retval = regs_return_value(regs);
 	
 	if (retval < 0) {
 		process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 		free_pH_task_struct(process);
 		process = NULL;
+		
+		spin_unlock(&pH_profile_list_sem);
+		spin_unlock(&pH_task_struct_list_sem);
+		
 		return retval;
 	}
+	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
 	
 	return 0;
 }
@@ -1148,9 +1224,15 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pH_profile* profile;
 	
 	if (!module_inserted_successfully) return 0;
+
+	spin_lock(&pH_task_struct_list_sem);	
+	spin_lock(&pH_profile_list_sem);
 	
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	if (!process || process == NULL) return 0;
+	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
 	
 	process_syscall(59);
 	return 0;
@@ -1317,7 +1399,7 @@ void pH_free_profile(pH_profile *profile)
     	//panic("After removing profile, profile with identifer is still in list");
     	return;
     }
-    spin_unlock(&pH_profile_list_sem);
+    //spin_unlock(&pH_profile_list_sem);
     
     if (ret != 0) {
     	pr_err("%s: ERROR: pH_remove_profile_from_list was unsuccessful in pH_free_profile!\n", DEVICE_NAME);
@@ -1348,10 +1430,10 @@ int remove_process_from_llist(pH_task_struct* process) {
 	
 	pr_err("%s: In remove_process_from_llist\n", DEVICE_NAME);
 
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	if (pH_task_struct_list == NULL) {
 		err("pH_task_struct_list is empty (NULL) when trying to free process %ld", process->process_id);
-		spin_unlock(&pH_task_struct_list_sem);
+		//spin_unlock(&pH_task_struct_list_sem);
 		return -1;
 	}
 	else if (pH_task_struct_list == process) {
@@ -1366,7 +1448,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 			}
 		}
 		pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
-		spin_unlock(&pH_task_struct_list_sem);
+		//spin_unlock(&pH_task_struct_list_sem);
 		return 0;
 	}
 	else {
@@ -1381,7 +1463,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 					prev_task_struct->next->prev = prev_task_struct;
 				}
 				pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
-				spin_unlock(&pH_task_struct_list_sem);
+				//spin_unlock(&pH_task_struct_list_sem);
 				return 0;
 			}
 			
@@ -1390,7 +1472,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 		}
 		
 		err("While freeing, couldn't find process %ld in pH_task_struct_list", process->process_id);
-		spin_unlock(&pH_task_struct_list_sem);
+		//spin_unlock(&pH_task_struct_list_sem);
 		return -1;
 	}
 }
@@ -1536,6 +1618,9 @@ static long jsys_exit(int error_code) {
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
+	spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_profile_list_sem);
+	
 	//pr_err("%s: In jsys_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
 	
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
@@ -1549,15 +1634,25 @@ static long jsys_exit(int error_code) {
 	
 	free_pH_task_struct(process);
 	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return 0;
 	
 not_monitoring:
 	//pr_err("%s: %d had no pH_task_struct associated with it\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
+	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return 0;
 	
 not_inserted:
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+
 	jprobe_return();
 	return 0;
 }
@@ -1568,6 +1663,9 @@ static long jdo_group_exit(int error_code) {
 	struct task_struct* t;
 	
 	if (!module_inserted_successfully) goto not_inserted;
+	
+	spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_profile_list_sem);
 	
 	p = current;
 	
@@ -1591,15 +1689,25 @@ static long jdo_group_exit(int error_code) {
 	process = llist_retrieve_process(pid_vnr(task_tgid(p)));
 	free_pH_task_struct(process);
 	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return 0;
 	
 not_monitoring:
 	//pr_err("%s: %d had no pH_task_struct associated with it\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
+	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return 0;
 	
 not_inserted:
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+
 	jprobe_return();
 	return 0;
 }
@@ -1643,11 +1751,16 @@ static void jfree_pid(struct pid* pid) {
 	pH_task_struct* iterator;
 	int i = 0;
 	
-	if (!module_inserted_successfully) goto not_inserted;
+	goto exit; // Temp bypass of function body
+	
+	if (!module_inserted_successfully) goto exit;
+
+	spin_lock(&pH_task_struct_list_sem);	
+	spin_lock(&pH_profile_list_sem);
 	
 	//pr_err("%s: In jfree_pid\n", DEVICE_NAME);
 	
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		if (i > 10000) {
 			pr_err("%s: ERROR: Got stuck in jfree_pid for loop\n", DEVICE_NAME);
@@ -1658,7 +1771,7 @@ static void jfree_pid(struct pid* pid) {
 			free_pH_task_struct(iterator);
 			iterator = NULL;
 			pr_err("%s: Done in jfree_pid\n", DEVICE_NAME);
-			spin_unlock(&pH_task_struct_list_sem);
+			//spin_unlock(&pH_task_struct_list_sem);
 			goto exit;
 			
 			/* // This used to be for freeing more than one process at a time, which may not be necessary
@@ -1685,16 +1798,18 @@ static void jfree_pid(struct pid* pid) {
 		}
 		i++;
 	}
+	//spin_unlock(&pH_task_struct_list_sem);
+	
+	spin_unlock(&pH_profile_list_sem);
 	spin_unlock(&pH_task_struct_list_sem);
 	
 	jprobe_return();
 	return;
 
-not_inserted:
-	jprobe_return();
-	return;
-
 exit:
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return;
 }
@@ -1817,6 +1932,9 @@ static void jhandle_signal(struct ksignal* ksig, struct pt_regs* regs) {
 	pH_task_struct* process;
 	
 	if (!module_inserted_successfully) goto not_inserted;
+
+	spin_lock(&pH_task_struct_list_sem);	
+	spin_lock(&pH_profile_list_sem);
 	
 	//pr_err("%s: In jhandle_signal\n", DEVICE_NAME);
 	
@@ -1828,10 +1946,16 @@ static void jhandle_signal(struct ksignal* ksig, struct pt_regs* regs) {
 		make_and_push_new_pH_seq(process);
 	}
 	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return;
 	
 not_inserted:
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return;
 }
@@ -1840,6 +1964,9 @@ static void jdo_signal(struct pt_regs* regs) {
 	pH_task_struct* process;
 	
 	if (!module_inserted_successfully) goto not_inserted;
+	
+	spin_lock(&pH_task_struct_list_sem);	
+	spin_lock(&pH_profile_list_sem);
 	
 	//pr_err("%s: In jdo_signal\n", DEVICE_NAME);
 	
@@ -1853,10 +1980,16 @@ static void jdo_signal(struct pt_regs* regs) {
 	
 	//pr_err("%s: Exiting jdo_signal\n", DEVICE_NAME);
 	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return;
-
+	
 not_inserted:
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
 	return;
 }
@@ -1887,12 +2020,13 @@ not_inserted:
 }
 */
 
-// Finish implementing me! And also finish cleaning up the new additions to ebbchar_init!
-// Try me with a kretprobe as well
 static long jsys_rt_sigreturn(void) {
 	pH_task_struct* process;
 	
 	if (!module_inserted_successfully) goto not_inserted;
+	
+	spin_lock(&pH_task_struct_list_sem);	
+	spin_lock(&pH_profile_list_sem);
 	
 	last_task_struct_in_sigreturn = current;
 	
@@ -1920,12 +2054,18 @@ static long jsys_rt_sigreturn(void) {
 	//process_syscall(383); // Currently not 
 	//pr_err("%s: Back in jsys_rt_sigreturn after processing syscall\n", DEVICE_NAME);
 	
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
-	return 0;
-
+	return;
+	
 not_inserted:
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
 	jprobe_return();
-	return 0;
+	return;
 }
 
 // Frees all of the pH_task_structs in one go
