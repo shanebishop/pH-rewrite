@@ -85,7 +85,7 @@ static int    majorNumber;
 static struct class*  ebbcharClass  = NULL;
 static struct device* ebbcharDevice = NULL;
 
-const char *PH_FILE_MAGIC="pH profile 0.18\n";
+const char *PH_FILE_MAGIC = "pH profile 0.18\n";
 
 static DEFINE_MUTEX(ebbchar_mutex);
 
@@ -1642,6 +1642,8 @@ struct jprobe wait_consider_task_jprobe = {
 static void jfree_pid(struct pid* pid) {
 	pH_task_struct* iterator;
 	int i = 0;
+	
+	goto exit; // Temp skip of entire function
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
