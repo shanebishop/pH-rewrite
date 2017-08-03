@@ -1643,8 +1643,6 @@ static void jfree_pid(struct pid* pid) {
 	pH_task_struct* iterator;
 	int i = 0;
 	
-	goto exit; // Temp skip of entire function
-	
 	if (!module_inserted_successfully) goto not_inserted;
 	
 	//pr_err("%s: In jfree_pid\n", DEVICE_NAME);
