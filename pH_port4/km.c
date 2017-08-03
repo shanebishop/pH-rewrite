@@ -619,6 +619,11 @@ int process_syscall(long syscall) {
 	
 	if (!pH_task_struct_list || pH_task_struct_list == NULL) return 0;
 	
+	if (pH_task_struct_list_sem == NULL || pH_profile_list_sem == NULL) {
+		pr_err("%s: ERROR: One of the list locks is NULL\n", DEVICE_NAME);
+		return -1;
+	}
+	
 	spin_lock(&pH_task_struct_list_sem);
 	spin_lock(&pH_profile_list_sem);
 
