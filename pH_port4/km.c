@@ -132,6 +132,7 @@ struct pH_profile {
 	// My new fields
 	struct hlist_node hlist; // Must be first field
 	int identifier;
+	spinlock_t freeing_lock;
 	
 	// Anil's old fields
 	int normal;			// Is test profile normal?
@@ -387,9 +388,12 @@ int new_profile(pH_profile* profile, char* filename) {
 	profile->lock = kmalloc(sizeof(spinlock_t), GFP_ATOMIC);
 	if (!(profile->lock) || profile->lock == NULL) {
 		pr_err("%s: Unable to allocate memory for profile->lock in new_profile()\n", DEVICE_NAME);
+		vfree(profile);
+		profile = NULL;
 		return -ENOMEM;
 	}
 	spin_lock_init(profile->lock);
+	spin_lock_init(&(profile->freeing_lock));
 
 	profile->train.sequences = 0;
 	profile->train.last_mod_count = 0;
@@ -674,8 +678,18 @@ int process_syscall(long syscall) {
 		goto exit;
 	}
 	
+	if (spin_trylock(&(profile->freeing_lock)) == 0) {
+		ret = -1;
+		goto exit;
+	}
+	
 	//pr_err("%s: Locking profile->lock\n", DEVICE_NAME);
 	spin_lock(profile->lock); // Grabs the lock to this profile
+	
+	if (profile->lock == NULL) {
+		pr_err("%s: ERROR: Somehow the profile->lock was NULL anyway\n", DEVICE_NAME);
+		goto exit;
+	}
 	
 	if (profile == NULL || !pH_profile_in_use(profile)) {
 		spin_unlock(profile->lock);
@@ -1333,7 +1347,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
 	if (!profile || profile == NULL) return 0;
 	
 	// Only remove a profile if the refcount == 0
-	if (atomic_read(&(profile->refcount)) != 0) {
+	if (pH_profile_in_use(profile) || atomic_read(&(profile->refcount)) != 0) {
 		pr_err("%s: ERROR: Trying to remove a profile that is in use\n", DEVICE_NAME);
 		return -1;
 	}
@@ -1410,6 +1424,14 @@ void pH_free_profile(pH_profile *profile)
         return;
     }
     
+    // Only remove a profile if the refcount == 0
+	if (pH_profile_in_use(profile) || atomic_read(&(profile->refcount)) != 0) {
+		pr_err("%s: ERROR: Trying to remove a profile that is in use\n", DEVICE_NAME);
+		return;
+	}
+    
+    spin_lock(&(profile->freeing_lock));
+    
     if (profile->lock == NULL) {
     	return;
     }
@@ -1463,6 +1485,7 @@ void pH_free_profile(pH_profile *profile)
     //kfree(profile->lock); // Do not do this - the profile lock cannot come out from under another functions feet
     //profile->lock = NULL; // Instead, check to see if the profile is still around
     pr_err("%s: Freed profile->lock\n", DEVICE_NAME);
+    spin_unlock(&(profile->freeing_lock));
     //vfree(profile); // For now, don't free any profiles
     //profile = NULL; // This is okay, because profile was removed from the linked list above
     pr_err("%s: Freed pH_profile (end of function)\n", DEVICE_NAME);
