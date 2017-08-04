@@ -1292,6 +1292,9 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	if (!module_inserted_successfully) return 0;
 
+	pr_err("%s: In sys_execve_return_handler\n", DEVICE_NAME);
+	return 0; // Temp return
+
 	spin_lock(&pH_task_struct_list_sem);	
 	spin_lock(&pH_profile_list_sem);
 	
