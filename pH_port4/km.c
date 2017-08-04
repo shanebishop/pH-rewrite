@@ -957,7 +957,6 @@ static long jsys_execve(const char __user *filename,
 	spin_lock(&pH_profile_list_sem);
 
 	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
-	//goto not_inserted; // Temp early exit
 	
 	current_process_id = pid_vnr(task_tgid(current)); // Grab the process ID right now
 	
@@ -984,10 +983,11 @@ static long jsys_execve(const char __user *filename,
 		//pr_err("%s: In jsys_execve with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
 		goto corrupted_path_to_binary;
 	}
-	goto not_inserted; // Temp early exit
+	//goto not_inserted; // Temp early exit
 	
 	// Handle the new process
 	handle_new_process(path_to_binary, NULL, current_process_id);
+	goto not_inserted; // Temp early exit
 	
 	list_length = pH_task_struct_list_length();
 	pr_err("%s: List length at end is %d\n", DEVICE_NAME, list_length);
