@@ -625,8 +625,6 @@ int process_syscall(long syscall) {
 	pH_profile* profile;
 	int ret;
 	
-	//return 0; // Temp return
-	
 	// Boolean checks
 	if (!module_inserted_successfully) return 0;
 	
@@ -639,21 +637,17 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	
-	//return 0;
-	
 	spin_lock(&pH_task_struct_list_sem);
 	spin_lock(&pH_profile_list_sem);
 
-	//goto exit_before_profile; // Temp exit
-
-	pr_err("%s: In process_syscall\n", DEVICE_NAME);
+	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
 	// Check to see if a process went out of use
 	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
-	goto exit_before_profile;
+	goto exit_before_profile; // Temp early exit
 	if (!process) {
 		// Ignore this syscall
 		ret = 0;
