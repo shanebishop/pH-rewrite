@@ -646,10 +646,12 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	
-	return 0;
+	//return 0;
 	
 	spin_lock(&pH_task_struct_list_sem);
 	spin_lock(&pH_profile_list_sem);
+
+	goto exit_before_profile; // Temp exit
 
 	pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
