@@ -651,7 +651,7 @@ int process_syscall(long syscall) {
 	
 	// Check to see if a process went out of use
 	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
-	return 0; // Temp return
+	goto exit; // Temp return
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
