@@ -651,7 +651,7 @@ int process_syscall(long syscall) {
 	spin_lock(&pH_task_struct_list_sem);
 	spin_lock(&pH_profile_list_sem);
 
-	goto exit_before_profile; // Temp exit
+	//goto exit_before_profile; // Temp exit - temporarily try without any early exit
 
 	pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
