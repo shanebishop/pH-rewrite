@@ -975,6 +975,7 @@ static long jsys_execve(const char __user *filename,
 		pr_err("%s: Unable to allocate memory for path_to_binary\n", DEVICE_NAME);
 		goto no_memory;
 	}
+	goto not_monitoring;
 	
 	// Copy memory from userspace to kernel land
 	copy_from_user(path_to_binary, filename, sizeof(char) * 4000);
