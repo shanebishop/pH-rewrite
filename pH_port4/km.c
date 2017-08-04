@@ -647,11 +647,11 @@ int process_syscall(long syscall) {
 	spin_lock(&pH_task_struct_list_sem);
 	spin_lock(&pH_profile_list_sem);
 
-	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
+	pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
 	// Check to see if a process went out of use
 	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
-	//return 0; // Temp return
+	return 0; // Temp return
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
@@ -661,7 +661,7 @@ int process_syscall(long syscall) {
 		goto exit;
 	}
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
-	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
+	pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
 	pH_refcount_inc(profile);
@@ -679,7 +679,7 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	*/
-	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
+	pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
 	// Check to see if this profile is still in use
 	if (!pH_profile_in_use(profile) || !(profile->lock) || profile->lock == NULL) {
@@ -695,7 +695,7 @@ int process_syscall(long syscall) {
 		goto exit;
 	}
 	
-	//pr_err("%s: Locking profile->lock\n", DEVICE_NAME);
+	pr_err("%s: Locking profile->lock\n", DEVICE_NAME);
 	spin_lock(profile->lock); // Grabs the lock to this profile
 	
 	if (profile->lock == NULL) {
@@ -737,7 +737,7 @@ int process_syscall(long syscall) {
 	
 	if (process) process->count++;
 	if (process) pH_append_call(process->seq, syscall);
-	//pr_err("%s: Successfully appended call %d\n", DEVICE_NAME, syscall);
+	pr_err("%s: Successfully appended call %d\n", DEVICE_NAME, syscall);
 	
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
@@ -757,7 +757,7 @@ int process_syscall(long syscall) {
 		ret = -1;
 		goto exit;
 	}
-	//pr_err("%s: Trained process\n", DEVICE_NAME);
+	pr_err("%s: Trained process\n", DEVICE_NAME);
 	
 	// Allocate space for new_syscall
 	new_syscall = kmalloc(sizeof(my_syscall), GFP_ATOMIC);
@@ -767,7 +767,7 @@ int process_syscall(long syscall) {
 		ret = -ENOMEM;
 		goto exit;
 	}
-	//pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
+	pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
 	
 	// Add new_syscall to the linked list of syscalls
 	new_syscall->syscall_num = syscall;
@@ -920,9 +920,8 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 
 	add_process_to_llist(this_process); // Add this process to the list of processes
 	pr_err("%s: Added this process to llist\n", DEVICE_NAME);
-	return 0;
 	
-	pH_refcount_dec(profile);
+	pH_refcount_dec(profile); // Perhaps I shouldn't decrement this?
 	
 	return 0;
 
