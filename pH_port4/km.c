@@ -632,6 +632,8 @@ int process_syscall(long syscall) {
 	pH_profile* profile;
 	int ret;
 	
+	return 0; // Temp return
+	
 	// Boolean checks
 	if (!module_inserted_successfully) return 0;
 	
