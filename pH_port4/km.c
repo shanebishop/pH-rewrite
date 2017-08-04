@@ -872,7 +872,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 		pr_err("%s: Unable to allocate memory for this process\n", DEVICE_NAME);
 		goto no_memory;
 	}
-	goto no_memory; // Temp test
+	return 0; // Temp test
 	
 	// Initialize this process - check with Anil to see if these are the right values to initialize it to
 	this_process->task_struct = current;
