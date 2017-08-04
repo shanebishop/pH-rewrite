@@ -657,7 +657,6 @@ int process_syscall(long syscall) {
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
 	pH_refcount_inc(profile);
-	//goto exit;
 	
 	if (!profile || profile == NULL) {
 		pr_err("%s: pH_task_struct corrupted: No profile\n", DEVICE_NAME);
