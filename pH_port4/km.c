@@ -78,6 +78,12 @@ MODULE_LICENSE("GPL"); // Don't ever forget this line!
 #define TRUE  (1 == 1)
 #define FALSE !TRUE
 
+#define ASSERT(x)                                                       \
+do {    if (x) break;                                                   \
+        printk(KERN_EMERG "### ASSERTION FAILED %s: %s: %d: %s\n",      \
+               __FILE__, __func__, __LINE__, #x); dump_stack(); BUG();  \
+} while (0)
+
 static int    majorNumber;
 //static char   message[256] = {0};
 //static short  size_of_message;
@@ -297,6 +303,7 @@ inline void pH_refcount_init(pH_profile *profile, int i)
         profile->refcount.counter = i;
 }
 
+/* // Commented out for now, as I might not need it
 // Returns the length of the profile list
 int pH_profile_list_length(void) {
 	pH_profile* iterator;
@@ -313,6 +320,7 @@ int pH_profile_list_length(void) {
 	
 	return i;
 }
+*/
 
 // Returns the length of the process list
 int pH_task_struct_list_length(void) {
@@ -333,11 +341,14 @@ int pH_task_struct_list_length(void) {
 
 // Adds an alloc'd profile to the profile list
 void add_to_profile_llist(pH_profile* p) {
+	pH_refcount_inc(p);
+	
 	//pr_err("%s: In add_to_profile_llist\n", DEVICE_NAME);
 	
 	// Checks for adding a NULL profile
 	if (!p || p == NULL) {
 		pr_err("%s: In add_to_profile_llist with a NULL profile\n", DEVICE_NAME);
+		pH_refcount_dec(p);
 		return;
 	}
 	
@@ -360,6 +371,8 @@ void add_to_profile_llist(pH_profile* p) {
 		pH_profile_list = p;
 	}
 	//spin_unlock(&pH_profile_list_sem);
+	
+	pH_refcount_dec(p);
 }
 
 // Makes a new pH_profile and stores it in profile
@@ -499,6 +512,7 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	}
 	
 	profile = process->profile;
+	pH_refcount_inc(profile);
 	
 	// Checks for NULL profile
 	if (!profile || profile == NULL) {
@@ -510,6 +524,7 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	new_sequence = kmalloc(sizeof(pH_seq), GFP_ATOMIC);
 	if (!new_sequence || new_sequence == NULL) {
 		pr_err("%s: Unable to allocate space for new_sequence in make_and_push_new_pH_seq\n", DEVICE_NAME);
+		pH_refcount_dec(profile);
 		return -ENOMEM;
 	}
 	
@@ -524,6 +539,7 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	stack_push(process, new_sequence);
 	//pr_err("%s: Pushed new_sequence\n", DEVICE_NAME);
 	//pr_err("%s: Exiting make_and_push_new_pH_seq\n", DEVICE_NAME);
+	pH_refcount_dec(profile);
 	return 0;
 }
 
@@ -647,12 +663,8 @@ int process_syscall(long syscall) {
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
 	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
 	
-	if (process) profile = process->profile; // Store process->profile in profile for shorter reference
-	else {
-		pr_err("%s: ERROR: process is NULL\n", DEVICE_NAME);
-		ret = -1;
-		goto exit;
-	}
+	profile = process->profile; // Store process->profile in profile for shorter reference
+	pH_refcount_inc(profile);
 	
 	if (!profile || profile == NULL) {
 		pr_err("%s: pH_task_struct corrupted: No profile\n", DEVICE_NAME);
@@ -766,6 +778,8 @@ int process_syscall(long syscall) {
 	ret = 0;
 
 exit:
+	pH_refcount_dec(profile);
+	
 	spin_unlock(&pH_profile_list_sem);
 	spin_unlock(&pH_task_struct_list_sem);
 
@@ -846,6 +860,8 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 
 // Helper function for jsys_execve and fork_handler, as both instances require similar code
 int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id) {
+	if (profile != NULL) pH_refcount_inc(profile);
+	
 	pH_task_struct* this_process;
 	
 	//pr_err("%s: In handle_new_process for %d %s\n", DEVICE_NAME, process_id, path_to_binary);
@@ -879,6 +895,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 			profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
 			if (!profile) {
 				pr_err("%s: Unable to allocate memory for profile in handle_new_process\n", DEVICE_NAME);
+				pH_refcount_inc(profile);
 				goto no_memory;
 			}
 			
@@ -902,9 +919,11 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	add_process_to_llist(this_process); // Add this process to the list of processes
 	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
+	pH_refcount_dec(profile);
+	
 	return 0;
 
-no_memory:
+no_memory:	
 	pr_err("%s: Ran out of memory\n", DEVICE_NAME);
 	
 	kfree(path_to_binary);
@@ -1086,6 +1105,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 		ret = -1;
 		goto exit;
 	}
+	pH_refcount_inc(profile);
 	
 	path_to_binary = profile->filename;
 	
@@ -1095,11 +1115,14 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	{
 		pr_err("%s: In fork_handler with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
 		ret = -1;
+		pH_refcount_dec(profile);
 		goto exit;
 	}
 	
 	// Handle the new process
 	handle_new_process(path_to_binary, profile, retval);
+	
+	pH_refcount_dec(profile);
 	
 	spin_unlock(&pH_profile_list_sem);
 	spin_unlock(&pH_task_struct_list_sem);
@@ -1287,7 +1310,7 @@ static struct kretprobe sys_execve_kretprobe = {
 
 // Frees profile storage
 void pH_free_profile_storage(pH_profile *profile)
-{
+{   
     int i;
 
 	pr_err("%s: In pH_free_profile_storage for %d\n", DEVICE_NAME, profile->identifier);
@@ -1312,6 +1335,7 @@ void pH_free_profile_storage(pH_profile *profile)
     pr_err("%s: Exiting pH_free_profile_storage\n", DEVICE_NAME);
 }
 
+/* // Commented out as I probably don't need this
 // Returns true if the list contains a given identifier
 bool profile_list_contains_identifier(int identifier) {
 	pH_profile* iterator = pH_profile_list;
@@ -1335,6 +1359,7 @@ bool profile_list_contains_identifier(int identifier) {
 	//pr_err("%s: No matching profile was found\n", DEVICE_NAME);
 	return FALSE;
 }
+*/
 
 // Returns 0 on success and anything else on failure
 // Calling functions (currently only pH_free_profile) MUST handle returned errors if possible
@@ -1458,22 +1483,10 @@ void pH_free_profile(pH_profile *profile)
     */
     
     ret = pH_remove_profile_from_list(profile);
-    if (profile_list_contains_identifier(profile->identifier)) {
-    	pr_err("%s: ERROR: After removing profile, profile with identifer is still in list!\n", DEVICE_NAME);
-    	if (profile->lock != NULL) spin_unlock(profile->lock);
-    	// Cause an intentional crash
-    	//panic("After removing profile, profile with identifer is still in list");
-    	return;
-    }
+    //ASSERT(profile_list_contains_identifier(profile->identifier));
     //spin_unlock(&pH_profile_list_sem);
     
-    if (ret != 0) {
-    	pr_err("%s: ERROR: pH_remove_profile_from_list was unsuccessful in pH_free_profile!\n", DEVICE_NAME);
-    	if (profile->lock != NULL) spin_unlock(profile->lock);
-    	// Cause an intentional crash
-    	//panic("pH_remove_profile_from_list was unsuccessful in pH_free_profile");
-    	return;
-    }
+    ASSERT(ret != 0);
 
     if (pH_aremonitoring) {
         //pH_write_profile(profile);
@@ -2566,7 +2579,7 @@ static void __exit ebbchar_exit(void){
 	pr_err("%s: Missed probing %d instances of exit\n", DEVICE_NAME, exit_kretprobe.nmissed);
 	*/
 	
-	profiles_freed = pH_profile_list_length();
+	//profiles_freed = pH_profile_list_length();
 	
 	//pr_err("%s: Freeing profiles...\n", DEVICE_NAME);
 	//profiles_freed = free_profiles();
@@ -2580,8 +2593,8 @@ static void __exit ebbchar_exit(void){
 	class_destroy(ebbcharClass);
 	unregister_chrdev(majorNumber, DEVICE_NAME);
 	
-	// Print lengths of lists
-	pr_err("%s: At time of module removal, pH was monitoring %d processes and had %d profiles in memory\n", DEVICE_NAME, pH_task_structs_freed, profiles_freed);
+	// Print lengths of lists - can't print everything until I add pH_profile_list_length() back
+	//pr_err("%s: At time of module removal, pH was monitoring %d processes and had %d profiles in memory\n", DEVICE_NAME, pH_task_structs_freed, profiles_freed);
 	pr_err("%s: During the uptime of the module, %d profiles were created\n", DEVICE_NAME, profiles_created);
 	pr_err("%s: During the uptime of the module, there were %d successful jsys_execves\n", DEVICE_NAME, successful_jsys_execves);
 	
@@ -2606,11 +2619,7 @@ static int dev_release(struct inode *inodep, struct file *filep){
 
 inline void pH_append_call(pH_seq* s, int new_value) {
 	if (s->last < 0) { pr_err("%s: s->last is not initialized!\n", DEVICE_NAME); return; }
-	if (s->length == 0) {
-		pr_err("%s: ERROR: In pH_append_call with s->length = 0. This will cause a division error.\n", DEVICE_NAME);
-		//panic("In pH_append_call with s->length = 0");
-		return;
-	}
+	ASSERT(s->length == 0);
 	
 	s->last = (s->last + 1) % (s->length);
 	s->data[s->last] = new_value;
@@ -2670,11 +2679,7 @@ void pH_add_seq(pH_seq *s, pH_profile_data *data)
 		return;
 	}
 	
-	if (seqlen == 0) {
-		pr_err("%s: ERROR: In pH_add_seq with s->length = 0\n", DEVICE_NAME);
-		//panic("In pH_add_seq with s->length = 0");
-		return;
-	}
+	ASSERT(seqlen == 0);
 
 	cur_idx = s->last;
 	cur_call = seqdata[cur_idx];
@@ -2760,11 +2765,7 @@ int pH_test_seq(pH_seq *s, pH_profile_data *data)
 	int seqlen = s->length;
 	int mismatches = 0;
 
-	if (seqlen == 0) {
-		pr_err("%s: ERROR: In pH_test_seq with s->length = 0\n", DEVICE_NAME);
-		//panic("In pH_test_seq with s->length = 0");
-		return;
-	}
+	ASSERT(seqlen == 0);
 
 	cur_idx = s->last;
 	cur_call = seqdata[cur_idx];
