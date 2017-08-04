@@ -864,7 +864,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	
 	pH_task_struct* this_process;
 	
-	//pr_err("%s: In handle_new_process for %d %s\n", DEVICE_NAME, process_id, path_to_binary);
+	pr_err("%s: In handle_new_process for %d %s\n", DEVICE_NAME, process_id, path_to_binary);
 	
 	// Allocate memory for this process
 	this_process = kmalloc(sizeof(pH_task_struct), GFP_ATOMIC);
@@ -872,7 +872,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 		pr_err("%s: Unable to allocate memory for this process\n", DEVICE_NAME);
 		goto no_memory;
 	}
-	return 0; // Temp test
+	//return 0; // Temp test
 	
 	// Initialize this process - check with Anil to see if these are the right values to initialize it to
 	this_process->task_struct = current;
@@ -884,12 +884,13 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	this_process->syscall_llist = NULL;
 	this_process->delay = 0;
 	this_process->count = 0;
-	//pr_err("%s: Initialized process\n", DEVICE_NAME);
+	pr_err("%s: Initialized process\n", DEVICE_NAME);
+	return 0;
 	
 	if (!profile || profile == NULL) {
 		// Retrieve the corresponding profile
 		profile = retrieve_pH_profile_by_filename(path_to_binary);
-		//pr_err("%s: Attempted to retrieve profile\n", DEVICE_NAME);
+		pr_err("%s: Attempted to retrieve profile\n", DEVICE_NAME);
 		
 		// If there is no corresponding profile, make a new one
 		if (!profile || profile == NULL) {
@@ -918,7 +919,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	this_process->profile = profile; // Put this profile in the pH_task_struct struct
 
 	add_process_to_llist(this_process); // Add this process to the list of processes
-	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
+	pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
 	pH_refcount_dec(profile);
 	
