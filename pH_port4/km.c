@@ -991,6 +991,7 @@ static long jsys_execve(const char __user *filename,
 	
 	// Handle the new process
 	handle_new_process(path_to_binary, NULL, current_process_id);
+	goto not_monitoring;
 	
 	list_length = pH_task_struct_list_length();
 	pr_err("%s: List length at end is %d\n", DEVICE_NAME, list_length);
