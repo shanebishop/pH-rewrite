@@ -651,7 +651,7 @@ int process_syscall(long syscall) {
 	spin_lock(&pH_task_struct_list_sem);
 	spin_lock(&pH_profile_list_sem);
 
-	goto exit_before_profile; // Temp exit
+	//goto exit_before_profile; // Temp exit
 
 	pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
@@ -660,6 +660,7 @@ int process_syscall(long syscall) {
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
+	goto exit_before_profile;
 	if (!process) {
 		// Ignore this syscall
 		ret = 0;
