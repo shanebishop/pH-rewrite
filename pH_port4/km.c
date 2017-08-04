@@ -486,8 +486,6 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 	do {
 		if (iterator->process_id == process_id) {
 			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
-			spin_unlock(&pH_task_struct_list_sem);
-			spin_unlock(&pH_profile_list_sem);
 			return iterator;
 		}
 		iterator = iterator->next;
