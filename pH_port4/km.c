@@ -646,7 +646,7 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	
-	return 0;
+	//return 0;
 	
 	spin_lock(&pH_task_struct_list_sem);
 	spin_lock(&pH_profile_list_sem);
@@ -655,14 +655,14 @@ int process_syscall(long syscall) {
 	
 	// Check to see if a process went out of use
 	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
-	goto exit; // Temp return
+	goto exit_before_profile; // Temp return
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	if (!process) {
 		// Ignore this syscall
 		ret = 0;
-		goto exit;
+		goto exit_before_profile;
 	}
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
 	pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
@@ -780,6 +780,12 @@ int process_syscall(long syscall) {
 	//pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
 	
 	ret = 0;
+
+exit_before_profile:
+	spin_unlock(&pH_profile_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+
+	return ret;
 
 exit:
 	pH_refcount_dec(profile);
