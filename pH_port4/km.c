@@ -653,7 +653,7 @@ int process_syscall(long syscall) {
 		goto exit_before_profile;
 	}
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
-	pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
+	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
 	pH_refcount_inc(profile);
@@ -672,7 +672,7 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	*/
-	pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
+	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
 	// Check to see if this profile is still in use
 	if (!pH_profile_in_use(profile) || !(profile->lock) || profile->lock == NULL) {
@@ -682,7 +682,7 @@ int process_syscall(long syscall) {
 		ret = -1;
 		goto exit;
 	}
-	goto exit;
+	//goto exit;
 	
 	if (spin_trylock(&(profile->freeing_lock)) == 0) {
 		ret = -1;
