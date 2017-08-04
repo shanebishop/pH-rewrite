@@ -916,7 +916,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	pH_refcount_inc(profile); // Increment refcount
 	
 	this_process->profile = profile; // Put this profile in the pH_task_struct struct
-	return 0; // Temp return
+	//return 0; // Temp return
 
 	add_process_to_llist(this_process); // Add this process to the list of processes
 	pr_err("%s: Added this process to llist\n", DEVICE_NAME);
