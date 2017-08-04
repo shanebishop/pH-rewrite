@@ -647,7 +647,7 @@ int process_syscall(long syscall) {
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
-	goto exit_before_profile; // Temp early exit
+	//goto exit_before_profile; // Temp early exit
 	if (!process) {
 		// Ignore this syscall
 		ret = 0;
@@ -658,6 +658,7 @@ int process_syscall(long syscall) {
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
 	pH_refcount_inc(profile);
+	goto exit_before_profile;
 	
 	if (!profile || profile == NULL) {
 		pr_err("%s: pH_task_struct corrupted: No profile\n", DEVICE_NAME);
