@@ -923,7 +923,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	add_process_to_llist(this_process); // Add this process to the list of processes
 	pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
-	return 0; // Temp return
+	//return 0; // Temp return
 	
 	pH_refcount_dec(profile); // Perhaps I shouldn't decrement this?
 	
