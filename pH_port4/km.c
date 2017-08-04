@@ -872,7 +872,6 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 		pr_err("%s: Unable to allocate memory for this process\n", DEVICE_NAME);
 		goto no_memory;
 	}
-	//return 0; // Temp test
 	
 	// Initialize this process - check with Anil to see if these are the right values to initialize it to
 	this_process->task_struct = current;
@@ -885,12 +884,13 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	this_process->delay = 0;
 	this_process->count = 0;
 	pr_err("%s: Initialized process\n", DEVICE_NAME);
-	return 0;
+	//return 0;
 	
 	if (!profile || profile == NULL) {
 		// Retrieve the corresponding profile
 		profile = retrieve_pH_profile_by_filename(path_to_binary);
 		pr_err("%s: Attempted to retrieve profile\n", DEVICE_NAME);
+		return 0;
 		
 		// If there is no corresponding profile, make a new one
 		if (!profile || profile == NULL) {
