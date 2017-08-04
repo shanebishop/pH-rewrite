@@ -872,6 +872,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 		pr_err("%s: Unable to allocate memory for this process\n", DEVICE_NAME);
 		goto no_memory;
 	}
+	goto no_memory; // Temp test
 	
 	// Initialize this process - check with Anil to see if these are the right values to initialize it to
 	this_process->task_struct = current;
@@ -987,7 +988,6 @@ static long jsys_execve(const char __user *filename,
 	
 	// Handle the new process
 	handle_new_process(path_to_binary, NULL, current_process_id);
-	goto not_inserted; // Temp early exit
 	
 	list_length = pH_task_struct_list_length();
 	pr_err("%s: List length at end is %d\n", DEVICE_NAME, list_length);
