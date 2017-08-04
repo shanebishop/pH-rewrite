@@ -322,6 +322,7 @@ int pH_profile_list_length(void) {
 }
 */
 
+/*
 // Returns the length of the process list
 int pH_task_struct_list_length(void) {
 	pH_task_struct* iterator;
@@ -338,6 +339,7 @@ int pH_task_struct_list_length(void) {
 	
 	return i;
 }
+*/
 
 // Adds an alloc'd profile to the profile list
 void add_to_profile_llist(pH_profile* p) {
@@ -442,6 +444,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	return 0;
 }
 
+/*
 // Adds a syscall to the linked list in its pH_task_struct
 void add_to_my_syscall_llist(pH_task_struct* t, my_syscall* s) {
 	//pr_err("%s: In add_to_my_syscall_llist\n", DEVICE_NAME);
@@ -451,19 +454,11 @@ void add_to_my_syscall_llist(pH_task_struct* t, my_syscall* s) {
 		s->next = NULL;
 	}
 	else {
-		/* // Old implementation
-		my_syscall* iterator = t->syscall_llist;
-		
-		while (iterator->next) iterator = iterator->next;
-		
-		iterator->next = s;
-		s->next = NULL;
-		*/
-		
 		s->next = t->syscall_llist;
 		t->syscall_llist = s;
 	}
 }
+*/
 
 // One issue with this function is if the process_id goes out of use or is reused while the lock
 // is held, it might return an incorrect result. Perhaps this is why my code is crashing.
@@ -773,9 +768,11 @@ int process_syscall(long syscall) {
 	}
 	pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
 	
+	/* // Since this is just for seeing if my code seems to be working, I don't need it
 	// Add new_syscall to the linked list of syscalls
 	new_syscall->syscall_num = syscall;
 	add_to_my_syscall_llist(process, new_syscall);
+	*/
 	
 	//pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
 	
@@ -970,7 +967,7 @@ static long jsys_execve(const char __user *filename,
 	
 	current_process_id = pid_vnr(task_tgid(current)); // Grab the process ID right now
 	
-	pr_err("%s: List length at start is %d\n", DEVICE_NAME, pH_task_struct_list_length());
+	//pr_err("%s: List length at start is %d\n", DEVICE_NAME, pH_task_struct_list_length());
 	
 	//clean_processes();
 	//pr_err("%s: Back from clean_processes()\n", DEVICE_NAME);
@@ -1296,23 +1293,6 @@ static struct kretprobe do_execve_kretprobe = {
 };
 
 static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
-	pH_task_struct* process;
-	pH_profile* profile;
-	
-	if (!module_inserted_successfully) return 0;
-
-	pr_err("%s: In sys_execve_return_handler\n", DEVICE_NAME);
-	return 0; // Temp return
-
-	spin_lock(&pH_task_struct_list_sem);	
-	spin_lock(&pH_profile_list_sem);
-	
-	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
-	if (!process || process == NULL) return 0;
-	
-	spin_unlock(&pH_profile_list_sem);
-	spin_unlock(&pH_task_struct_list_sem);
-	
 	process_syscall(59);
 	return 0;
 }
@@ -1451,7 +1431,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
     }
 }
 
-// Destructor for pH_profiles
+// Destructor for pH_profiles - perhaps remove use of freeing lock?
 void pH_free_profile(pH_profile *profile)
 {
     int ret;
@@ -1572,6 +1552,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 	}
 }
 
+/* // Shouldn't have any syscalls anymore, since they are not required
 // Frees all of the syscalls that are stored in a process
 void free_syscalls(pH_task_struct* t) {
 	my_syscall* current_syscall;
@@ -1584,6 +1565,7 @@ void free_syscalls(pH_task_struct* t) {
 		current_syscall = NULL;
 	}
 }
+*/
 
 /*
 // Returns true if a given profile has at least one process that matches it
@@ -1675,8 +1657,8 @@ void free_pH_task_struct(pH_task_struct* process) {
 	//stack_print(process); // Don't bother printing right now
 	//mutex_destroy(&(process->pH_seq_stack_sem)); // Leave the mutex intact?
 	
-	free_syscalls(process); // Frees syscalls
-	pr_err("%s: Freed syscalls\n", DEVICE_NAME);
+	//free_syscalls(process); // Frees syscalls
+	//pr_err("%s: Freed syscalls\n", DEVICE_NAME);
 	
 	/* // For now, don't free any profiles - later, implement freeing profiles every ten seconds
 	   // (every ten seconds userspace should send a "free profiles" message, where the profile list
