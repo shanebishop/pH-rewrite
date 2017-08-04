@@ -646,7 +646,7 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	
-	//return 0;
+	return 0;
 	
 	spin_lock(&pH_task_struct_list_sem);
 	spin_lock(&pH_profile_list_sem);
@@ -655,7 +655,6 @@ int process_syscall(long syscall) {
 	
 	// Check to see if a process went out of use
 	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
-	goto exit_before_profile; // Temp return
 	
 	// Retrieve process
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
@@ -911,19 +910,18 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 			
 			new_profile(profile, path_to_binary);
 			pr_err("%s: Made new profile for [%s]\n", DEVICE_NAME, path_to_binary);
-			//return 0;
 			
 			if (!profile || profile == NULL) {
 				pr_err("%s: new_profile() made a corrupted or NULL profile\n", DEVICE_NAME);
 			}
+			else pH_refcount_inc(profile);
 		}
 		else {
+			pH_refcount_inc(profile);
 			kfree(path_to_binary);
 			path_to_binary = NULL;
 		}
 	}
-	
-	pH_refcount_inc(profile); // Increment refcount
 	
 	this_process->profile = profile; // Put this profile in the pH_task_struct struct
 
