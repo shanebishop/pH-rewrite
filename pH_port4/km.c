@@ -957,6 +957,7 @@ static long jsys_execve(const char __user *filename,
 	spin_lock(&pH_profile_list_sem);
 
 	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
+	goto not_inserted; // Temp early exit
 	
 	current_process_id = pid_vnr(task_tgid(current)); // Grab the process ID right now
 	
