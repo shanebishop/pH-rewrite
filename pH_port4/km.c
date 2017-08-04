@@ -681,12 +681,13 @@ int process_syscall(long syscall) {
 		ret = -1;
 		goto exit;
 	}
-	//goto exit;
+	goto exit;
 	
 	if (spin_trylock(&(profile->freeing_lock)) == 0) {
 		ret = -1;
 		goto exit;
 	}
+	goto exit;
 	
 	pr_err("%s: Locking profile->lock\n", DEVICE_NAME);
 	spin_lock(profile->lock); // Grabs the lock to this profile
