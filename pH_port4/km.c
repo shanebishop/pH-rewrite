@@ -646,6 +646,8 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	
+	return 0;
+	
 	spin_lock(&pH_task_struct_list_sem);
 	spin_lock(&pH_profile_list_sem);
 
@@ -918,12 +920,9 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	pH_refcount_inc(profile); // Increment refcount
 	
 	this_process->profile = profile; // Put this profile in the pH_task_struct struct
-	//return 0; // Temp return
 
 	add_process_to_llist(this_process); // Add this process to the list of processes
 	pr_err("%s: Added this process to llist\n", DEVICE_NAME);
-	
-	//return 0; // Temp return
 	
 	pH_refcount_dec(profile); // Perhaps I shouldn't decrement this?
 	
@@ -993,12 +992,12 @@ static long jsys_execve(const char __user *filename,
 	
 	// Handle the new process
 	handle_new_process(path_to_binary, NULL, current_process_id);
-	goto not_monitoring;
+	//goto not_monitoring; // Last temp stop
 	
-	list_length = pH_task_struct_list_length();
-	pr_err("%s: List length at end is %d\n", DEVICE_NAME, list_length);
+	//list_length = pH_task_struct_list_length();
+	//pr_err("%s: List length at end is %d\n", DEVICE_NAME, list_length);
 	
-	successful_jsys_execves++; // Increment successful_jsys_execves
+	//successful_jsys_execves++; // Increment successful_jsys_execves
 	
 	spin_unlock(&pH_profile_list_sem);
 	spin_unlock(&pH_task_struct_list_sem);
