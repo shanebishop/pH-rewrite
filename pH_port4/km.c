@@ -890,7 +890,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 		// Retrieve the corresponding profile
 		profile = retrieve_pH_profile_by_filename(path_to_binary);
 		pr_err("%s: Attempted to retrieve profile\n", DEVICE_NAME);
-		return 0;
+		//return 0;
 		
 		// If there is no corresponding profile, make a new one
 		if (!profile || profile == NULL) {
@@ -903,7 +903,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 			
 			new_profile(profile, path_to_binary);
 			pr_err("%s: Made new profile for [%s]\n", DEVICE_NAME, path_to_binary);
-			//return 0;
+			return 0;
 			
 			if (!profile || profile == NULL) {
 				pr_err("%s: new_profile() made a corrupted or NULL profile\n", DEVICE_NAME);
