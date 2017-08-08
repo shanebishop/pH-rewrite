@@ -918,10 +918,11 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	
 	if (!profile || profile == NULL) {
 		// Retrieve the corresponding profile
+		pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
 		spin_lock(&pH_profile_list_sem);
 		profile = retrieve_pH_profile_by_filename(path_to_binary);
 		spin_unlock(&pH_profile_list_sem);
-		pr_err("%s: Attempted to retrieve profile\n", DEVICE_NAME);
+		pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
 		
 		// If there is no corresponding profile, make a new one
 		if (!profile || profile == NULL) {
