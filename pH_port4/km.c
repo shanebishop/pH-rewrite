@@ -986,8 +986,15 @@ static long jsys_execve(const char __user *filename,
 	process = llist_retrieve_process(current_process_id);
 	spin_unlock(&pH_task_struct_list_sem);
 	if (!process || process == NULL) {
-		pr_err("%s: ERROR: A pH_task_struct should already exist for this execve\n", DEVICE_NAME);
-		goto exit;
+		pr_err("%s: Unable to find process in jsys_execve\n", DEVICE_NAME);
+		pr_err("%s: Continuing anyway...\n", DEVICE_NAME);
+		
+		// Allocate memory for this process
+		process = kmalloc(sizeof(pH_task_struct), GFP_ATOMIC);
+		if (!process) {
+			pr_err("%s: Unable to allocate memory for process\n", DEVICE_NAME);
+			goto exit;
+		}
 	}
 	
 	pH_refcount_dec(process->profile);
