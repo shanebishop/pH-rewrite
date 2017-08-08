@@ -666,7 +666,7 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 
-	pr_err("%s: In process_syscall\n", DEVICE_NAME);
+	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
 	// Check to see if a process went out of use
 	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
