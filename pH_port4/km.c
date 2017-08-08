@@ -353,7 +353,7 @@ void add_to_profile_llist(pH_profile* p) {
 	ASSERT(spin_is_locked(&pH_profile_list_sem));
 	ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
 	
-	//pr_err("%s: In add_to_profile_llist\n", DEVICE_NAME);
+	pr_err("%s: In add_to_profile_llist\n", DEVICE_NAME);
 	
 	// Checks for adding a NULL profile
 	if (!p || p == NULL) {
@@ -364,6 +364,7 @@ void add_to_profile_llist(pH_profile* p) {
 	
 	//spin_lock(&pH_profile_list_sem);
 	if (pH_profile_list == NULL) {
+		pr_err("%s: First element added to list\n", DEVICE_NAME);
 		pH_profile_list = p;
 		p->next = NULL;
 	}
@@ -377,12 +378,15 @@ void add_to_profile_llist(pH_profile* p) {
 		p->next = NULL;
 		*/
 		
+		pr_err("%s: Adding a new element...\n", DEVICE_NAME);
 		p->next = pH_profile_list;
 		pH_profile_list = p;
 	}
 	//spin_unlock(&pH_profile_list_sem);
 	
 	pH_refcount_dec(p);
+	
+	pr_err("%s: Returning from add_to_profile_llist()...\n", DEVICE_NAME);
 }
 
 // Makes a new pH_profile and stores it in profile
@@ -406,6 +410,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	profile->anomalies = 0;
 	profile->length = pH_default_looklen;
 	profile->count = 0;
+	pr_err("%s: Got here 1 (new_profile)\n", DEVICE_NAME);
 
 	// Allocates memory for the lock
 	profile->lock = kmalloc(sizeof(spinlock_t), GFP_ATOMIC);
@@ -417,6 +422,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	}
 	spin_lock_init(profile->lock);
 	spin_lock_init(&(profile->freeing_lock));
+	pr_err("%s: Got here 2 (new_profile)\n", DEVICE_NAME);
 
 	profile->train.sequences = 0;
 	profile->train.last_mod_count = 0;
@@ -436,10 +442,12 @@ int new_profile(pH_profile* profile, char* filename) {
 	*/
 
 	profile->test = profile->train;
+	pr_err("%s: Got here 3 (new_profile)\n", DEVICE_NAME);
 
 	profile->next = NULL;
 	pH_refcount_init(profile, 0);
 	profile->filename = filename;
+	pr_err("%s: Got here 4 (new_profile)\n", DEVICE_NAME);
 
 	//pH_open_seq_logfile(profile);
 
@@ -450,6 +458,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	spin_lock(&pH_profile_list_sem);
 	add_to_profile_llist(profile);
 	spin_unlock(&pH_profile_list_sem);
+	pr_err("%s: Got here 5 (new_profile) returning...\n", DEVICE_NAME);
 
 	return 0;
 }
@@ -872,7 +881,6 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	//pr_err("%s: No matching profile was found\n", DEVICE_NAME);
 	return NULL;
 }
-
 
 // Helper function for jsys_execve and fork_handler, as both instances require similar code
 int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id) {
