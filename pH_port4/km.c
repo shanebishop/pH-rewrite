@@ -491,7 +491,7 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 	pH_task_struct* iterator = NULL;
 	
 	ASSERT(spin_is_locked(&pH_task_struct_list_sem));
-	ASSERT(!spin_is_locked(&pH_profile_list_sem));
+	//ASSERT(!spin_is_locked(&pH_profile_list_sem));
 	
 	iterator = pH_task_struct_list;
 	
@@ -673,9 +673,11 @@ int process_syscall(long syscall) {
 	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
 	
 	// Retrieve process
+	spin_lock(&pH_profile_list_sem);
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
+	spin_unlock(&pH_profile_list_sem);
 	if (!process) {
 		// Ignore this syscall
 		ret = 0;
