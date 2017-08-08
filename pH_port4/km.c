@@ -711,11 +711,12 @@ int process_syscall(long syscall) {
 		goto exit;
 	}
 	
+	/*
 	if (spin_is_locked(&(profile->freeing_lock))) {
 		ret = -1;
 		goto exit;
 	}
-	goto exit; // Temp early quit
+	*/
 	
 	pr_err("%s: Locking profile->lock\n", DEVICE_NAME);
 	spin_lock(profile->lock); // Grabs the lock to this profile
