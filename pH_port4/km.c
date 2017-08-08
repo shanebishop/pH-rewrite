@@ -1095,7 +1095,9 @@ static long jsys_execve(const char __user *filename,
 	pH_refcount_inc(profile);
 	
 	if (!already_had_process) {
+		spin_lock(&pH_task_struct_list_sem);
 		add_process_to_llist(process);
+		spin_unlock(&pH_task_struct_list_sem);
 	}
 	
 	/* // The task struct already exists, what we need to be doing now is decrementing the refcount
