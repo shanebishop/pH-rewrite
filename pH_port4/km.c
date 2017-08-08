@@ -1094,6 +1094,10 @@ static long jsys_execve(const char __user *filename,
 	process->profile = profile;
 	pH_refcount_inc(profile);
 	
+	if (!already_had_process) {
+		add_process_to_llist(process);
+	}
+	
 	/* // The task struct already exists, what we need to be doing now is decrementing the refcount
 	   // for the old profile and then searching for the new profile (also wipe the task struct data).
 	   // Double-check all of my execve handlers - I need to do the appropriate things in each handler.
