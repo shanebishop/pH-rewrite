@@ -666,7 +666,7 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 
-	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
+	pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
 	// Check to see if a process went out of use
 	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
@@ -681,7 +681,7 @@ int process_syscall(long syscall) {
 		goto exit_before_profile;
 	}
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
-	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
+	pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
 	pH_refcount_inc(profile);
@@ -699,7 +699,7 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	*/
-	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
+	pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
 	// Check to see if this profile is still in use
 	if (!pH_profile_in_use(profile) || !(profile->lock) || profile->lock == NULL) {
@@ -752,7 +752,7 @@ int process_syscall(long syscall) {
 		if (process) stack_push(process, temp);
 		//pr_err("%s: Got here 2\n", DEVICE_NAME);
 		INIT_LIST_HEAD(&temp->seqList);
-		//pr_err("%s: Successfully allocated memory for temp in process_syscall\n", DEVICE_NAME);
+		pr_err("%s: Successfully allocated memory for temp in process_syscall\n", DEVICE_NAME);
 	}
 	
 	if (process) process->count++;
@@ -795,7 +795,7 @@ int process_syscall(long syscall) {
 	add_to_my_syscall_llist(process, new_syscall);
 	*/
 	
-	//pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
+	pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
 	
 	ret = 0;
 
