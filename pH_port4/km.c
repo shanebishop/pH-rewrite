@@ -837,9 +837,10 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	pH_profile* profile_list_iterator = pH_profile_list;
 	
 	if (pH_task_struct_list == NULL || pH_profile_list == NULL) {
+		pr_err("%s: pH_profile_list is NULL\n", DEVICE_NAME);
 		return NULL;
 	}
-	//pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
+	pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
 	
 	// Search through profile list
 	//spin_lock(&pH_profile_list_sem);
