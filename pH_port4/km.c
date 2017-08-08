@@ -460,6 +460,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	//hash_add(profile_hashtable, &profile->hlist, pid_vnr(task_tgid(current)));
 	
 	// Add this new profile to the llist
+	pr_err("%s: Locking profile list in new_profile on line 464\n", DEVICE_NAME);
 	spin_lock(&pH_profile_list_sem);
 	add_to_profile_llist(profile);
 	spin_unlock(&pH_profile_list_sem);
@@ -919,6 +920,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	if (!profile || profile == NULL) {
 		// Retrieve the corresponding profile
 		pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
+		pr_err("%s: Locking profile list in handle_new_process on line 924\n", DEVICE_NAME);
 		spin_lock(&pH_profile_list_sem);
 		profile = retrieve_pH_profile_by_filename(path_to_binary);
 		spin_unlock(&pH_profile_list_sem);
@@ -1065,6 +1067,7 @@ static long jsys_execve(const char __user *filename,
 	// Grab the profile from memory - if this fails, I would want to do a read, but since I am not
 	// implementing that right now, then make a new profile
 	pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
+	pr_err("%s: Locking profile list in jsys_execve on line 1071\n", DEVICE_NAME);
 	spin_lock(&pH_profile_list_sem);
 	profile = retrieve_pH_profile_by_filename(path_to_binary);
 	spin_unlock(&pH_profile_list_sem);
