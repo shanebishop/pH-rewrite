@@ -490,7 +490,7 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 	pH_task_struct* iterator = NULL;
 	
 	ASSERT(spin_is_locked(&pH_task_struct_list_sem));
-	ASSERT(!spin_is_locked(&pH_profile_list_sem));
+	ASSERT(spin_is_locked(&pH_profile_list_sem) == 0);
 	
 	iterator = pH_task_struct_list;
 	
