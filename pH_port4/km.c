@@ -995,9 +995,12 @@ static long jsys_execve(const char __user *filename,
 			pr_err("%s: Unable to allocate memory for process\n", DEVICE_NAME);
 			goto exit;
 		}
+		pr_err("%s: Successfully allocated memory for process\n", DEVICE_NAME);
 	}
-	
-	pH_refcount_dec(process->profile);
+	else {
+		pH_refcount_dec(process->profile);
+		pr_err("%s: Decremented old profile refcount\n", DEVICE_NAME);
+	}
 	
 	// Allocate space for path_to_binary
 	path_to_binary = kmalloc(sizeof(char) * 4000, GFP_ATOMIC);
@@ -1005,18 +1008,20 @@ static long jsys_execve(const char __user *filename,
 		pr_err("%s: Unable to allocate memory for path_to_binary\n", DEVICE_NAME);
 		goto exit;
 	}
+	pr_err("%s: Successfully allocated memory for path_to_binary\n", DEVICE_NAME);
 	
 	// Copy memory from userspace to kernel land
 	copy_from_user(path_to_binary, filename, sizeof(char) * 4000);
-	//pr_err("%s: path_to_binary = %s\n", DEVICE_NAME, path_to_binary);
+	pr_err("%s: path_to_binary = [%s]\n", DEVICE_NAME, path_to_binary);
 	
 	// Checks to see if path_to_binary is okay - perhaps move this to handle_new_process()
 	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
 		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
 	{
-		//pr_err("%s: In jsys_execve with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
+		pr_err("%s: In jsys_execve with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
 		goto exit;
 	}
+	pr_err("%s: My code thinks path_to_binary is not corrupted\n", DEVICE_NAME);
 	
 	// Emtpies stack of pH_seqs
 	while (process->seq != NULL) {
