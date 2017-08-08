@@ -844,6 +844,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	// Search through profile list
 	//spin_lock(&pH_profile_list_sem);
 	do {
+		pr_err("%s: Filename is [%s]\n", DEVICE_NAME, profile_list_iterator->filename);
 		if (strcmp(filename, profile_list_iterator->filename) == 0) {
 			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
 			//spin_unlock(&pH_profile_list_sem);
