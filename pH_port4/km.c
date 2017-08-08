@@ -809,6 +809,8 @@ exit:
 
 // Adds a process to the linked list of processes
 void add_process_to_llist(pH_task_struct* t) {
+	pr_err("%s: In add_process_to_llist\n", DEVICE_NAME);
+
 	ASSERT(spin_is_locked(&pH_task_struct_list_sem));
 	ASSERT(!spin_is_locked(&pH_profile_list_sem));
 	
@@ -850,11 +852,18 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	pH_task_struct* process_list_iterator;
 	pH_profile* profile_list_iterator = pH_profile_list;
 	
-	if (pH_task_struct_list == NULL || pH_profile_list == NULL) {
+	if (pH_profile_list == NULL) {
 		pr_err("%s: pH_profile_list is NULL\n", DEVICE_NAME);
 		return NULL;
 	}
 	pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
+	
+	if (pH_task_struct_list == NULL) {
+		pr_err("%s: pH_task_struct_list is NULL\n", DEVICE_NAME);
+		ASSERT(pH_task_struct_list != NULL);
+		return NULL;
+	}
+	pr_err("%s: pH_task_struct_list is not NULL\n", DEVICE_NAME);
 	
 	// Search through profile list
 	//spin_lock(&pH_profile_list_sem);
