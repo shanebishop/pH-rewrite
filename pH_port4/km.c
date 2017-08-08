@@ -1064,10 +1064,11 @@ static long jsys_execve(const char __user *filename,
 	
 	// Grab the profile from memory - if this fails, I would want to do a read, but since I am not
 	// implementing that right now, then make a new profile
+	pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
 	spin_lock(&pH_profile_list_sem);
 	profile = retrieve_pH_profile_by_filename(path_to_binary);
 	spin_unlock(&pH_profile_list_sem);
-	pr_err("%s: Attempted to retrieve profile\n", DEVICE_NAME);
+	pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
 	
 	// If there is no corresponding profile, make a new one - this should actually start a read
 	// request, once I have got to implementing that
