@@ -359,6 +359,7 @@ void add_to_profile_llist(pH_profile* p) {
 	if (!p || p == NULL) {
 		pr_err("%s: In add_to_profile_llist with a NULL profile\n", DEVICE_NAME);
 		pH_refcount_dec(p);
+		ASSERT(p != NULL);
 		return;
 	}
 	
@@ -381,10 +382,14 @@ void add_to_profile_llist(pH_profile* p) {
 		pr_err("%s: Adding a new element...\n", DEVICE_NAME);
 		p->next = pH_profile_list;
 		pH_profile_list = p;
+		ASSERT(pH_profile_list->next != NULL);
 	}
 	//spin_unlock(&pH_profile_list_sem);
 	
 	pH_refcount_dec(p);
+	
+	ASSERT(pH_profile_list != NULL);
+	ASSERT(pH_profile_list == p);
 	
 	pr_err("%s: Returning from add_to_profile_llist()...\n", DEVICE_NAME);
 }
