@@ -962,6 +962,7 @@ static long jsys_execve(const char __user *filename,
 	int list_length;
 	pH_task_struct* process;
 	pH_profile* profile;
+	bool already_had_process = FALSE;
 
 	// Boolean checks
 	if (!module_inserted_successfully) goto exit;
@@ -998,6 +999,7 @@ static long jsys_execve(const char __user *filename,
 		pr_err("%s: Successfully allocated memory for process\n", DEVICE_NAME);
 	}
 	else {
+		already_had_process = TRUE;
 		pH_refcount_dec(process->profile);
 		pr_err("%s: Decremented old profile refcount\n", DEVICE_NAME);
 	}
@@ -1024,7 +1026,7 @@ static long jsys_execve(const char __user *filename,
 	pr_err("%s: My code thinks path_to_binary is not corrupted\n", DEVICE_NAME);
 	
 	// Emtpies stack of pH_seqs
-	while (process->seq != NULL) {
+	while (already_had_process && process->seq != NULL) {
 		//pr_err("%s: In while %d\n", DEVICE_NAME, i);
 		stack_pop(process);
 		//pr_err("%s: &process = %p\n", DEVICE_NAME, &process);
