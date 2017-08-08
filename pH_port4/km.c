@@ -710,7 +710,7 @@ int process_syscall(long syscall) {
 		goto exit;
 	}
 	
-	if (spin_trylock(&(profile->freeing_lock)) == 0) {
+	if (spin_is_locked(&(profile->freeing_lock))) {
 		ret = -1;
 		goto exit;
 	}
