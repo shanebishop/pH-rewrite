@@ -1031,6 +1031,12 @@ static long jsys_execve(const char __user *filename,
 			goto exit;
 		}
 		pr_err("%s: Successfully allocated memory for process\n", DEVICE_NAME);
+		
+		// Initialization for entirely new process - this might not be quite correct
+		process->process_id = current_process_id;
+		process->task_struct = current;
+		process->pid = task_pid(current);
+		pr_err("%s: Pre-initialized entirely new process\n", DEVICE_NAME);
 	}
 	else {
 		already_had_process = TRUE;
