@@ -274,10 +274,6 @@ int profiles_created = 0;                   // Number of profiles that have been
 int successful_jsys_execves = 0;            // Number of successful jsys_execves
 struct task_struct* last_task_struct_in_sigreturn = NULL;
 
-/**
- * Maybe I should remove these helper functions to atomic calls and call them directly
- */
-
 // Returns true if the process is being monitored, false otherwise
 inline bool pH_monitoring(pH_task_struct* process) {
         return process->profile != NULL;
@@ -460,10 +456,11 @@ int new_profile(pH_profile* profile, char* filename) {
 	//hash_add(profile_hashtable, &profile->hlist, pid_vnr(task_tgid(current)));
 	
 	// Add this new profile to the llist
-	pr_err("%s: Locking profile list in new_profile on line 464\n", DEVICE_NAME);
+	pr_err("%s: Locking profile list in new_profile on line 460\n", DEVICE_NAME);
 	spin_lock(&pH_profile_list_sem);
 	add_to_profile_llist(profile);
 	spin_unlock(&pH_profile_list_sem);
+	pr_err("%s: Unlocking profile list in new_profile on line 462\n", DEVICE_NAME);
 	pr_err("%s: Got here 5 (new_profile) returning...\n", DEVICE_NAME);
 
 	return 0;
@@ -866,7 +863,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	do {
 		pr_err("%s: Filename is [%s]\n", DEVICE_NAME, profile_list_iterator->filename);
 		if (strcmp(filename, profile_list_iterator->filename) == 0) {
-			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
+			pr_err("%s: Found it! Returning\n", DEVICE_NAME);
 			//spin_unlock(&pH_profile_list_sem);
 			return profile_list_iterator;
 		}
@@ -888,7 +885,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	} while (process_list_iterator);
 	*/
 	
-	//pr_err("%s: No matching profile was found\n", DEVICE_NAME);
+	pr_err("%s: No matching profile was found\n", DEVICE_NAME);
 	return NULL;
 }
 
@@ -922,10 +919,11 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	if (!profile || profile == NULL) {
 		// Retrieve the corresponding profile
 		pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
-		pr_err("%s: Locking profile list in handle_new_process on line 924\n", DEVICE_NAME);
+		pr_err("%s: Locking profile list in handle_new_process on line 922\n", DEVICE_NAME);
 		spin_lock(&pH_profile_list_sem);
 		profile = retrieve_pH_profile_by_filename(path_to_binary);
 		spin_unlock(&pH_profile_list_sem);
+		pr_err("%s: Unlocking profile list in handle_new_process on line 924\n", DEVICE_NAME);
 		pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
 		
 		// If there is no corresponding profile, make a new one
@@ -1069,10 +1067,11 @@ static long jsys_execve(const char __user *filename,
 	// Grab the profile from memory - if this fails, I would want to do a read, but since I am not
 	// implementing that right now, then make a new profile
 	pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
-	pr_err("%s: Locking profile list in jsys_execve on line 1071\n", DEVICE_NAME);
+	pr_err("%s: Locking profile list in jsys_execve on line 1070\n", DEVICE_NAME);
 	spin_lock(&pH_profile_list_sem);
 	profile = retrieve_pH_profile_by_filename(path_to_binary);
 	spin_unlock(&pH_profile_list_sem);
+	pr_err("%s: Unlocking profile list in jsys_execve on line 1072\n", DEVICE_NAME);
 	pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
 	
 	// If there is no corresponding profile, make a new one - this should actually start a read
