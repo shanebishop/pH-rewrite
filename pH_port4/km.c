@@ -2734,7 +2734,7 @@ static int dev_release(struct inode *inodep, struct file *filep){
 
 inline void pH_append_call(pH_seq* s, int new_value) {
 	if (s->last < 0) { pr_err("%s: s->last is not initialized!\n", DEVICE_NAME); return; }
-	ASSERT(s->length == 0);
+	ASSERT(s->length != 0);
 	
 	s->last = (s->last + 1) % (s->length);
 	s->data[s->last] = new_value;
