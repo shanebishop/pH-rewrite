@@ -1050,7 +1050,7 @@ static long jsys_execve(const char __user *filename,
 	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
 		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
 	{
-		pr_err("%s: In jsys_execve with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
+		//pr_err("%s: In jsys_execve with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
 		goto corrupted_path_to_binary;
 	}
 	//pr_err("%s: My code thinks path_to_binary is not corrupted\n", DEVICE_NAME);
@@ -1223,7 +1223,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	// Boolean check
 	if (!module_inserted_successfully) return 0;
 	
-	//pr_err("%s: In fork_handler\n", DEVICE_NAME);
+	pr_err("%s: In fork_handler\n", DEVICE_NAME);
 	
 	retval = regs_return_value(regs);
 	
@@ -1238,13 +1238,13 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	if (!parent_process || parent_process == NULL) {
-		//pr_err("%s: In fork_handler with NULL parent_process\n", DEVICE_NAME);
+		pr_err("%s: In fork_handler with NULL parent_process\n", DEVICE_NAME);
 		return -1;
 	}
 	
 	profile = parent_process->profile;
 	if (!profile || profile == NULL) {
-		//pr_err("%s: In fork_handler with NULL parent_process->profile\n", DEVICE_NAME);
+		pr_err("%s: In fork_handler with NULL parent_process->profile\n", DEVICE_NAME);
 		return -1;
 	}
 	pH_refcount_inc(profile);
@@ -1266,6 +1266,8 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	handle_new_process(path_to_binary, profile, retval);
 	
 	pH_refcount_dec(profile);
+	
+	pr_err("%s: Got through all of fork_handler\n", DEVICE_NAME);
 	
 	return 0;
 }
@@ -1922,7 +1924,7 @@ static long jdo_group_exit(int error_code) {
 		//preempt_enable();
 		
 		if (process != NULL) {
-			pr_err("%s: Calling free_pH_task_struct from jdo_group_exit\n", DEVICE_NAME);
+			//pr_err("%s: Calling free_pH_task_struct from jdo_group_exit\n", DEVICE_NAME);
 			free_pH_task_struct(process);
 		}
 	}
@@ -1933,7 +1935,7 @@ static long jdo_group_exit(int error_code) {
 	//preempt_enable();
 	
 	if (process != NULL) {
-		pr_err("%s: Calling free_pH_task_struct from jdo_group_exit\n", DEVICE_NAME);
+		//pr_err("%s: Calling free_pH_task_struct from jdo_group_exit\n", DEVICE_NAME);
 		free_pH_task_struct(process);
 	}
 	
@@ -2197,7 +2199,7 @@ static void jdo_signal(struct pt_regs* regs) {
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
-	//pr_err("%s: In jdo_signal\n", DEVICE_NAME);
+	pr_err("%s: In jdo_signal\n", DEVICE_NAME);
 	
 	// Will this retrieve the process that the signal is being sent to, or will it retrieve the
 	// process that is sending the signal?
@@ -2211,7 +2213,7 @@ static void jdo_signal(struct pt_regs* regs) {
 		make_and_push_new_pH_seq(process);
 	}
 	
-	//pr_err("%s: Exiting jdo_signal\n", DEVICE_NAME);
+	pr_err("%s: Exiting jdo_signal\n", DEVICE_NAME);
 	jprobe_return();
 	return;
 	
@@ -2253,7 +2255,10 @@ static long jsys_rt_sigreturn(void) {
 	
 	last_task_struct_in_sigreturn = current;
 	
-	//pr_err("%s: In jsys_rt_sigreturn\n", DEVICE_NAME);
+	pr_err("%s: In jsys_rt_sigreturn\n", DEVICE_NAME);
+	
+	process_syscall(383);
+	pr_err("%s: Back in jsys_rt_sigreturn after processing syscall\n", DEVICE_NAME);
 	
 	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
@@ -2278,8 +2283,7 @@ static long jsys_rt_sigreturn(void) {
 	
 	stack_pop(process);
 	
-	//process_syscall(383); // Currently not 
-	//pr_err("%s: Back in jsys_rt_sigreturn after processing syscall\n", DEVICE_NAME);
+	pr_err("%s: Got through all of jsys_rt_sigreturn\n", DEVICE_NAME);
 	
 	jprobe_return();
 	return 0;
@@ -2335,24 +2339,8 @@ static int __init ebbchar_init(void) {
 	pr_err("%s: device class created correctly\n", DEVICE_NAME); // Device was initialized
 	mutex_init(&ebbchar_mutex); // Initialize the mutex dynamically
 	
-	//handle_signal_jprobe.kp.addr = kallsyms_lookup_name("handle_signal");
-	
 	/*
-	if (kallsyms_lookup_name("handle_signal") == 0) {
-		pr_err("%s: Unable to look up symbol for handle_signal_jprobe\n", DEVICE_NAME);
-		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
-	}
-
+	handle_signal_jprobe.kp.addr = kallsyms_lookup_name("handle_signal");
 	ret = register_jprobe(&handle_signal_jprobe);
 	if (ret < 0) {
 		pr_err("%s: register_jprobe failed (handle_signal_jprobe), returned %d\n", DEVICE_NAME, ret);
@@ -2521,13 +2509,10 @@ static int __init ebbchar_init(void) {
 		
 		return PTR_ERR(ebbcharDevice);
 	}
+	pr_err("%s: Successfully registered do_signal_jprobe\n", DEVICE_NAME);
 	
 	/*
 	wait_consider_task_jprobe.kp.addr = kallsyms_lookup_name("wait_consider_task");
-	if (kallsyms_lookup_name("wait_consider_task") == 0) {
-		pr_err("%s: Unable to find symbol wait_consider_task\n", DEVICE_NAME);
-	}
-	
 	ret = register_jprobe(&wait_consider_task_jprobe);
 	if (ret < 0) {
 		pr_err("%s: register_jprobe failed (wait_consider_task_jprobe), returned %d\n", DEVICE_NAME, ret);
@@ -2596,28 +2581,6 @@ static int __init ebbchar_init(void) {
 	/*
 	// Regiser exit_kretprobe
 	exit_kretprobe.kp.addr = (kprobe_opcode_t*) kallsyms_lookup_name("do_exit");
-	
-	if (kallsyms_lookup_name("do_exit") == 0) {
-		pr_err("%s: Did not find symbol 'do_exit'\n", DEVICE_NAME);
-		
-		//unregister_jprobe(&handle_signal_jprobe);
-		//unregister_jprobe(&sys_sigreturn_jprobe);
-		unregister_jprobe(&do_signal_jprobe);
-		unregister_kretprobe(&fork_kretprobe);
-		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
-	}
-	pr_err("%s: Found symbol 'do_exit'\n", DEVICE_NAME);
-	
 	ret = register_kretprobe(&exit_kretprobe);
 	if (ret < 0) {
 		pr_err("%s: Failed to register do_exit kretprobe, returned %d\n", DEVICE_NAME, ret);
@@ -2640,7 +2603,6 @@ static int __init ebbchar_init(void) {
 	}
 	pr_err("%s: Registered exit_kretprobe\n", DEVICE_NAME);
 	*/
-	
 	
 	do_group_exit_jprobe.kp.addr = kallsyms_lookup_name("do_group_exit");
 	ret = register_jprobe(&do_group_exit_jprobe);
