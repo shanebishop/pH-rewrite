@@ -789,7 +789,7 @@ int process_syscall(long syscall) {
 		ret = -ENOMEM;
 		goto exit;
 	}
-	pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
+	//pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
 	
 	/* // Since this is just for seeing if my code seems to be working, I don't need it
 	// Add new_syscall to the linked list of syscalls
@@ -1977,25 +1977,26 @@ struct jprobe wait_consider_task_jprobe = {
 static void jfree_pid(struct pid* pid) {
 	pH_task_struct* iterator;
 	int i = 0;
-	
-	goto exit; // Temp bypass of function body
+	bool freed_anything = FALSE;
 	
 	if (!module_inserted_successfully) goto exit;
 	
-	//pr_err("%s: In jfree_pid\n", DEVICE_NAME);
+	pr_err("%s: In jfree_pid\n", DEVICE_NAME);
 	
-	//spin_lock(&pH_task_struct_list_sem);
+	spin_lock(&pH_task_struct_list_sem);
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		if (i > 10000) {
 			pr_err("%s: ERROR: Got stuck in jfree_pid for loop\n", DEVICE_NAME);
+			spin_unlock(&pH_task_struct_list_sem);
 			ASSERT(i <= 10000);
-			return;
+			goto exit;
 		}
 		if (iterator->pid == pid) {
 			free_pH_task_struct(iterator);
 			iterator = NULL;
+			freed_anything = TRUE;
 			pr_err("%s: Done in jfree_pid\n", DEVICE_NAME);
-			//spin_unlock(&pH_task_struct_list_sem);
+			spin_unlock(&pH_task_struct_list_sem);
 			goto exit;
 			
 			/* // This used to be for freeing more than one process at a time, which may not be necessary
@@ -2022,7 +2023,9 @@ static void jfree_pid(struct pid* pid) {
 		}
 		i++;
 	}
-	//spin_unlock(&pH_task_struct_list_sem);
+	spin_unlock(&pH_task_struct_list_sem);
+	
+	ASSERT(freed_anything);
 	
 	jprobe_return();
 	return;
