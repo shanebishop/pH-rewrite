@@ -1335,7 +1335,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	
 	if (!module_inserted_successfully) return 0;
 	
-	pr_err("%s: In fork_handler\n", DEVICE_NAME);
+	//pr_err("%s: In fork_handler\n", DEVICE_NAME);
 	
 	retval = regs_return_value(regs);
 	
@@ -1350,7 +1350,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	if (!parent_process || parent_process == NULL) {
-		pr_err("%s: In fork_handler with NULL parent_process\n", DEVICE_NAME);
+		//pr_err("%s: In fork_handler with NULL parent_process\n", DEVICE_NAME);
 		return -1;
 	}
 	
@@ -1367,7 +1367,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
 		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
 	{
-		pr_err("%s: In fork_handler with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
+		//pr_err("%s: In fork_handler with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
 		pH_refcount_dec(profile);
 		return -1;
 	}
@@ -1379,7 +1379,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	
 	pH_refcount_dec(profile);
 	
-	pr_err("%s: Got through all of fork_handler\n", DEVICE_NAME);
+	//pr_err("%s: Got through all of fork_handler\n", DEVICE_NAME);
 	
 	return 0;
 }
