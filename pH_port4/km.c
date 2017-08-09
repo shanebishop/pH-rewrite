@@ -994,11 +994,6 @@ static long jsys_execve(const char __user *filename,
 	if (!module_inserted_successfully) goto exit;
 	
 	if (!pH_aremonitoring) goto exit;
-	
-	if (&pH_task_struct_list_sem == NULL || &pH_profile_list_sem == NULL) {
-		pr_err("%s: ERROR: One of the list locks is NULL\n", DEVICE_NAME);
-		goto exit;
-	}
 
 	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
 	
@@ -1884,6 +1879,10 @@ not_inserted:
 	return 0;
 }
 
+struct jprobe sys_exit_jprobe = {
+	.entry = jsys_exit,
+};
+
 static long jdo_group_exit(int error_code) {
 	pH_task_struct* process;
 	struct task_struct* p;
@@ -1938,6 +1937,10 @@ not_inserted:
 	jprobe_return();
 	return 0;
 }
+
+struct jprobe do_group_exit_jprobe = {
+	.entry = jdo_group_exit,
+};
 
 /*
 static int jwait_consider_task(struct wait_opts *wo, int ptrace, struct task_struct *p) {
@@ -2622,6 +2625,52 @@ static int __init ebbchar_init(void) {
 	}
 	pr_err("%s: Registered exit_kretprobe\n", DEVICE_NAME);
 	*/
+	
+	do_group_exit_jprobe.kp.addr = kallsyms_lookup_name("do_group_exit");
+	ret = register_jprobe(&do_group_exit_jprobe);
+	if (ret < 0) {
+		pr_err("%s: Failed to register do_group_exit_jprobe, returned %d\n", DEVICE_NAME, ret);
+		
+		//unregister_jprobe(&handle_signal_jprobe);
+		//unregister_jprobe(&sys_sigreturn_jprobe);
+		unregister_jprobe(&do_signal_jprobe);
+		unregister_kretprobe(&fork_kretprobe);
+		
+		mutex_destroy(&ebbchar_mutex);
+		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
+		class_unregister(ebbcharClass);
+		class_destroy(ebbcharClass);
+		unregister_chrdev(majorNumber, DEVICE_NAME);
+		
+		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
+		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
+		
+		return PTR_ERR(ebbcharDevice);
+	}
+	pr_err("%s: Registered do_group_exit_jprobe\n", DEVICE_NAME);
+	
+	sys_exit_jprobe.kp.addr = kallsyms_lookup_name("sys_exit");
+	ret = register_jprobe(&sys_exit_jprobe);
+	if (ret < 0) {
+		pr_err("%s: Failed to register sys_exit_jprobe, returned %d\n", DEVICE_NAME, ret);
+		
+		//unregister_jprobe(&handle_signal_jprobe);
+		//unregister_jprobe(&sys_sigreturn_jprobe);
+		unregister_jprobe(&do_signal_jprobe);
+		unregister_kretprobe(&fork_kretprobe);
+		
+		mutex_destroy(&ebbchar_mutex);
+		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
+		class_unregister(ebbcharClass);
+		class_destroy(ebbcharClass);
+		unregister_chrdev(majorNumber, DEVICE_NAME);
+		
+		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
+		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
+		
+		return PTR_ERR(ebbcharDevice);
+	}
+	pr_err("%s: Registered sys_exit_jprobe\n", DEVICE_NAME);
 
 	//pr_err("%s: num_syscalls = %d\n", DEVICE_NAME, num_syscalls);
 	for (i = 0; i < num_syscalls; i++) {
