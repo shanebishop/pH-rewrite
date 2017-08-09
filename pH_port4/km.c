@@ -1931,8 +1931,11 @@ static long jdo_group_exit(int error_code) {
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
-	pr_err("%s: Calling free_pH_task_struct from jdo_group_exit\n", DEVICE_NAME);
-	free_pH_task_struct(process);
+	
+	if (process != NULL) {
+		pr_err("%s: Calling free_pH_task_struct from jdo_group_exit\n", DEVICE_NAME);
+		free_pH_task_struct(process);
+	}
 	
 	jprobe_return();
 	return 0;
@@ -2717,7 +2720,7 @@ static int __init ebbchar_init(void) {
 			
 			return PTR_ERR(ebbcharDevice);
 		}
-		pr_err("%s: %d: Successfully registered %s\n", DEVICE_NAME, i, jprobes_array[i].kp.symbol_name);
+		//pr_err("%s: %d: Successfully registered %s\n", DEVICE_NAME, i, jprobes_array[i].kp.symbol_name);
 	}
 	pr_err("%s: Registered all syscall probes\n", DEVICE_NAME);
 	
