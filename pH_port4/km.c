@@ -456,7 +456,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	//hash_add(profile_hashtable, &profile->hlist, pid_vnr(task_tgid(current)));
 	
 	// Add this new profile to the llist
-	pr_err("%s: Locking profile list in new_profile on line 460\n", DEVICE_NAME);
+	//pr_err("%s: Locking profile list in new_profile on line 460\n", DEVICE_NAME);
 	//preempt_disable();
 	spin_lock(&pH_profile_list_sem);
 	add_to_profile_llist(profile);
@@ -754,7 +754,7 @@ int process_syscall(long syscall) {
 		if (process) stack_push(process, temp);
 		//pr_err("%s: Got here 2\n", DEVICE_NAME);
 		INIT_LIST_HEAD(&temp->seqList);
-		pr_err("%s: Successfully allocated memory for temp in process_syscall\n", DEVICE_NAME);
+		//pr_err("%s: Successfully allocated memory for temp in process_syscall\n", DEVICE_NAME);
 	}
 	
 	if (process) process->count++;
@@ -897,7 +897,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	
 	pH_task_struct* this_process;
 	
-	pr_err("%s: In handle_new_process for %d %s\n", DEVICE_NAME, process_id, path_to_binary);
+	//pr_err("%s: In handle_new_process for %d %s\n", DEVICE_NAME, process_id, path_to_binary);
 	
 	// Allocate memory for this process
 	this_process = kmalloc(sizeof(pH_task_struct), GFP_ATOMIC);
@@ -995,7 +995,7 @@ static long jsys_execve(const char __user *filename,
 	
 	if (!pH_aremonitoring) goto exit;
 
-	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
+	//pr_err("%s: In jsys_execve\n", DEVICE_NAME);
 	
 	current_process_id = pid_vnr(task_tgid(current)); // Grab the process ID right now
 	
@@ -1026,12 +1026,12 @@ static long jsys_execve(const char __user *filename,
 		process->process_id = current_process_id;
 		process->task_struct = current;
 		process->pid = task_pid(current);
-		pr_err("%s: Pre-initialized entirely new process\n", DEVICE_NAME);
+		//pr_err("%s: Pre-initialized entirely new process\n", DEVICE_NAME);
 	}
 	else {
 		already_had_process = TRUE;
 		pH_refcount_dec(process->profile);
-		pr_err("%s: Decremented old profile refcount\n", DEVICE_NAME);
+		//pr_err("%s: Decremented old profile refcount\n", DEVICE_NAME);
 	}
 	
 	// Allocate space for path_to_binary
