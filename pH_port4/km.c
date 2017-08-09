@@ -487,6 +487,8 @@ void add_to_my_syscall_llist(pH_task_struct* t, my_syscall* s) {
 pH_task_struct* llist_retrieve_process(int process_id) {
 	pH_task_struct* iterator = NULL;
 	
+	pr_err("%s: In llist_retrieve_process\n", DEVICE_NAME);
+	
 	ASSERT(spin_is_locked(&pH_task_struct_list_sem));
 	ASSERT(!spin_is_locked(&pH_profile_list_sem));
 	
@@ -1003,6 +1005,7 @@ static long jsys_execve(const char __user *filename,
 	//clean_processes();
 	//pr_err("%s: Back from clean_processes()\n", DEVICE_NAME);
 	
+	pr_err("%s: Calling llist_retrieve_process from jsys_execve\n", DEVICE_NAME);
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(current_process_id);
 	spin_unlock(&pH_task_struct_list_sem);
