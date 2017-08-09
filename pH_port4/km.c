@@ -2794,7 +2794,7 @@ void pH_add_seq(pH_seq *s, pH_profile_data *data)
 		return;
 	}
 	
-	ASSERT(seqlen == 0);
+	ASSERT(seqlen != 0);
 
 	cur_idx = s->last;
 	cur_call = seqdata[cur_idx];
@@ -2880,7 +2880,7 @@ int pH_test_seq(pH_seq *s, pH_profile_data *data)
 	int seqlen = s->length;
 	int mismatches = 0;
 
-	ASSERT(seqlen == 0);
+	ASSERT(seqlen != 0);
 
 	cur_idx = s->last;
 	cur_call = seqdata[cur_idx];
