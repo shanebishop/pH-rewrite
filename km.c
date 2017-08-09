@@ -197,6 +197,11 @@ typedef struct pH_task_struct { // My own version of a pH_task_state
 	struct pid* pid; // Pointer to corresponding struct pid
 } pH_task_struct;
 
+typedef struct read_filename {
+	char* filename;
+	struct read_filename* next;
+} read_filename;
+
 static void jhandle_signal(struct ksignal*, struct pt_regs*);
 
 struct jprobe handle_signal_jprobe = {
@@ -260,6 +265,7 @@ struct jprobe jprobes_array[num_syscalls];  // Array of jprobes (is this obsolet
 long userspace_pid;                         // The PID of the userspace process
 const char TRANSFER_OPERATION[2] = {'t', '\0'};
 const char STOP_TRANSFER_OPERATION[3] = {'s', 't', '\0'};
+const char READ_PROFILE_FROM_DISK[3] = {'r', 'b', '\0'};
 char* output_string;                        // The string that will be sent to userspace
 void* bin_receive_ptr;                      // The pointer for binary writes
 bool done_waiting_for_user        = FALSE;
@@ -271,38 +277,42 @@ spinlock_t pH_profile_list_sem;             // Lock for list of profiles
 spinlock_t pH_task_struct_list_sem;         // Lock for process list
 int profiles_created = 0;                   // Number of profiles that have been created
 int successful_jsys_execves = 0;            // Number of successful jsys_execves
+struct task_struct* last_task_struct_in_sigreturn = NULL;
 pH_disk_profile* profile_queue_front = NULL;
 pH_disk_profile* profile_queue_rear = NULL;
-struct task_struct* last_task_struct_in_sigreturn = NULL;
+pH_profile* read_profile_queue_front = NULL;
+pH_profile* read_profile_queue_rear = NULL;
+read_filename* read_filename_queue_front = NULL;
+read_filename* read_filename_queue_rear = NULL;
 
 // Returns true if the process is being monitored, false otherwise
 inline bool pH_monitoring(pH_task_struct* process) {
-        return process->profile != NULL;
+    return process->profile != NULL;
 }
 
 // Returns true if the profile is in use, false otherwise
 inline bool pH_profile_in_use(pH_profile *profile)
 {
-        return atomic_read(&(profile->refcount)) > 0;
+    return atomic_read(&(profile->refcount)) > 0;
 }
 
 // Increments the profile's reference count
 inline void pH_refcount_inc(pH_profile *profile)
 {
-        atomic_inc(&(profile->refcount));
+    atomic_inc(&(profile->refcount));
 }
 
 // Decrements the profile's reference count
 inline void pH_refcount_dec(pH_profile *profile)
 {
-        atomic_dec(&(profile->refcount));
+    atomic_dec(&(profile->refcount));
 }
 
 // Initializes the profile's reference count
 // Perhaps this should call atomic_set rather than directly changing the value
 inline void pH_refcount_init(pH_profile *profile, int i)
 {
-        profile->refcount.counter = i;
+    profile->refcount.counter = i;
 }
 
 /* // Commented out for now, as I might not need it
@@ -434,7 +444,65 @@ pH_disk_profile* remove_from_profile_queue(void) {
 	return to_return;
 }
 
-int pH_write_profile(pH_profile*);
+void add_to_read_profile_queue(pH_profile* profile) {
+	ASSERT(profile != NULL);
+	
+	if (read_profile_queue_front == NULL) {
+		read_profile_queue_front = profile;
+		read_profile_queue_rear = profile;
+		read_profile_queue_rear->next = NULL;
+	}
+	else {
+		read_profile_queue_rear->next = profile;
+		read_profile_queue_rear = profile;
+		read_profile_queue_rear->next = NULL;
+	}
+}
+
+pH_profile* grab_profile_from_read_queue(void) {
+	pH_profile* to_return;
+	
+	if (read_profile_queue_front == NULL) {
+		return NULL;
+	}
+	
+	to_return = read_profile_queue_front;
+	read_profile_queue_front = read_profile_queue_front->next;
+	return to_return;
+}
+
+void add_to_read_filename_queue(char* filename) {
+	read_filename* to_add = kmalloc(sizeof(read_filename), GFP_ATOMIC);
+	if (!to_add || to_add == NULL) {
+		pr_err("%s: Out of memory in add_to_read_filename\n", DEVICE_NAME);
+		return;
+	}
+	to_add->filename = filename;
+	to_add->next = NULL;
+	
+	if (read_filename_queue_front == NULL) {
+		read_filename_queue_front = to_add;
+		read_filename_queue_rear = to_add;
+		read_filename_queue_rear->next = NULL;
+	}
+	else {
+		read_filename_queue_rear->next = to_add;
+		read_filename_queue_rear = to_add;
+		read_filename_queue_rear->next = NULL;
+	}
+}
+
+// The return value MUST be deallocated by the calling function
+// Before freeing, use strcpy to copy to a local char*
+read_filename* remove_from_read_filename_queue(void) {
+	read_filename* to_return;
+	
+	if (read_filename_queue_front == NULL) return NULL;
+	
+	to_return = read_filename_queue_front;
+	read_filename_queue_front = read_filename_queue_front->next;
+	return to_return;
+}
 
 // Makes a new pH_profile and stores it in profile
 // profile must be allocated before this function is called
@@ -510,8 +578,6 @@ int new_profile(pH_profile* profile, char* filename) {
 	//preempt_enable();
 	//pr_err("%s: Unlocking profile list in new_profile on line 462\n", DEVICE_NAME);
 	//pr_err("%s: Got here 5 (new_profile) returning...\n", DEVICE_NAME);
-	
-	pH_write_profile(profile); // Temp line for debugging
 
 	return 0;
 }
@@ -3088,6 +3154,8 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	}
 }
 
+int pH_profile_disk2mem(pH_disk_profile*, pH_profile*);
+
 static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t *offset) {
 	const char* buffer;
 	int ret;
@@ -3100,13 +3168,14 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 		buffer = kmalloc(sizeof(char) * 254, GFP_ATOMIC);
 		if (!buffer) {
 			pr_err("%s: Unable to allocate memory for dev_write buffer", DEVICE_NAME);
-			return -ENOMEM;
+			return len;
 		}
 		
 		buffer = (char*) buf;
 		strcpy(message, buffer);
 		//kfree(buffer); // Freeing this causes an error for some reason?
 		size_of_message = strlen(message); // Store the length of the stored message
+		pr_err("%s: Did some setup\n", DEVICE_NAME);
 		
 		// If we failed to receive a message, kill the userspace app and return -1
 		if (message == NULL || size_of_message < 1) {
@@ -3145,6 +3214,47 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			pr_err("%s: Received %ld PID from userspace\n", DEVICE_NAME, userspace_pid);
 		}
 		
+		if (strcmp(output_string, READ_PROFILE_FROM_DISK) == 0) {
+			pr_err("%s: In READ_PROFILE_FROM_DISK if\n", DEVICE_NAME);
+			
+			if (strcmp("success", message) != 0) {
+				pr_err("%s: Received non-success message from userspace [%s]\n", DEVICE_NAME, message);
+				
+				// Send SIGSTOP signal to the userspace app
+				ret = send_signal(SIGSTOP);
+				if (ret < 0) return ret;
+				
+				// Depending on the situation, we may want to process what the user sent us before returning
+				return 0;
+			}
+			
+			if (buffer == NULL) {
+				pr_err("%s: Received NULL from userspace\n", DEVICE_NAME);
+				pr_err("%s: This is either an error or no matching disk profile.\n", DEVICE_NAME);
+				pr_err("%s: Deal with this as you will, I am returning.\n", DEVICE_NAME);
+			
+				// Send SIGSTOP signal to the userspace app
+				ret = send_signal(SIGSTOP);
+				if (ret < 0) return ret;
+			
+				// Depending on the situation, we may want to process what the user sent us before returning
+				return 0;
+			}
+		
+			pH_profile* profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
+			if (!profile || profile == NULL) {
+				pr_err("%s: Unable to allocate memory for profile in dev_write\n", DEVICE_NAME);
+				return len;
+			}
+		
+			pr_err("%s: Copying from disk to mem...\n", DEVICE_NAME);
+			pH_profile_disk2mem((pH_disk_profile*) buffer, profile);
+		
+			pr_err("%s: Adding to read profile queue...\n", DEVICE_NAME);
+			add_to_read_profile_queue(profile);
+		}
+		pr_err("%s: After READ_PROFILE_FROM_DISK if\n", DEVICE_NAME);
+		
 		// If we have the PID of the userspace process, suspend the process
 		if (profile_queue_is_empty()) {
 			// Send SIGSTOP signal to the userspace app
@@ -3153,12 +3263,18 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 		
 			// We are done waiting for the user now
 			done_waiting_for_user = TRUE;
+			return 0;
 			
 			// Depending on the situation, we may want to process what the user sent us before returning
+			if (strcmp("success", message) == 0) {
+				pr_err("%s: Received non-success message from userspace [%s]\n", DEVICE_NAME, message);
+				return 0;
+			}
+			pr_err("%s: Received success message from userspace\n", DEVICE_NAME);
 		}
 	}
 
-	return len;
+	return 0;
 }
 
 // This shares some code with ebbchar_exit, so perhaps I will want to use a helper function for
