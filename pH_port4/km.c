@@ -347,7 +347,7 @@ void add_to_profile_llist(pH_profile* p) {
 	pH_refcount_inc(p);
 	
 	ASSERT(spin_is_locked(&pH_profile_list_sem));
-	ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
+	//ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
 	
 	pr_err("%s: In add_to_profile_llist\n", DEVICE_NAME);
 	
@@ -457,11 +457,11 @@ int new_profile(pH_profile* profile, char* filename) {
 	
 	// Add this new profile to the llist
 	pr_err("%s: Locking profile list in new_profile on line 460\n", DEVICE_NAME);
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_profile_list_sem);
 	add_to_profile_llist(profile);
 	spin_unlock(&pH_profile_list_sem);
-	preempt_enable();
+	//preempt_enable();
 	pr_err("%s: Unlocking profile list in new_profile on line 462\n", DEVICE_NAME);
 	pr_err("%s: Got here 5 (new_profile) returning...\n", DEVICE_NAME);
 
@@ -492,7 +492,7 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 	//pr_err("%s: In llist_retrieve_process\n", DEVICE_NAME);
 	
 	ASSERT(spin_is_locked(&pH_task_struct_list_sem));
-	ASSERT(!spin_is_locked(&pH_profile_list_sem));
+	//ASSERT(!spin_is_locked(&pH_profile_list_sem));
 	
 	iterator = pH_task_struct_list;
 	
@@ -674,11 +674,11 @@ int process_syscall(long syscall) {
 	//clean_processes(); // Temporarily commented out since the module isn't working at the moment
 	
 	// Retrieve process
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
-	preempt_enable();
+	//preempt_enable();
 	if (!process) {
 		// Ignore this syscall
 		ret = 0;
@@ -818,7 +818,7 @@ void add_process_to_llist(pH_task_struct* t) {
 	pr_err("%s: In add_process_to_llist\n", DEVICE_NAME);
 
 	ASSERT(spin_is_locked(&pH_task_struct_list_sem));
-	ASSERT(!spin_is_locked(&pH_profile_list_sem));
+	//ASSERT(!spin_is_locked(&pH_profile_list_sem));
 	
 	// Checks for NULL
 	if (!t || t == NULL) {
@@ -853,7 +853,7 @@ void add_process_to_llist(pH_task_struct* t) {
 // Returns a pH_profile, given a filename
 pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	ASSERT(spin_is_locked(&pH_profile_list_sem));
-	ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
+	//ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
 	
 	pH_task_struct* process_list_iterator;
 	pH_profile* profile_list_iterator = pH_profile_list;
@@ -926,11 +926,11 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 		// Retrieve the corresponding profile
 		pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
 		pr_err("%s: Locking profile list in handle_new_process on line 922\n", DEVICE_NAME);
-		preempt_disable();
+		//preempt_disable();
 		spin_lock(&pH_profile_list_sem);
 		profile = retrieve_pH_profile_by_filename(path_to_binary);
 		spin_unlock(&pH_profile_list_sem);
-		preempt_enable();
+		//preempt_enable();
 		pr_err("%s: Unlocking profile list in handle_new_process on line 924\n", DEVICE_NAME);
 		pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
 		
@@ -958,11 +958,11 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	this_process->profile = profile; // Put this profile in the pH_task_struct struct
 	pH_refcount_inc(profile);
 
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
 	add_process_to_llist(this_process); // Add this process to the list of processes
 	spin_unlock(&pH_task_struct_list_sem);
-	preempt_enable();
+	//preempt_enable();
 	pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
 	return 0;
@@ -1014,11 +1014,11 @@ static long jsys_execve(const char __user *filename,
 	//pr_err("%s: Back from clean_processes()\n", DEVICE_NAME);
 	
 	pr_err("%s: Calling llist_retrieve_process from jsys_execve\n", DEVICE_NAME);
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(current_process_id);
 	spin_unlock(&pH_task_struct_list_sem);
-	preempt_enable();
+	//preempt_enable();
 	if (!process || process == NULL) {
 		pr_err("%s: Unable to find process in jsys_execve\n", DEVICE_NAME);
 		pr_err("%s: Continuing anyway...\n", DEVICE_NAME);
@@ -1081,11 +1081,11 @@ static long jsys_execve(const char __user *filename,
 	// implementing that right now, then make a new profile
 	pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
 	pr_err("%s: Locking profile list in jsys_execve on line 1070\n", DEVICE_NAME);
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_profile_list_sem);
 	profile = retrieve_pH_profile_by_filename(path_to_binary);
 	spin_unlock(&pH_profile_list_sem);
-	preempt_enable();
+	//preempt_enable();
 	pr_err("%s: Unlocking profile list in jsys_execve on line 1072\n", DEVICE_NAME);
 	pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
 	
@@ -1114,11 +1114,11 @@ static long jsys_execve(const char __user *filename,
 	pH_refcount_inc(profile);
 	
 	if (!already_had_process) {
-		preempt_disable();
+		//preempt_disable();
 		spin_lock(&pH_task_struct_list_sem);
 		add_process_to_llist(process);
 		spin_unlock(&pH_task_struct_list_sem);
-		preempt_enable();
+		//preempt_enable();
 		pr_err("%s: process has been added to the llist\n", DEVICE_NAME);
 	}
 	
@@ -1224,11 +1224,11 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 		return retval;
 	}
 	
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
 	parent_process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
-	preempt_enable();
+	//preempt_enable();
 	if (!parent_process || parent_process == NULL) {
 		//pr_err("%s: In fork_handler with NULL parent_process\n", DEVICE_NAME);
 		return -1;
@@ -1399,11 +1399,11 @@ static int do_execveat_common_handler(struct kretprobe_instance* ri, struct pt_r
 	retval = regs_return_value(regs);
 	
 	if (retval < 0) {
-		preempt_disable();
+		//preempt_disable();
 		spin_lock(&pH_task_struct_list_sem);
 		process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 		spin_unlock(&pH_task_struct_list_sem);
-		preempt_enable();
+		//preempt_enable();
 		free_pH_task_struct(process);
 		process = NULL;
 		
@@ -1521,7 +1521,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
     pH_profile *prev_profile, *cur_profile;
     
     ASSERT(spin_is_locked(&pH_profile_list_sem));
-	ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
+	//ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
     ASSERT(profile != NULL);
 	ASSERT(!pH_profile_in_use(profile));
 
@@ -1648,7 +1648,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 	pH_task_struct *prev_task_struct, *cur_task_struct;
 	
 	ASSERT(spin_is_locked(&pH_task_struct_list_sem));
-	ASSERT(!spin_is_locked(&pH_profile_list_sem));
+	//ASSERT(!spin_is_locked(&pH_profile_list_sem));
 	ASSERT(process != NULL);
 	
 	pr_err("%s: In remove_process_from_llist\n", DEVICE_NAME);
@@ -1829,11 +1829,11 @@ void free_pH_task_struct(pH_task_struct* process) {
 	
 	// When everything else is done, remove process from llist, kfree process
 	// (maybe remove the process from the llist earlier?)
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
 	remove_process_from_llist(process);
 	spin_unlock(&pH_task_struct_list_sem);
-	preempt_enable();
+	//preempt_enable();
 	kfree(process);
 	process = NULL; // Okay because process is removed from llist above
 	pr_err("%s: Freed process (end of function)\n", DEVICE_NAME);
@@ -1846,11 +1846,11 @@ static long jsys_exit(int error_code) {
 	
 	//pr_err("%s: In jsys_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
 	
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
-	preempt_enable();
+	//preempt_enable();
 	
 	if (process == NULL) goto not_monitoring;
 	
@@ -1885,11 +1885,11 @@ static long jdo_group_exit(int error_code) {
 	
 	//pr_err("%s: In jdo_group_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(p)));
 	
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
-	preempt_enable();
+	//preempt_enable();
 
 	if (process == NULL) goto not_monitoring;
 	
@@ -1899,21 +1899,21 @@ static long jdo_group_exit(int error_code) {
 	while_each_thread(p, t) {
 		if (t->exit_state) continue;
 		
-		preempt_disable();
+		//preempt_disable();
 		spin_lock(&pH_task_struct_list_sem);
 		process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 		spin_unlock(&pH_task_struct_list_sem);
-		preempt_enable();
+		//preempt_enable();
 		
 		if (process != NULL) {
 			free_pH_task_struct(process);
 		}
 	}
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
-	preempt_enable();
+	//preempt_enable();
 	free_pH_task_struct(process);
 	
 	jprobe_return();
@@ -2145,11 +2145,11 @@ static void jhandle_signal(struct ksignal* ksig, struct pt_regs* regs) {
 	
 	// Will this retrieve the process that the signal is being sent to, or will it retrieve the
 	// process that is sending the signal?
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
-	preempt_enable();
+	//preempt_enable();
 	
 	if (process != NULL) {
 		make_and_push_new_pH_seq(process);
@@ -2172,11 +2172,11 @@ static void jdo_signal(struct pt_regs* regs) {
 	
 	// Will this retrieve the process that the signal is being sent to, or will it retrieve the
 	// process that is sending the signal?
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
-	preempt_enable();
+	//preempt_enable();
 	
 	if (process != NULL) {
 		make_and_push_new_pH_seq(process);
@@ -2226,11 +2226,11 @@ static long jsys_rt_sigreturn(void) {
 	
 	//pr_err("%s: In jsys_rt_sigreturn\n", DEVICE_NAME);
 	
-	preempt_disable();
+	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
-	preempt_enable();
+	//preempt_enable();
 	
 	if (current->exit_state == EXIT_DEAD || current->exit_state == EXIT_ZOMBIE || current->state == TASK_DEAD) {
 		pr_err("%s: Freeing task_struct...\n", DEVICE_NAME);
