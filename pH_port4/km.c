@@ -862,14 +862,14 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 		pr_err("%s: pH_profile_list is NULL\n", DEVICE_NAME);
 		return NULL;
 	}
-	pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
+	//pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
 	
 	// Search through profile list
 	//spin_lock(&pH_profile_list_sem);
 	do {
-		pr_err("%s: Filename is [%s]\n", DEVICE_NAME, profile_list_iterator->filename);
+		//pr_err("%s: Filename is [%s]\n", DEVICE_NAME, profile_list_iterator->filename);
 		if (strcmp(filename, profile_list_iterator->filename) == 0) {
-			pr_err("%s: Found it! Returning\n", DEVICE_NAME);
+			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
 			//spin_unlock(&pH_profile_list_sem);
 			return profile_list_iterator;
 		}
