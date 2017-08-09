@@ -2626,6 +2626,7 @@ static int __init ebbchar_init(void) {
 	pr_err("%s: Registered exit_kretprobe\n", DEVICE_NAME);
 	*/
 	
+	/*
 	do_group_exit_jprobe.kp.addr = kallsyms_lookup_name("do_group_exit");
 	ret = register_jprobe(&do_group_exit_jprobe);
 	if (ret < 0) {
@@ -2648,6 +2649,7 @@ static int __init ebbchar_init(void) {
 		return PTR_ERR(ebbcharDevice);
 	}
 	pr_err("%s: Registered do_group_exit_jprobe\n", DEVICE_NAME);
+	*/
 	
 	/* // Registration of sys_exit_jprobe fails for some reason - returns -17
 	sys_exit_jprobe.kp.addr = kallsyms_lookup_name("sys_exit");
