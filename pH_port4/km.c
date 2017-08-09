@@ -1054,7 +1054,7 @@ static long jsys_execve(const char __user *filename,
 		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
 	{
 		pr_err("%s: In jsys_execve with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
-		goto exit;
+		goto corrupted_path_to_binary;
 	}
 	pr_err("%s: My code thinks path_to_binary is not corrupted\n", DEVICE_NAME);
 	
@@ -1141,6 +1141,14 @@ exit:
 	kfree(path_to_binary);
 	path_to_binary = NULL;
 	if (process != NULL) free_pH_task_struct(process);
+	process = NULL;
+	
+	jprobe_return();
+	return 0;
+	
+corrupted_path_to_binary:
+	kfree(path_to_binary);
+	path_to_binary = NULL;
 	process = NULL;
 	
 	jprobe_return();
