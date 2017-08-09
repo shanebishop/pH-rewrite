@@ -2675,6 +2675,7 @@ static int __init ebbchar_init(void) {
 	*/
 
 	//pr_err("%s: num_syscalls = %d\n", DEVICE_NAME, num_syscalls);
+	pr_err("%s: Registering syscall jprobes...\n", DEVICE_NAME);
 	for (i = 0; i < num_syscalls; i++) {
 		ret = register_jprobe(&jprobes_array[i]);
 		if (ret < 0) {
@@ -2702,7 +2703,7 @@ static int __init ebbchar_init(void) {
 			
 			return PTR_ERR(ebbcharDevice);
 		}
-		//pr_err("%s: %d: Successfully registered %s\n", DEVICE_NAME, i, jprobes_array[i].kp.symbol_name);
+		pr_err("%s: %d: Successfully registered %s\n", DEVICE_NAME, i, jprobes_array[i].kp.symbol_name);
 	}
 	pr_err("%s: Registered all syscall probes\n", DEVICE_NAME);
 	
