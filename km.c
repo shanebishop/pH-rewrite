@@ -2367,7 +2367,7 @@ static void jdo_signal(struct pt_regs* regs) {
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
-	pr_err("%s: In jdo_signal\n", DEVICE_NAME);
+	//pr_err("%s: In jdo_signal\n", DEVICE_NAME);
 	
 	// Will this retrieve the process that the signal is being sent to, or will it retrieve the
 	// process that is sending the signal?
@@ -2381,7 +2381,7 @@ static void jdo_signal(struct pt_regs* regs) {
 		make_and_push_new_pH_seq(process);
 	}
 	
-	pr_err("%s: Exiting jdo_signal\n", DEVICE_NAME);
+	//pr_err("%s: Exiting jdo_signal\n", DEVICE_NAME);
 	jprobe_return();
 	return;
 	
@@ -2425,10 +2425,10 @@ static long jsys_rt_sigreturn(void) {
 	
 	last_task_struct_in_sigreturn = current;
 	
-	pr_err("%s: In jsys_rt_sigreturn\n", DEVICE_NAME);
+	//pr_err("%s: In jsys_rt_sigreturn\n", DEVICE_NAME);
 	
 	process_syscall(383);
-	pr_err("%s: Back in jsys_rt_sigreturn after processing syscall\n", DEVICE_NAME);
+	//pr_err("%s: Back in jsys_rt_sigreturn after processing syscall\n", DEVICE_NAME);
 	
 	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
@@ -2453,7 +2453,7 @@ static long jsys_rt_sigreturn(void) {
 	
 	stack_pop(process);
 	
-	pr_err("%s: Got through all of jsys_rt_sigreturn\n", DEVICE_NAME);
+	//pr_err("%s: Got through all of jsys_rt_sigreturn\n", DEVICE_NAME);
 	
 	jprobe_return();
 	return 0;
