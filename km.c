@@ -434,6 +434,8 @@ pH_disk_profile* remove_from_profile_queue(void) {
 	return to_return;
 }
 
+int pH_write_profile(pH_profile*);
+
 // Makes a new pH_profile and stores it in profile
 // profile must be allocated before this function is called
 int new_profile(pH_profile* profile, char* filename) {
@@ -509,7 +511,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	//pr_err("%s: Unlocking profile list in new_profile on line 462\n", DEVICE_NAME);
 	//pr_err("%s: Got here 5 (new_profile) returning...\n", DEVICE_NAME);
 	
-	pH_write_profile(profile);
+	pH_write_profile(profile); // Temp line for debugging
 
 	return 0;
 }
