@@ -1992,11 +1992,11 @@ static void jfree_pid(struct pid* pid) {
 			goto exit;
 		}
 		if (iterator->pid == pid) {
+			spin_unlock(&pH_task_struct_list_sem);
 			free_pH_task_struct(iterator);
 			iterator = NULL;
 			freed_anything = TRUE;
 			pr_err("%s: Done in jfree_pid\n", DEVICE_NAME);
-			spin_unlock(&pH_task_struct_list_sem);
 			goto exit;
 			
 			/* // This used to be for freeing more than one process at a time, which may not be necessary
