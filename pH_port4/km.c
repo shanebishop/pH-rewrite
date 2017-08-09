@@ -487,7 +487,7 @@ void add_to_my_syscall_llist(pH_task_struct* t, my_syscall* s) {
 pH_task_struct* llist_retrieve_process(int process_id) {
 	pH_task_struct* iterator = NULL;
 	
-	pr_err("%s: In llist_retrieve_process\n", DEVICE_NAME);
+	//pr_err("%s: In llist_retrieve_process\n", DEVICE_NAME);
 	
 	ASSERT(spin_is_locked(&pH_task_struct_list_sem));
 	ASSERT(!spin_is_locked(&pH_profile_list_sem));
