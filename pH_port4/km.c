@@ -2446,6 +2446,7 @@ static int __init ebbchar_init(void) {
 	}
 	pr_err("%s: Successfully registered sys_execve_kretprobe\n", DEVICE_NAME);
 	
+	/*
 	free_pid_jprobe.kp.addr = kallsyms_lookup_name("free_pid");
 	ret = register_jprobe(&free_pid_jprobe);
 	if (ret < 0) {
@@ -2465,6 +2466,7 @@ static int __init ebbchar_init(void) {
 		return PTR_ERR(ebbcharDevice);
 	}
 	pr_err("%s: Successfully registered free_pid_jprobe\n", DEVICE_NAME);
+	*/
 	
 	sys_sigreturn_jprobe.kp.addr = kallsyms_lookup_name("sys_rt_sigreturn");
 	ret = register_jprobe(&sys_sigreturn_jprobe);
