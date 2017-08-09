@@ -686,6 +686,7 @@ int process_syscall(long syscall) {
 	}
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
 	pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
+	pr_err("\n\n\n\n\n\n\n\%s: No really, the process was retrieved successfully\n*****************\n*****************\n*****************\n", DEVICE_NAME);
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
 	pH_refcount_inc(profile);
