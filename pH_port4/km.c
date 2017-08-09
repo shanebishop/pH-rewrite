@@ -1137,7 +1137,10 @@ static long jsys_execve(const char __user *filename,
 exit:
 	kfree(path_to_binary);
 	path_to_binary = NULL;
-	if (process != NULL) free_pH_task_struct(process);
+	if (process != NULL) {
+		pr_err("%s: Calling free_pH_task_struct from jsys_execve()\n", DEVICE_NAME);
+		free_pH_task_struct(process);
+	}
 	process = NULL;
 	
 	jprobe_return();
@@ -1409,6 +1412,7 @@ static int do_execveat_common_handler(struct kretprobe_instance* ri, struct pt_r
 		process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 		spin_unlock(&pH_task_struct_list_sem);
 		//preempt_enable();
+		pr_err("%s: Calling free_pH_task_struct from do_execveat_common_handler\n", DEVICE_NAME);
 		free_pH_task_struct(process);
 		process = NULL;
 		
@@ -1864,6 +1868,7 @@ static long jsys_exit(int error_code) {
 	//process_syscall(72); // Process this syscall before calling free_pH_task_struct on process
 	//pr_err("%s: Back in jsys_exit after processing syscall\n", DEVICE_NAME);
 	
+	pr_err("%s: Calling free_pH_task_struct from jsys_exit\n", DEVICE_NAME);
 	free_pH_task_struct(process);
 	
 	jprobe_return();
@@ -1915,6 +1920,7 @@ static long jdo_group_exit(int error_code) {
 		//preempt_enable();
 		
 		if (process != NULL) {
+			pr_err("%s: Calling free_pH_task_struct from jdo_group_exit\n", DEVICE_NAME);
 			free_pH_task_struct(process);
 		}
 	}
@@ -1923,6 +1929,7 @@ static long jdo_group_exit(int error_code) {
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
+	pr_err("%s: Calling free_pH_task_struct from jdo_group_exit\n", DEVICE_NAME);
 	free_pH_task_struct(process);
 	
 	jprobe_return();
@@ -1996,6 +2003,7 @@ static void jfree_pid(struct pid* pid) {
 		}
 		if (iterator->pid == pid) {
 			spin_unlock(&pH_task_struct_list_sem);
+			pr_err("%s: Calling free_pH_task_struct from jfree_pid\n", DEVICE_NAME);
 			free_pH_task_struct(iterator);
 			iterator = NULL;
 			freed_anything = TRUE;
@@ -2249,12 +2257,12 @@ static long jsys_rt_sigreturn(void) {
 	//preempt_enable();
 	
 	if (current->exit_state == EXIT_DEAD || current->exit_state == EXIT_ZOMBIE || current->state == TASK_DEAD) {
-		pr_err("%s: Freeing task_struct...\n", DEVICE_NAME);
+		pr_err("%s: Calling free_pH_task_struct from jsys_rt_sigreturn\n", DEVICE_NAME);
 		free_pH_task_struct(process);
 	}
 	
 	if (sigismember(&current->pending.signal, SIGKILL)) {
-		pr_err("%s: Freeing task_struct...\n", DEVICE_NAME);
+		pr_err("%s: Calling free_pH_task_struct from jsys_rt_sigreturn\n", DEVICE_NAME);
 		free_pH_task_struct(process);
 	}
 	else {
@@ -2628,7 +2636,7 @@ static int __init ebbchar_init(void) {
 	pr_err("%s: Registered exit_kretprobe\n", DEVICE_NAME);
 	*/
 	
-	/*
+	
 	do_group_exit_jprobe.kp.addr = kallsyms_lookup_name("do_group_exit");
 	ret = register_jprobe(&do_group_exit_jprobe);
 	if (ret < 0) {
@@ -2651,7 +2659,7 @@ static int __init ebbchar_init(void) {
 		return PTR_ERR(ebbcharDevice);
 	}
 	pr_err("%s: Registered do_group_exit_jprobe\n", DEVICE_NAME);
-	*/
+	
 	
 	/* // Registration of sys_exit_jprobe fails for some reason - returns -17
 	sys_exit_jprobe.kp.addr = kallsyms_lookup_name("sys_exit");
