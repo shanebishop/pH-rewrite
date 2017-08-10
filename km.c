@@ -479,6 +479,12 @@ pH_profile* grab_profile_from_read_queue(void) {
 }
 */
 
+char* peek_read_filename_queue(void) {
+	if (read_filename_queue_front == NULL) return NULL;
+	
+	read_filename_queue_front->filename;
+}
+
 void add_to_read_filename_queue(char* filename) {
 	read_filename* to_add = kmalloc(sizeof(read_filename), GFP_ATOMIC);
 	if (!to_add || to_add == NULL) {
@@ -512,12 +518,6 @@ read_filename* remove_from_read_filename_queue(void) {
 	to_return = read_filename_queue_front;
 	read_filename_queue_front = read_filename_queue_front->next;
 	return to_return;
-}
-
-char* peek_read_filename_queue(void) {
-	if (read_filename_queue_front == NULL) return NULL;
-	
-	read_filename_queue_front->filename;
 }
 
 // Makes a new pH_profile and stores it in profile
