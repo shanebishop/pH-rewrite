@@ -1380,7 +1380,6 @@ int handle_new_process_fork(char* path_to_binary, pH_profile* profile, int proce
 	//pr_err("%s: Initialized process\n", DEVICE_NAME);
 	
 	// Put this profile in the pH_task_struct struct
-	// What if profile is NULL?
 	this_process->profile = profile;
 	pH_refcount_inc(profile);
 
@@ -1710,6 +1709,27 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	process_id = pid_vnr(task_tgid(current));
 	
+	//if (!spin_is_locked(&execve_count_lock)) return 0; // This line might be incorrect
+	
+	spin_lock(&execve_count_lock); // Perhaps we'd rather rearrange the locking
+	
+	spin_lock(&pH_task_struct_list_sem);
+	process = llist_retrieve_process(process_id);
+	spin_unlock(&pH_task_struct_list_sem);
+	if (!process || process == NULL) {
+		pr_err("%s: Got NULL process in sys_execve_return_handler\n", DEVICE_NAME);
+		return -1;
+	}
+	pr_err("%s: Retrieved a process\n", DEVICE_NAME);
+	
+	if (process->profile != NULL) {
+		spin_unlock(&execve_count_lock);
+		pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
+		process_syscall(59);
+		pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
+		return 0;
+	}
+	
 	ret = send_sig(SIGSTOP, current, SIGNAL_PRIVILEGE);
 	if (ret < 0) {
 		pr_err("%s: Failed to send SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
@@ -1717,9 +1737,6 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	}
 	pr_err("%s: Sent SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
 	
-	if (!spin_is_locked(&execve_count_lock)) return 0;
-	
-	spin_lock(&execve_count_lock); // Perhaps we'd rather rearrange the locking
 	spin_lock(&pH_profile_list_sem);
 	profile = retrieve_pH_profile_by_filename(&output_string[2]);
 	spin_unlock(&execve_count_lock);
@@ -1731,15 +1748,6 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		return -1;
 	}
 	pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
-	
-	spin_lock(&pH_task_struct_list_sem);
-	process = llist_retrieve_process(process_id);
-	spin_unlock(&pH_task_struct_list_sem);
-	if (!process || process == NULL) {
-		pr_err("%s: Got NULL process in sys_execve_return_handler\n", DEVICE_NAME);
-		return -1;
-	}
-	pr_err("%s: Retrieved a process\n", DEVICE_NAME);
 	
 	process->profile = profile;
 	pH_refcount_inc(profile);
