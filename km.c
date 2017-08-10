@@ -1701,7 +1701,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		pr_err("%s: Failed to send SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
 		return ret;
 	}
-	pr_err("%s: Sent SIGSTOP signal to %d\n", DEVICE_NAME);
+	pr_err("%s: Sent SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
 	
 	if (!spin_is_locked(&execve_count_lock)) return 0;
 	
@@ -1741,7 +1741,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process_id);
 		return ret;
 	}
-	pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME);
+	pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
 	
 	return 0;
 }
