@@ -498,6 +498,8 @@ void add_to_read_filename_queue(char* filename) {
 		read_filename_queue_rear = to_add;
 		read_filename_queue_rear->next = NULL;
 	}
+	
+	pr_err("%s: Front has filename [%s]\n", DEVICE_NAME, peek_read_filename_queue());
 }
 
 // The return value MUST be deallocated by the calling function
