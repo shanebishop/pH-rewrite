@@ -841,6 +841,8 @@ int process_syscall(long syscall) {
 	if (!pH_aremonitoring) return 0;
 	
 	if (!pH_task_struct_list || pH_task_struct_list == NULL) return 0;
+	
+	if (!pH_profile_list || pH_profile_list == NULL) return 0;
 
 	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
@@ -863,13 +865,13 @@ int process_syscall(long syscall) {
 	//pr_err("\n\n\n\n\n\n\n\%s: No really, the process was retrieved successfully\n*****************\n*****************\n*****************\n", DEVICE_NAME);
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
-	pH_refcount_inc(profile);
-	
 	if (!profile || profile == NULL) {
 		pr_err("%s: pH_task_struct corrupted: No profile\n", DEVICE_NAME);
 		ret = -1;
-		goto exit;
+		goto exit_before_profile;
 	}
+	pH_refcount_inc(profile);
+	
 	/*
 	if (profile->filename == NULL) {
 		pr_err("%s: profile is corrupted in process_syscall: NULL profile->filename\n", DEVICE_NAME);
@@ -1027,11 +1029,15 @@ void add_process_to_llist(pH_task_struct* t) {
 
 // Returns a pH_profile, given a filename
 pH_profile* retrieve_pH_profile_by_filename(char* filename) {
+	pr_err("%s: In retrieve_pH_profile_by_filename\n", DEVICE_NAME);
+	
 	ASSERT(spin_is_locked(&pH_profile_list_sem));
 	//ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
+	pr_err("%s: Made it past assertions\n", DEVICE_NAME);
 	
 	pH_task_struct* process_list_iterator;
 	pH_profile* profile_list_iterator = pH_profile_list;
+	pr_err("%s: Made it past declarations\n", DEVICE_NAME);
 	
 	if (pH_profile_list == NULL) {
 		pr_err("%s: pH_profile_list is NULL\n", DEVICE_NAME);
@@ -1048,7 +1054,7 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 		}
 		
 		profile_list_iterator = profile_list_iterator->next;
-		//pr_err("%s: Iterating\n", DEVICE_NAME);
+		pr_err("%s: Iterating\n", DEVICE_NAME);
 	} while (profile_list_iterator);
 	
 	/*
@@ -1683,7 +1689,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pr_err("%s: output_string = %p\n", DEVICE_NAME, output_string);
 	pr_err("%s: output_string = %s\n", DEVICE_NAME, output_string);
 	pr_err("%s: output_string[2] = %p\n", DEVICE_NAME, &output_string[2]);
-	pr_err("%s: output_string[2] = %s\n", DEVICE_NAME, output_string[2]);
+	pr_err("%s: output_string[2] = %s\n", DEVICE_NAME, &output_string[2]);
 	pr_err("%s: If all of these lines (including this one) print, then the problem is in retrieve_pH_profile_by_filename\n", DEVICE_NAME);
 	
 	if (!spin_is_locked(&execve_count_lock)) return 0;
