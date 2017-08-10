@@ -3406,6 +3406,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 					*/
 				}
 				
+				pr_err("%s: Returing from dev_write...\n", DEVICE_NAME);
+				
 				// Depending on the situation, we may want to process what the user sent us before returning
 				return 0;
 			}
@@ -3468,7 +3470,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 
 // This shares some code with ebbchar_exit, so perhaps I will want to use a helper function for
 // both of them to limit duplicated code
-static int dev_release(struct inode *inodep, struct file *filep){
+static int dev_release(struct inode *inodep, struct file *filep) {
 	// Set all booleans to FALSE
 	module_inserted_successfully = FALSE;
 	pH_aremonitoring             = 0;
