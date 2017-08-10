@@ -532,6 +532,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	profile->normal_time = 0;
 	profile->anomalies = 0;
 	profile->length = pH_default_looklen;
+	ASSERT(profile->length >= 1);
 	profile->count = 0;
 	//pr_err("%s: Got here 1 (new_profile)\n", DEVICE_NAME);
 
@@ -652,6 +653,11 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	pH_seq* new_sequence;
 	
 	ASSERT(process != NULL);
+	
+	if (process->seq == NULL) {
+		pr_err("%s: In make_and_push_new_pH_seq with NULL process->seq\n", DEVICE_NAME);
+		return 0;
+	}
 	
 	profile = process->profile;
 	if (profile != NULL) pH_refcount_inc(profile);
@@ -1133,6 +1139,10 @@ static long jsys_execve(const char __user *filename,
 		process->process_id = current_process_id;
 		process->task_struct = current;
 		process->pid = task_pid(current);
+		process->profile = NULL;
+		process->next = NULL;
+		process->prev = NULL;
+		process->seq = NULL;
 		pr_err("%s: Pre-initialized entirely new process\n", DEVICE_NAME);
 	}
 	else {
@@ -1365,9 +1375,13 @@ int handle_new_process_fork(char* path_to_binary, pH_profile* profile, int proce
 	this_process->syscall_llist = NULL;
 	this_process->delay = 0;
 	this_process->count = 0;
+	this_process->next = NULL;
+	this_process->prev = NULL;
 	//pr_err("%s: Initialized process\n", DEVICE_NAME);
 	
-	this_process->profile = profile; // Put this profile in the pH_task_struct struct
+	// Put this profile in the pH_task_struct struct
+	// What if profile is NULL?
+	this_process->profile = profile;
 	pH_refcount_inc(profile);
 
 	//preempt_disable();
@@ -2519,7 +2533,7 @@ static void jhandle_signal(struct ksignal* ksig, struct pt_regs* regs) {
 	spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	
-	if (process != NULL && process->profile != NULL) {
+	if (process != NULL && process->profile != NULL && process->seq != NULL) {
 		make_and_push_new_pH_seq(process);
 	}
 	
@@ -2548,7 +2562,7 @@ static void jdo_signal(struct pt_regs* regs) {
 	spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	
-	if (process != NULL && process->profile != NULL) {
+	if (process != NULL && process->profile != NULL && process->seq != NULL) {
 		make_and_push_new_pH_seq(process);
 	}
 	
@@ -2620,7 +2634,7 @@ static long jsys_rt_sigreturn(void) {
 		//pr_err("%s: SIGKILL is not a member of current->pending.signal\n", DEVICE_NAME);
 	}
 	
-	if (!process || process == NULL || process->profile == NULL) goto not_inserted;
+	if (!process || process == NULL || process->profile == NULL || process->seq == NULL) goto not_inserted;
 	
 	stack_pop(process);
 	
