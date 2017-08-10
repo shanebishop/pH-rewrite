@@ -1678,6 +1678,8 @@ static struct kretprobe do_execve_kretprobe = {
 static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	pH_task_struct* process;
 	pH_profile* profile;
+	int ret;
+	int process_id;
 	
 	if (!done_waiting_for_user) return 0;
 	
@@ -1692,9 +1694,18 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pr_err("%s: output_string[2] = %s\n", DEVICE_NAME, &output_string[2]);
 	pr_err("%s: If all of these lines (including this one) print, then the problem is in retrieve_pH_profile_by_filename\n", DEVICE_NAME);
 	
+	process_id = pid_vnr(task_tgid(current));
+	
+	ret = send_sig(SIGSTOP, current, SIGNAL_PRIVILEGE);
+	if (ret < 0) {
+		pr_err("%s: Failed to send SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
+		return ret;
+	}
+	pr_err("%s: Sent SIGSTOP signal to %d\n", DEVICE_NAME);
+	
 	if (!spin_is_locked(&execve_count_lock)) return 0;
 	
-	spin_lock(&execve_count_lock);
+	spin_lock(&execve_count_lock); // Perhaps we'd rather rearrange the locking
 	spin_lock(&pH_profile_list_sem);
 	profile = retrieve_pH_profile_by_filename(&output_string[2]);
 	spin_unlock(&execve_count_lock);
@@ -1708,7 +1719,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pr_err("%s: grab_profile_from_read_queue returned a profile\n", DEVICE_NAME);
 	
 	spin_lock(&pH_task_struct_list_sem);
-	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
+	process = llist_retrieve_process(process_id);
 	spin_unlock(&pH_task_struct_list_sem);
 	if (!process || process == NULL) {
 		pr_err("%s: Got NULL process in sys_execve_return_handler\n", DEVICE_NAME);
@@ -1724,6 +1735,13 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 	process_syscall(59);
 	pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
+	
+	ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
+	if (ret < 0) {
+		pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process_id);
+		return ret;
+	}
+	pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME);
 	
 	return 0;
 }
