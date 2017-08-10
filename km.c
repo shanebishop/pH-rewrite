@@ -512,6 +512,12 @@ read_filename* remove_from_read_filename_queue(void) {
 	return to_return;
 }
 
+char* peek_read_filename_queue(void) {
+	if (read_filename_queue_front == NULL) return NULL;
+	
+	read_filename_queue_front->filename;
+}
+
 // Makes a new pH_profile and stores it in profile
 // profile must be allocated before this function is called
 int new_profile(pH_profile* profile, char* filename) {
@@ -1704,8 +1710,8 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pr_err("%s: pH_profile_list_sem = %p\n", DEVICE_NAME, &pH_profile_list_sem);
 	pr_err("%s: output_string = %p\n", DEVICE_NAME, output_string);
 	pr_err("%s: output_string = %s\n", DEVICE_NAME, output_string);
-	pr_err("%s: output_string[2] = %p\n", DEVICE_NAME, &output_string[2]);
-	pr_err("%s: output_string[2] = %s\n", DEVICE_NAME, &output_string[2]);
+	pr_err("%s: read_filename_queue_front = %p\n", DEVICE_NAME, peek_read_filename_queue());
+	pr_err("%s: read_filename_queue_front = %s\n", DEVICE_NAME, peek_read_filename_queue());
 	pr_err("%s: If all of these lines (including this one) print, then the problem is in retrieve_pH_profile_by_filename\n", DEVICE_NAME);
 	
 	process_id = pid_vnr(task_tgid(current));
@@ -1739,12 +1745,12 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pr_err("%s: Sent SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
 	
 	spin_lock(&pH_profile_list_sem);
-	profile = retrieve_pH_profile_by_filename(&output_string[2]);
+	profile = retrieve_pH_profile_by_filename(peek_read_filename_queue());
 	spin_unlock(&execve_count_lock);
 	spin_unlock(&pH_profile_list_sem);
 	
 	if (!profile || profile == NULL) {
-		pr_err("%s: ERROR: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, &output_string[2]);
+		pr_err("%s: ERROR: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, peek_read_filename_queue());
 		ASSERT(profile != NULL);
 		return -1;
 	}
@@ -3368,8 +3374,10 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 						return len;
 					}
 					
-					pr_err("%s: Making new profile with filename [%s]\n", DEVICE_NAME, &output_string[2]);
-					new_profile(profile, &output_string[2]);
+					pr_err("%s: Making new profile with filename [%s]\n", DEVICE_NAME, peek_read_filename_queue());
+					new_profile(profile, peek_read_filename_queue());
+					
+					kfree(remove_from_read_filename_queue());
 					
 					if (spin_is_locked(&execve_count_lock)) {
 						spin_unlock(&execve_count_lock);
