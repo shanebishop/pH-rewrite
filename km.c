@@ -2509,9 +2509,11 @@ void stack_pop(pH_task_struct* process) {
 	pr_err("%s: temp = process->seq;\n", DEVICE_NAME);
 	process->seq = process->seq->next;
 	pr_err("%s: process->seq = process->seq->next;\n", DEVICE_NAME);
-	process->seq->prev = NULL;
-	pr_err("%s: process->seq->prev = NULL;\n", DEVICE_NAME);
-	if (process->seq->next != NULL) process->seq->next->prev = process->seq; // This line might be unecessary
+	if (process->seq != NULL) {
+		process->seq->prev = NULL;
+		pr_err("%s: process->seq->prev = NULL;\n", DEVICE_NAME);
+		if (process->seq->next != NULL) process->seq->next->prev = process->seq; // This line might be unecessary
+	}
 	kfree(temp);
 	pr_err("%s: kfree(temp);\n", DEVICE_NAME);
 	temp = NULL;
