@@ -76,6 +76,7 @@ int write_profile(pH_disk_profile* disk_profile) {
 	binary_files_created++;
 }
 
+/*
 int read_ascii_file(char* input_string, int fd) {
     FILE *fp;
     fp = fopen(input_string, "r");
@@ -108,6 +109,7 @@ int read_ascii_file(char* input_string, int fd) {
 
     return 0;
 }
+*/
 
 int write_ascii_file(char* input_string, int fd) {
     FILE *fp;
@@ -294,9 +296,11 @@ int main(){
 		printf("The received message is: [%s]\n", receive);
 
 		if (strcmp(receive, "quit") == 0) break;
+		/*
 		else if (receive[0] == 'r') { // r stands for read
 			read_ascii_file(&receive[1], fd);
 		}
+		*/
 		else if (strcmp(receive, "rb") == 0) { // rb stands for read binary
 			ret = read(fd, receive, PH_MAX_DISK_FILENAME);
 			if (ret < 0) {
