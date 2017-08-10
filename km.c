@@ -1037,22 +1037,19 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 		pr_err("%s: pH_profile_list is NULL\n", DEVICE_NAME);
 		return NULL;
 	}
-	//pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
+	pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
 	
 	// Search through profile list
-	//spin_lock(&pH_profile_list_sem);
 	do {
 		//pr_err("%s: Filename is [%s]\n", DEVICE_NAME, profile_list_iterator->filename);
 		if (strcmp(filename, profile_list_iterator->filename) == 0) {
-			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
-			//spin_unlock(&pH_profile_list_sem);
+			pr_err("%s: Found it! Returning\n", DEVICE_NAME);
 			return profile_list_iterator;
 		}
 		
 		profile_list_iterator = profile_list_iterator->next;
 		//pr_err("%s: Iterating\n", DEVICE_NAME);
 	} while (profile_list_iterator);
-	//spin_unlock(&pH_profile_list_sem);
 	
 	/*
 	// If searching through profile list fails, search through process list
@@ -1709,11 +1706,14 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		pr_err("%s: Got NULL process in sys_execve_return_handler\n", DEVICE_NAME);
 		return -1;
 	}
+	pr_err("%s: Retrieved a process\n", DEVICE_NAME);
 	
 	process->profile = profile;
 	pH_refcount_inc(profile);
 	ASSERT(get_refcount(profile) == 1);
+	pr_err("%s: Added the profile to the process\n", DEVICE_NAME);
 	
+	pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 	process_syscall(59);
 	pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 	
