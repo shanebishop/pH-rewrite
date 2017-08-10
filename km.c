@@ -671,17 +671,17 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	}
 	
 	// Initialize the new pH_seq and push it onto the stack
-	//pr_err("%s: Initializing new_sequence in make_and_push_new_pH_seq...\n", DEVICE_NAME);
+	pr_err("%s: Initializing new_sequence in make_and_push_new_pH_seq...\n", DEVICE_NAME);
 	new_sequence->next = NULL;
 	new_sequence->prev = NULL;
-	//pr_err("%s: Set new_sequence->next to NULL\n", DEVICE_NAME);
+	pr_err("%s: Set new_sequence->next to NULL\n", DEVICE_NAME);
 	new_sequence->length = profile->length;
-	//pr_err("%s: Set new_sequence->length to %d\n", DEVICE_NAME, profile->length);
+	pr_err("%s: Set new_sequence->length to %d\n", DEVICE_NAME, profile->length);
 	new_sequence->last = profile->length - 1;
-	//pr_err("%s: Set new_sequence->last to %d\n", DEVICE_NAME, profile->length - 1);
+	pr_err("%s: Set new_sequence->last to %d\n", DEVICE_NAME, profile->length - 1);
 	stack_push(process, new_sequence);
-	//pr_err("%s: Pushed new_sequence\n", DEVICE_NAME);
-	//pr_err("%s: Exiting make_and_push_new_pH_seq\n", DEVICE_NAME);
+	pr_err("%s: Pushed new_sequence\n", DEVICE_NAME);
+	pr_err("%s: Exiting make_and_push_new_pH_seq\n", DEVICE_NAME);
 	pH_refcount_dec(profile);
 	return 0;
 }
