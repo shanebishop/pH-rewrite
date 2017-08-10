@@ -1698,7 +1698,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	spin_lock(&pH_profile_list_sem);
 	profile = retrieve_pH_profile_by_filename(&output_string[2]);
 	spin_unlock(&execve_count_lock);
-	spin_lock(&pH_profile_list_sem);
+	spin_unlock(&pH_profile_list_sem);
 	
 	if (!profile || profile == NULL) {
 		pr_err("%s: ERROR: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, &output_string[2]);
