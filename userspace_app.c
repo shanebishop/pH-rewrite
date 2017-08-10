@@ -29,7 +29,7 @@ bool find_profile(pH_disk_profile* disk_profile, char* filename) {
 	char* input_file;
 	int i;
 	
-	printf("In find_profile with filename [s]\n", filename);
+	printf("In find_profile with filename [%s]\n", filename);
 	
 	if (!disk_profile || disk_profile == NULL) {
 		printf("In find_profile with NULL disk_profile\n");
