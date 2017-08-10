@@ -3098,7 +3098,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 		size_of_message = strlen(output_string);
 
 		// If we are asking to perform a binary transfer, set binary_read to TRUE
-		if (*output_string == 't') {
+		if (strcmp(output_string, TRANSFER_OPERATION) == 0 || strcmp(output_string, READ_PROFILE_FROM_DISK) == 0) {
 			binary_read = TRUE;
 		}			
 
