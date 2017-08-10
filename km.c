@@ -279,7 +279,7 @@ spinlock_t pH_profile_list_sem;             // Lock for list of profiles
 spinlock_t pH_task_struct_list_sem;         // Lock for process list
 int profiles_created = 0;                   // Number of profiles that have been created
 int successful_jsys_execves = 0;            // Number of successful jsys_execves
-//spinlock_t execve_count_lock;
+spinlock_t execve_count_lock;
 struct task_struct* last_task_struct_in_sigreturn = NULL;
 pH_disk_profile* profile_queue_front = NULL;
 pH_disk_profile* profile_queue_rear = NULL;
@@ -1269,8 +1269,8 @@ static long jsys_execve(const char __user *filename,
 		}
 		pr_err("%s: The userspace process should have received a SIGCONT signal\n", DEVICE_NAME);
 		
-		//spin_lock(&execve_count_lock);
-		//pr_err("%s: Locked execve_count_lock\n", DEVICE_NAME);
+		spin_lock(&execve_count_lock);
+		pr_err("%s: Locked execve_count_lock\n", DEVICE_NAME);
 	}
 	else {
 		kfree(path_to_binary);
@@ -1727,6 +1727,13 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	if (!module_inserted_successfully) return 0;
 	
+	process_id = pid_vnr(task_tgid(current));
+	
+	//if (!spin_is_locked(&execve_count_lock)) return 0; // This line might be incorrect
+	
+	spin_lock(&execve_count_lock); // Perhaps we'd rather rearrange the locking
+	spin_unlock(&execve_count_lock);
+	
 	pr_err("%s: In sys_execve_return_handler\n", DEVICE_NAME);
 	//pr_err("%s: execve_count_lock = %p\n", DEVICE_NAME, &execve_count_lock);
 	pr_err("%s: pH_profile_list_sem = %p\n", DEVICE_NAME, &pH_profile_list_sem);
@@ -1735,12 +1742,6 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	//pr_err("%s: read_filename_queue_front = %p\n", DEVICE_NAME, peek_read_filename_queue());
 	//pr_err("%s: read_filename_queue_front = %s\n", DEVICE_NAME, peek_read_filename_queue());
 	pr_err("%s: If all of these lines (including this one) print, then the problem is in retrieve_pH_profile_by_filename\n", DEVICE_NAME);
-	
-	process_id = pid_vnr(task_tgid(current));
-	
-	//if (!spin_is_locked(&execve_count_lock)) return 0; // This line might be incorrect
-	
-	//spin_lock(&execve_count_lock); // Perhaps we'd rather rearrange the locking
 	
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(process_id);
@@ -3400,12 +3401,12 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 					pr_err("%s: Making new profile with filename [%s]\n", DEVICE_NAME, peek_read_filename_queue());
 					new_profile(profile, peek_read_filename_queue());
 					
-					/*
+					
 					if (spin_is_locked(&execve_count_lock)) {
 						spin_unlock(&execve_count_lock);
 						pr_err("%s: Unlocked execve_count_lock\n", DEVICE_NAME);
 					}
-					*/
+					
 				}
 				
 				pr_err("%s: Returing from dev_write...\n", DEVICE_NAME);
@@ -3439,12 +3440,11 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			pr_err("%s: Adding to profile list...\n", DEVICE_NAME);
 			add_to_profile_llist(profile);
 			
-			/*
 			if (spin_is_locked(&execve_count_lock)) {
 				spin_unlock(&execve_count_lock);
 				pr_err("%s: Unlocked execve_count_lock\n", DEVICE_NAME);
 			}
-			*/
+			
 		}
 		pr_err("%s: After READ_PROFILE_FROM_DISK if\n", DEVICE_NAME);
 		
