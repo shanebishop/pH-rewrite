@@ -1771,6 +1771,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		return -1;
 	}
 	pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
+	remove_from_read_filename_queue();
 	
 	process->profile = profile;
 	pH_refcount_inc(profile);
@@ -3392,8 +3393,6 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 					
 					pr_err("%s: Making new profile with filename [%s]\n", DEVICE_NAME, peek_read_filename_queue());
 					new_profile(profile, peek_read_filename_queue());
-					
-					remove_from_read_filename_queue();
 					
 					if (spin_is_locked(&execve_count_lock)) {
 						spin_unlock(&execve_count_lock);
