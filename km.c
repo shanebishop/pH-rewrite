@@ -1097,7 +1097,7 @@ static long jsys_execve(const char __user *filename,
 	
 	if (!pH_aremonitoring) goto exit;
 
-	//pr_err("%s: In jsys_execve\n", DEVICE_NAME);
+	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
 	
 	current_process_id = pid_vnr(task_tgid(current)); // Grab the process ID right now
 	
@@ -1113,8 +1113,8 @@ static long jsys_execve(const char __user *filename,
 	spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	if (!process || process == NULL) {
-		//pr_err("%s: Unable to find process in jsys_execve\n", DEVICE_NAME);
-		//pr_err("%s: Continuing anyway...\n", DEVICE_NAME);
+		pr_err("%s: Unable to find process in jsys_execve\n", DEVICE_NAME);
+		pr_err("%s: Continuing anyway...\n", DEVICE_NAME);
 		
 		// Allocate memory for this process
 		process = kmalloc(sizeof(pH_task_struct), GFP_ATOMIC);
@@ -1122,18 +1122,18 @@ static long jsys_execve(const char __user *filename,
 			pr_err("%s: Unable to allocate memory for process\n", DEVICE_NAME);
 			goto exit;
 		}
-		//pr_err("%s: Successfully allocated memory for process\n", DEVICE_NAME);
+		pr_err("%s: Successfully allocated memory for process\n", DEVICE_NAME);
 		
 		// Initialization for entirely new process - this might not be quite correct
 		process->process_id = current_process_id;
 		process->task_struct = current;
 		process->pid = task_pid(current);
-		//pr_err("%s: Pre-initialized entirely new process\n", DEVICE_NAME);
+		pr_err("%s: Pre-initialized entirely new process\n", DEVICE_NAME);
 	}
 	else {
 		already_had_process = TRUE;
 		pH_refcount_dec(process->profile);
-		//pr_err("%s: Decremented old profile refcount\n", DEVICE_NAME);
+		pr_err("%s: Decremented old profile refcount\n", DEVICE_NAME);
 	}
 	
 	// Allocate space for path_to_binary
@@ -1142,20 +1142,20 @@ static long jsys_execve(const char __user *filename,
 		pr_err("%s: Unable to allocate memory for path_to_binary\n", DEVICE_NAME);
 		goto exit;
 	}
-	//pr_err("%s: Successfully allocated memory for path_to_binary\n", DEVICE_NAME);
+	pr_err("%s: Successfully allocated memory for path_to_binary\n", DEVICE_NAME);
 	
 	// Copy memory from userspace to kernel land
 	copy_from_user(path_to_binary, filename, sizeof(char) * 4000);
-	//pr_err("%s: path_to_binary = [%s]\n", DEVICE_NAME, path_to_binary);
+	pr_err("%s: path_to_binary = [%s]\n", DEVICE_NAME, path_to_binary);
 	
 	// Checks to see if path_to_binary is okay - perhaps move this to handle_new_process()
 	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
 		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/'))
 	{
-		//pr_err("%s: In jsys_execve with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
+		pr_err("%s: In jsys_execve with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
 		goto corrupted_path_to_binary;
 	}
-	//pr_err("%s: My code thinks path_to_binary is not corrupted\n", DEVICE_NAME);
+	pr_err("%s: My code thinks path_to_binary is not corrupted\n", DEVICE_NAME);
 	
 	// Emtpies stack of pH_seqs
 	while (already_had_process && process->seq != NULL) {
@@ -1164,7 +1164,7 @@ static long jsys_execve(const char __user *filename,
 		//pr_err("%s: &process = %p\n", DEVICE_NAME, &process);
 		//pr_err("%s: After stack_pop(process);\n", DEVICE_NAME);
 	}
-	//pr_err("%s: Emptied stack of pH_seqs\n", DEVICE_NAME);
+	pr_err("%s: Emptied stack of pH_seqs\n", DEVICE_NAME);
 	
 	// Since we are using an existing pH_task_struct, the task_struct, pid, etc. are already
 	// initialized - instead we want to wipe everything else
@@ -1174,19 +1174,19 @@ static long jsys_execve(const char __user *filename,
 	process->syscall_llist = NULL;
 	process->delay = 0;
 	process->count = 0;
-	//pr_err("%s: Initialized process\n", DEVICE_NAME);
+	pr_err("%s: Initialized process\n", DEVICE_NAME);
 	
 	// Grab the profile from memory - if this fails, I would want to do a read, but since I am not
 	// implementing that right now, then make a new profile
-	//pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
-	//pr_err("%s: Locking profile list in jsys_execve on line 1070\n", DEVICE_NAME);
+	pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
+	pr_err("%s: Locking profile list in jsys_execve on line 1070\n", DEVICE_NAME);
 	//preempt_disable();
 	spin_lock(&pH_profile_list_sem);
 	profile = retrieve_pH_profile_by_filename(path_to_binary);
 	spin_unlock(&pH_profile_list_sem);
 	//preempt_enable();
-	//pr_err("%s: Unlocking profile list in jsys_execve on line 1072\n", DEVICE_NAME);
-	//pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
+	pr_err("%s: Unlocking profile list in jsys_execve on line 1072\n", DEVICE_NAME);
+	pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
 	
 	/*
 	// If there is no corresponding profile, make a new one - this should actually start a read
@@ -1213,12 +1213,19 @@ static long jsys_execve(const char __user *filename,
 	
 	if (!profile || profile == NULL) {
 		add_to_read_filename_queue(path_to_binary);
+		pr_err("%s: path_to_binary was added to the read filename queue\n", DEVICE_NAME);
 		strcpy(output_string, READ_PROFILE_FROM_DISK); // Maybe I shouldn't do this if there is another command already
 		
 		ret = send_signal(SIGCONT);
-		if (ret < 0) return ret; // Maybe I will want to handle this more drastically
+		if (ret < 0) {
+			pr_err("%s: The userspace process was not woken for some reason\n", DEVICE_NAME);
+			ASSERT(ret >= 0);
+			return ret; // Maybe I will want to handle this more drastically
+		}
+		pr_err("%s: The userspace process should have received a SIGCONT signal\n", DEVICE_NAME);
 		
 		spin_lock(&execve_count_lock);
+		pr_err("%s: Locked execve_count_lock\n", DEVICE_NAME);
 	}
 	else {
 		kfree(path_to_binary);
@@ -1237,10 +1244,13 @@ static long jsys_execve(const char __user *filename,
 		add_process_to_llist(process);
 		spin_unlock(&pH_task_struct_list_sem);
 		//preempt_enable();
-		//pr_err("%s: process has been added to the llist\n", DEVICE_NAME);
+		pr_err("%s: process has been added to the llist\n", DEVICE_NAME);
 	}
 	
 	successful_jsys_execves++;
+	pr_err("%s: Incremented successful_jsys_execves\n", DEVICE_NAME);
+	
+	pr_err("%s: Returning from jsys_execve...\n", DEVICE_NAME);
 	
 	jprobe_return();
 	return 0;
@@ -1603,9 +1613,13 @@ static int do_execveat_common_handler(struct kretprobe_instance* ri, struct pt_r
 	
 	if (!module_inserted_successfully) return 0;
 	
+	pr_err("%s: In do_execveat_common_handler\n", DEVICE_NAME);
+	
 	retval = regs_return_value(regs);
 	
 	if (retval < 0) {
+		pr_err("%s: execve failed\n", DEVICE_NAME);
+		
 		//preempt_disable();
 		spin_lock(&pH_task_struct_list_sem);
 		process = llist_retrieve_process(pid_vnr(task_tgid(current)));
@@ -1617,6 +1631,7 @@ static int do_execveat_common_handler(struct kretprobe_instance* ri, struct pt_r
 		
 		return retval;
 	}
+	pr_err("%s: execve succeeded\n", DEVICE_NAME);
 	
 	return 0;
 }
@@ -1666,6 +1681,8 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	if (!spin_is_locked(&execve_count_lock)) return 0;
 	
+	spin_lock(&execve_count_lock);
+	
 	profile = grab_profile_from_read_queue();
 	spin_unlock(&execve_count_lock);
 	if (!profile || profile == NULL) {
@@ -1673,6 +1690,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		ASSERT(profile != NULL);
 		return -1;
 	}
+	pr_err("%s: grab_profile_from_read_queue returned a profile\n", DEVICE_NAME);
 	
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
@@ -3203,6 +3221,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 	user_process_has_been_loaded = TRUE;
 	binary_read = FALSE;
 	
+	pr_err("%s: In dev_write\n", DEVICE_NAME);
+	
 	if (numberOpens > 0) {		
 		// Allocate space for buffer
 		buffer = kmalloc(sizeof(char) * 254, GFP_ATOMIC);
@@ -3292,6 +3312,11 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 		
 			pr_err("%s: Adding to read profile queue...\n", DEVICE_NAME);
 			add_to_read_profile_queue(profile);
+			
+			if (spin_is_locked(&execve_count_lock)) {
+				spin_unlock(&execve_count_lock);
+				pr_err("%s: Unlocked execve_count_lock\n", DEVICE_NAME);
+			}
 		}
 		pr_err("%s: After READ_PROFILE_FROM_DISK if\n", DEVICE_NAME);
 		
