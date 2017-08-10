@@ -103,6 +103,7 @@ typedef int pH_seqflags;
 typedef struct pH_seq {
 	// My new fields
 	struct pH_seq* next; // For linked list stack implementation
+	struct pH_seq* prev;
 
 	// Anil's old fields
 	int last; // seq is a circular array; this is its end
@@ -277,6 +278,7 @@ spinlock_t pH_profile_list_sem;             // Lock for list of profiles
 spinlock_t pH_task_struct_list_sem;         // Lock for process list
 int profiles_created = 0;                   // Number of profiles that have been created
 int successful_jsys_execves = 0;            // Number of successful jsys_execves
+spinlock_t execve_count_lock;
 struct task_struct* last_task_struct_in_sigreturn = NULL;
 pH_disk_profile* profile_queue_front = NULL;
 pH_disk_profile* profile_queue_rear = NULL;
@@ -313,6 +315,10 @@ inline void pH_refcount_dec(pH_profile *profile)
 inline void pH_refcount_init(pH_profile *profile, int i)
 {
     profile->refcount.counter = i;
+}
+
+inline int get_refcount(pH_profile* profile) {
+	return atomic_read(&(profile->refcount));
 }
 
 /* // Commented out for now, as I might not need it
@@ -643,11 +649,7 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	pH_profile* profile;
 	pH_seq* new_sequence;
 	
-	// Checks for NULL process
-	if (!process || process == NULL) {
-		pr_err("%s: process is NULL in make_and_push_new_pH_seq\n", DEVICE_NAME);
-		return 0;
-	}
+	ASSERT(process != NULL);
 	
 	profile = process->profile;
 	pH_refcount_inc(profile);
@@ -669,6 +671,7 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	// Initialize the new pH_seq and push it onto the stack
 	//pr_err("%s: Initializing new_sequence in make_and_push_new_pH_seq...\n", DEVICE_NAME);
 	new_sequence->next = NULL;
+	new_sequence->prev = NULL;
 	//pr_err("%s: Set new_sequence->next to NULL\n", DEVICE_NAME);
 	new_sequence->length = profile->length;
 	//pr_err("%s: Set new_sequence->length to %d\n", DEVICE_NAME, profile->length);
@@ -1065,88 +1068,10 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	return NULL;
 }
 
-// Helper function for jsys_execve and fork_handler, as both instances require similar code
-int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id) {
-	if (profile != NULL) pH_refcount_inc(profile);
-	
-	pH_task_struct* this_process;
-	
-	//pr_err("%s: In handle_new_process for %d %s\n", DEVICE_NAME, process_id, path_to_binary);
-	
-	// Allocate memory for this process
-	this_process = kmalloc(sizeof(pH_task_struct), GFP_ATOMIC);
-	if (!this_process) {
-		pr_err("%s: Unable to allocate memory for this process\n", DEVICE_NAME);
-		goto no_memory;
-	}
-	
-	// Initialize this process - check with Anil to see if these are the right values to initialize it to
-	this_process->task_struct = current;
-	this_process->pid = task_pid(current); // Perhaps I am calling the wrong function here
-	this_process->process_id = process_id;
-	//pH_reset_ALF(this_process);
-	this_process->seq = NULL;
-	//spin_lock_init(&(this_process->pH_seq_stack_sem));
-	this_process->syscall_llist = NULL;
-	this_process->delay = 0;
-	this_process->count = 0;
-	//pr_err("%s: Initialized process\n", DEVICE_NAME);
-	
-	if (!profile || profile == NULL) {
-		// Retrieve the corresponding profile
-		//pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
-		//pr_err("%s: Locking profile list in handle_new_process on line 922\n", DEVICE_NAME);
-		//preempt_disable();
-		spin_lock(&pH_profile_list_sem);
-		profile = retrieve_pH_profile_by_filename(path_to_binary);
-		spin_unlock(&pH_profile_list_sem);
-		//preempt_enable();
-		//pr_err("%s: Unlocking profile list in handle_new_process on line 924\n", DEVICE_NAME);
-		//pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
-		
-		// If there is no corresponding profile, make a new one
-		if (!profile || profile == NULL) {
-			profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
-			if (!profile) {
-				pr_err("%s: Unable to allocate memory for profile in handle_new_process\n", DEVICE_NAME);
-				goto no_memory;
-			}
-			
-			new_profile(profile, path_to_binary);
-			pr_err("%s: Made new profile for [%s]\n", DEVICE_NAME, path_to_binary);
-			
-			if (!profile || profile == NULL) {
-				pr_err("%s: new_profile() made a corrupted or NULL profile\n", DEVICE_NAME);
-			}
-		}
-		else {
-			kfree(path_to_binary);
-			path_to_binary = NULL;
-		}
-	}
-	
-	this_process->profile = profile; // Put this profile in the pH_task_struct struct
-	pH_refcount_inc(profile);
-
-	//preempt_disable();
-	spin_lock(&pH_task_struct_list_sem);
-	add_process_to_llist(this_process); // Add this process to the list of processes
-	spin_unlock(&pH_task_struct_list_sem);
-	//preempt_enable();
-	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
-	
-	return 0;
-
-no_memory:	
-	pr_err("%s: Ran out of memory\n", DEVICE_NAME);
-	
-	kfree(path_to_binary);
-	path_to_binary = NULL;
-	free_pH_task_struct(this_process); // Potentially at this point the process may not be in the llist, which may cause issues
-	this_process = NULL;
-	
-	return -ENOMEM;
-}
+/**
+ * This is where the definition of handle_new_process used to rest. The see the definition again,
+ * go to "wells/Documents/archive/km (archive from August 10, 2017 at 1110 hours.c".
+ */
 
 void stack_pop(pH_task_struct*);
 
@@ -1162,6 +1087,7 @@ static long jsys_execve(const char __user *filename,
 	int list_length;
 	pH_task_struct* process;
 	pH_profile* profile;
+	int ret;
 	bool already_had_process = FALSE;
 
 	// Boolean checks
@@ -1262,6 +1188,7 @@ static long jsys_execve(const char __user *filename,
 	//pr_err("%s: Unlocking profile list in jsys_execve on line 1072\n", DEVICE_NAME);
 	//pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
 	
+	/*
 	// If there is no corresponding profile, make a new one - this should actually start a read
 	// request, once I have got to implementing that
 	if (!profile || profile == NULL) {
@@ -1282,9 +1209,27 @@ static long jsys_execve(const char __user *filename,
 		kfree(path_to_binary);
 		path_to_binary = NULL;
 	}
+	*/
 	
-	process->profile = profile;
-	pH_refcount_inc(profile);
+	if (!profile || profile == NULL) {
+		add_to_read_filename_queue(path_to_binary);
+		strcpy(output_string, READ_PROFILE_FROM_DISK); // Maybe I shouldn't do this if there is another command already
+		
+		ret = send_signal(SIGCONT);
+		if (ret < 0) return ret; // Maybe I will want to handle this more drastically
+		
+		spin_lock(&execve_count_lock);
+	}
+	else {
+		kfree(path_to_binary);
+		path_to_binary = NULL;
+	}
+	
+	if (profile != NULL) {
+		process->profile = profile;
+		pH_refcount_inc(profile);
+		ASSERT(get_refcount(profile) == 1); // I should perform this test whenever I first create a profile
+	}
 	
 	if (!already_had_process) {
 		//preempt_disable();
@@ -1295,17 +1240,7 @@ static long jsys_execve(const char __user *filename,
 		//pr_err("%s: process has been added to the llist\n", DEVICE_NAME);
 	}
 	
-	/* // The task struct already exists, what we need to be doing now is decrementing the refcount
-	   // for the old profile and then searching for the new profile (also wipe the task struct data).
-	   // Double-check all of my execve handlers - I need to do the appropriate things in each handler.
-	// Handle the new process
-	handle_new_process(path_to_binary, NULL, current_process_id);
-	*/
-	
-	//list_length = pH_task_struct_list_length();
-	//pr_err("%s: List length at end is %d\n", DEVICE_NAME, list_length);
-	
-	//successful_jsys_execves++; // Increment successful_jsys_execves
+	successful_jsys_execves++;
 	
 	jprobe_return();
 	return 0;
@@ -1387,12 +1322,92 @@ struct my_kretprobe_data {
 	ktime_t entry_stamp;
 };
 
+// Think about what to do on for with a NULL profile
+int handle_new_process_fork(char* path_to_binary, pH_profile* profile, int process_id) {
+	ASSERT(profile != NULL);
+	
+	pH_refcount_inc(profile);
+	
+	pH_task_struct* this_process;
+	
+	//pr_err("%s: In handle_new_process for %d %s\n", DEVICE_NAME, process_id, path_to_binary);
+	
+	// Allocate memory for this process
+	this_process = kmalloc(sizeof(pH_task_struct), GFP_ATOMIC);
+	if (!this_process) {
+		pr_err("%s: Unable to allocate memory for this process\n", DEVICE_NAME);
+		goto no_memory;
+	}
+	
+	// Initialize this process - check with Anil to see if these are the right values to initialize it to
+	this_process->task_struct = current;
+	this_process->pid = task_pid(current); // Perhaps I am calling the wrong function here
+	this_process->process_id = process_id;
+	//pH_reset_ALF(this_process);
+	this_process->seq = NULL;
+	//spin_lock_init(&(this_process->pH_seq_stack_sem));
+	this_process->syscall_llist = NULL;
+	this_process->delay = 0;
+	this_process->count = 0;
+	//pr_err("%s: Initialized process\n", DEVICE_NAME);
+	
+	this_process->profile = profile; // Put this profile in the pH_task_struct struct
+	pH_refcount_inc(profile);
+
+	//preempt_disable();
+	spin_lock(&pH_task_struct_list_sem);
+	add_process_to_llist(this_process); // Add this process to the list of processes
+	spin_unlock(&pH_task_struct_list_sem);
+	//preempt_enable();
+	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
+	
+	return 0;
+
+no_memory:	
+	pr_err("%s: Ran out of memory\n", DEVICE_NAME);
+	
+	kfree(path_to_binary);
+	path_to_binary = NULL;
+	free_pH_task_struct(this_process); // Potentially at this point the process may not be in the llist, which may cause issues
+	this_process = NULL;
+	
+	return -ENOMEM;
+}
+
+// For this to work, I might need to make the stack of pH_seq's doubly-linked
+int copy_task_struct_data(pH_task_struct* old, pH_task_struct* new) {
+	pH_seq* iterator;
+	int i;
+	
+	ASSERT(old != NULL);
+	ASSERT(new != NULL);
+	
+	for (iterator = old->seq; iterator != NULL; iterator = iterator->next) {
+		; // This will get me to the last non-null element
+	}
+	
+	for (; iterator != NULL; iterator = iterator->prev) {
+		make_and_push_new_pH_seq(new);
+		new->seq->last = old->seq->last;
+		new->seq->length = old->seq->length;
+
+		for (i = 0; i < PH_MAX_SEQLEN; i++) {
+			new->seq->data[i] = old->seq->data[i];
+		}
+		
+		ASSERT(new->seq != NULL);
+		
+		// Do I want to initialize the list_head seqList?
+	}
+}
+
 // Currently a child process can only be handled if the pH_task_struct for the parent
 // process is still in memory. This is because pH_profiles require the absolute path
 // to the binary file, which I currently only know how to retrieve from sys_execve calls.
 static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	int retval;
 	pH_task_struct* parent_process;
+	pH_task_struct* child_process;
 	char* path_to_binary;
 	pH_profile* profile;
 	
@@ -1441,7 +1456,9 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	// Handle the new process
 	// I will want to change this out so that I copy memory over from the parent pH_task_struct
 	// to the new pH_task_struct that I am creating
-	handle_new_process(path_to_binary, profile, retval);
+	handle_new_process_fork(path_to_binary, profile, retval);
+	
+	copy_task_struct_data(parent_process, child_process);
 	
 	pH_refcount_dec(profile);
 	
@@ -1638,7 +1655,40 @@ static struct kretprobe do_execve_kretprobe = {
 */
 
 static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
+	pH_task_struct* process;
+	pH_profile* profile;
+	
+	if (!done_waiting_for_user) return 0;
+	
+	if (!module_inserted_successfully) return 0;
+	
+	pr_err("%s: In sys_execve_return_handler\n", DEVICE_NAME);
+	
+	if (!spin_is_locked(&execve_count_lock)) return 0;
+	
+	profile = grab_profile_from_read_queue();
+	spin_unlock(&execve_count_lock);
+	if (!profile || profile == NULL) {
+		pr_err("%s: ERROR: grab_profile_from_read_queue returned NULL with successful_jsys_execves of %d\n", DEVICE_NAME, successful_jsys_execves);
+		ASSERT(profile != NULL);
+		return -1;
+	}
+	
+	spin_lock(&pH_task_struct_list_sem);
+	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
+	spin_unlock(&pH_task_struct_list_sem);
+	if (!process || process == NULL) {
+		pr_err("%s: Got NULL process in sys_execve_return_handler\n", DEVICE_NAME);
+		return -1;
+	}
+	
+	process->profile = profile;
+	pH_refcount_inc(profile);
+	ASSERT(get_refcount(profile) == 1);
+	
 	process_syscall(59);
+	pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
+	
 	return 0;
 }
 
@@ -2342,23 +2392,19 @@ void stack_print(pH_task_struct* process) {
 void stack_push(pH_task_struct* process, pH_seq* new_node) {
 	//pH_seq* top = process->seq;
 	
-	if (process == NULL) {
-		pr_err("%s: ERROR: process is NULL in stack_push\n", DEVICE_NAME);
-		return;
-	}
-	
-	if (new_node == NULL) {
-		pr_err("%s: ERROR: new_node is NULL in stack_push\n", DEVICE_NAME);
-		return;
-	}
+	ASSERT(process != NULL);
+	ASSERT(new_node != NULL);
 
 	if (process->seq == NULL) {
 		new_node->next = NULL;
+		new_node->prev = NULL;
 		process->seq = new_node;
 	}
 	else {
 		new_node->next = process->seq;
 		process->seq = new_node;
+		new_node->prev = NULL;
+		new_node->next->prev = new_node;
 	}
 }
 
@@ -2377,19 +2423,12 @@ void stack_pop(pH_task_struct* process) {
 		return;
 	}
 	
-	//mutex_lock(&(process->pH_seq_stack_sem));
 	temp = process->seq;
-	//pr_err("%s: temp = %p top = %p\n", DEVICE_NAME, temp, top);
 	process->seq = process->seq->next;
-	//pr_err("%s: Set top to top->next\n", DEVICE_NAME);
-	//pr_err("%s: Is temp null? %d\n", DEVICE_NAME, temp == NULL);
-	//pr_err("%s: temp->length = %d\n", DEVICE_NAME, temp->length);
-	//pr_err("%s: Freeing temp... (temp = %p)\n", DEVICE_NAME, temp);
+	process->seq->prev = NULL;
+	process->seq->next->prev = process->seq; // This line might be unecessary
 	kfree(temp);
-	//pr_err("%s: Freed temp\n", DEVICE_NAME);
 	temp = NULL;
-	//mutex_unlock(&(process->pH_seq_stack_sem));
-	//pr_err("%s: Done stack_pop\n", DEVICE_NAME);
 }
 
 pH_seq* stack_peek(pH_task_struct* process) {
