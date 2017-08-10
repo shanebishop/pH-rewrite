@@ -955,6 +955,7 @@ int process_syscall(long syscall) {
 	}
 	//pr_err("%s: Trained process\n", DEVICE_NAME);
 	
+	/* // Since this is just for seeing if my code seems to be working, I don't need it
 	// Allocate space for new_syscall
 	new_syscall = kmalloc(sizeof(my_syscall), GFP_ATOMIC);
 	if (!new_syscall) {
@@ -965,7 +966,6 @@ int process_syscall(long syscall) {
 	}
 	//pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
 	
-	/* // Since this is just for seeing if my code seems to be working, I don't need it
 	// Add new_syscall to the linked list of syscalls
 	new_syscall->syscall_num = syscall;
 	add_to_my_syscall_llist(process, new_syscall);
