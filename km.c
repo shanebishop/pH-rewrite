@@ -196,6 +196,7 @@ typedef struct pH_task_struct { // My own version of a pH_task_state
 	pH_profile* profile; // Pointer to appropriate profile
 	struct task_struct* task_struct; // Pointer to corresponding task_struct
 	struct pid* pid; // Pointer to corresponding struct pid
+	char* filename;
 } pH_task_struct;
 
 typedef struct read_filename {
@@ -1165,6 +1166,7 @@ static long jsys_execve(const char __user *filename,
 		process->next = NULL;
 		process->prev = NULL;
 		process->seq = NULL;
+		process->filename = NULL;
 		pr_err("%s: Pre-initialized entirely new process\n", DEVICE_NAME);
 	}
 	else {
@@ -1193,6 +1195,7 @@ static long jsys_execve(const char __user *filename,
 		goto corrupted_path_to_binary;
 	}
 	pr_err("%s: My code thinks path_to_binary is not corrupted\n", DEVICE_NAME);
+	process->filename = path_to_binary;
 	
 	// Emtpies stack of pH_seqs
 	while (already_had_process && process->seq != NULL) {
@@ -1400,6 +1403,7 @@ pH_task_struct* handle_new_process_fork(char* path_to_binary, pH_profile* profil
 	this_process->count = 0;
 	this_process->next = NULL;
 	this_process->prev = NULL;
+	this_process->filename = path_to_binary;
 	//pr_err("%s: Initialized process\n", DEVICE_NAME);
 	
 	// Put this profile in the pH_task_struct struct
@@ -1726,8 +1730,8 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pr_err("%s: pH_profile_list_sem = %p\n", DEVICE_NAME, &pH_profile_list_sem);
 	pr_err("%s: output_string = %p\n", DEVICE_NAME, output_string);
 	pr_err("%s: output_string = %s\n", DEVICE_NAME, output_string);
-	pr_err("%s: read_filename_queue_front = %p\n", DEVICE_NAME, peek_read_filename_queue());
-	pr_err("%s: read_filename_queue_front = %s\n", DEVICE_NAME, peek_read_filename_queue());
+	//pr_err("%s: read_filename_queue_front = %p\n", DEVICE_NAME, peek_read_filename_queue());
+	//pr_err("%s: read_filename_queue_front = %s\n", DEVICE_NAME, peek_read_filename_queue());
 	pr_err("%s: If all of these lines (including this one) print, then the problem is in retrieve_pH_profile_by_filename\n", DEVICE_NAME);
 	
 	process_id = pid_vnr(task_tgid(current));
@@ -1761,12 +1765,12 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pr_err("%s: Sent SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
 	
 	spin_lock(&pH_profile_list_sem);
-	profile = retrieve_pH_profile_by_filename(peek_read_filename_queue());
+	profile = retrieve_pH_profile_by_filename(process->filename);
 	spin_unlock(&execve_count_lock);
 	spin_unlock(&pH_profile_list_sem);
 	
 	if (!profile || profile == NULL) {
-		pr_err("%s: ERROR: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, peek_read_filename_queue());
+		pr_err("%s: ERROR: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
 		ASSERT(profile != NULL);
 		return -1;
 	}
