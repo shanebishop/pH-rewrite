@@ -491,7 +491,17 @@ void add_to_read_filename_queue(char* filename) {
 		pr_err("%s: Out of memory in add_to_read_filename\n", DEVICE_NAME);
 		return;
 	}
-	to_add->filename = filename;
+	
+	char* save_filename = kmalloc(strlen(filename), GFP_ATOMIC);
+	if (!save_filename || save_filename == NULL) {
+		pr_err("%s: Out of memory in add_to_read_filename\n", DEVICE_NAME);
+		return;
+	}
+	
+	strcpy(save_filename, filename);
+	pr_err("%s: save_filename is now [%s]\n", DEVICE_NAME, save_filename);
+	
+	to_add->filename = save_filename;
 	to_add->next = NULL;
 	
 	if (read_filename_queue_front == NULL) {
@@ -504,6 +514,8 @@ void add_to_read_filename_queue(char* filename) {
 		read_filename_queue_rear = to_add;
 		read_filename_queue_rear->next = NULL;
 	}
+	
+	ASSERT(read_filename_queue_front != NULL);
 	
 	pr_err("%s: Front has filename [%s]\n", DEVICE_NAME, peek_read_filename_queue());
 }
