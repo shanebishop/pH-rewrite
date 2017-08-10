@@ -610,6 +610,8 @@ int new_profile(pH_profile* profile, char* filename) {
 	//preempt_enable();
 	//pr_err("%s: Unlocking profile list in new_profile on line 462\n", DEVICE_NAME);
 	//pr_err("%s: Got here 5 (new_profile) returning...\n", DEVICE_NAME);
+	
+	pr_err("%s: Made new profile with filename [%s]\n", DEVICE_NAME, filename);
 
 	return 0;
 }
