@@ -2513,7 +2513,7 @@ static void jhandle_signal(struct ksignal* ksig, struct pt_regs* regs) {
 	spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	
-	if (process != NULL) {
+	if (process != NULL && process->profile != NULL) {
 		make_and_push_new_pH_seq(process);
 	}
 	
@@ -2542,7 +2542,7 @@ static void jdo_signal(struct pt_regs* regs) {
 	spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	
-	if (process != NULL) {
+	if (process != NULL && process->profile != NULL) {
 		make_and_push_new_pH_seq(process);
 	}
 	
@@ -2614,7 +2614,7 @@ static long jsys_rt_sigreturn(void) {
 		//pr_err("%s: SIGKILL is not a member of current->pending.signal\n", DEVICE_NAME);
 	}
 	
-	if (!process || process == NULL) goto not_inserted;
+	if (!process || process == NULL || process->profile == NULL) goto not_inserted;
 	
 	stack_pop(process);
 	
