@@ -29,7 +29,7 @@ bool find_profile(pH_disk_profile* disk_profile, char* filename) {
 	char* input_file;
 	int i;
 	
-	printf("In find_profile\n");
+	printf("In find_profile with filename [s]\n", filename);
 	
 	if (!disk_profile || disk_profile == NULL) {
 		printf("In find_profile with NULL disk_profile\n");
@@ -301,7 +301,8 @@ int main(){
 			read_ascii_file(&receive[1], fd);
 		}
 		*/
-		else if (strcmp(receive, "rb") == 0) { // rb stands for read binary
+		else if (receive[0] == 'r' && receive[1] == 'b') { // rb stands for read binary
+			/*
 			ret = read(fd, receive, PH_MAX_DISK_FILENAME);
 			if (ret < 0) {
 				perror("Failed to read the message from the device: Releasing device");
@@ -309,6 +310,7 @@ int main(){
 				return errno;
 			}
 			printf("Successfully performed binary read on device.\n");
+			*/
 			
 			disk_profile = malloc(sizeof(pH_disk_profile));
 			if (!disk_profile || disk_profile == NULL) {
@@ -316,7 +318,7 @@ int main(){
 				return errno;
 			}
 			
-			bool profile_found = find_profile(disk_profile, receive);
+			bool profile_found = find_profile(disk_profile, &receive[2]);
 			printf("Back from find_profile()\n");
 			
 			if (!profile_found) {

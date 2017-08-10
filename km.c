@@ -1215,6 +1215,7 @@ static long jsys_execve(const char __user *filename,
 		add_to_read_filename_queue(path_to_binary);
 		pr_err("%s: path_to_binary was added to the read filename queue\n", DEVICE_NAME);
 		strcpy(output_string, READ_PROFILE_FROM_DISK); // Maybe I shouldn't do this if there is another command already
+		strcat(output_string, path_to_binary);
 		
 		ret = send_signal(SIGCONT);
 		if (ret < 0) {
