@@ -1230,6 +1230,8 @@ static long jsys_execve(const char __user *filename,
 		add_to_read_filename_queue(path_to_binary);
 		pr_err("%s: path_to_binary was added to the read filename queue\n", DEVICE_NAME);
 		strcpy(output_string, READ_PROFILE_FROM_DISK); // Maybe I shouldn't do this if there is another command already
+		output_string[2] = '\0';
+		pr_err("%s: After strcpy, output_string should be rb [%s]\n", DEVICE_NAME, output_string);
 		strcat(output_string, path_to_binary);
 		
 		ret = send_signal(SIGCONT);
@@ -1929,6 +1931,8 @@ int pH_write_profile(pH_profile* profile) {
 		pr_err("%s: output_string is NULL in pH_write_profile\n", DEVICE_NAME);
 	}
 	strcpy(output_string, TRANSFER_OPERATION);
+	output_string[1] = '\0';
+	pr_err("%s: After strcpy, output_string should be t [%s]\n", DEVICE_NAME, output_string);
 	
 	// The use of SIGCONT here might not be correct. Perhaps the userspace app is already running,
 	// in which case sending it a signal might be a bad idea and might cause problems. I will need
@@ -2503,7 +2507,7 @@ void stack_pop(pH_task_struct* process) {
 		return;
 	}
 	
-	pr_err("%s: made it to beginning of main part of stack_pop\n", DEVICE_NAME);
+	pr_err("%s: Made it to beginning of main part of stack_pop\n", DEVICE_NAME);
 	temp = process->seq;
 	pr_err("%s: temp = process->seq;\n", DEVICE_NAME);
 	process->seq = process->seq->next;
@@ -3249,6 +3253,8 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	if (profile_queue_is_empty()) {
 		pr_err("%s: Profile queue is empty\n", DEVICE_NAME);
 		strcpy(output_string, STOP_TRANSFER_OPERATION);
+		output_string[2] = '\0';
+		pr_err("%s: After strcpy, ouput_string should be st = [%s]", DEVICE_NAME, output_string);
 	}
 	if (!disk_profile || disk_profile == NULL) {
 		pr_err("%s: Retrieved a NULL disk profile from the queue...\n", DEVICE_NAME);
