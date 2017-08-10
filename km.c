@@ -1680,6 +1680,8 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pr_err("%s: In sys_execve_return_handler\n", DEVICE_NAME);
 	pr_err("%s: execve_count_lock = %p\n", DEVICE_NAME, &execve_count_lock);
 	pr_err("%s: pH_profile_list_sem = %p\n", DEVICE_NAME, &pH_profile_list_sem);
+	pr_err("%s: output_string = %p\n", DEVICE_NAME, output_string);
+	pr_err("%s: output_string = %s\n", DEVICE_NAME, output_string);
 	pr_err("%s: output_string[2] = %p\n", DEVICE_NAME, &output_string[2]);
 	pr_err("%s: output_string[2] = %s\n", DEVICE_NAME, output_string[2]);
 	pr_err("%s: If all of these lines (including this one) print, then the problem is in retrieve_pH_profile_by_filename\n", DEVICE_NAME);
