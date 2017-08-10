@@ -492,7 +492,7 @@ void add_to_read_filename_queue(char* filename) {
 		return;
 	}
 	
-	/*
+	
 	char* save_filename = kmalloc(strlen(filename), GFP_ATOMIC);
 	if (!save_filename || save_filename == NULL) {
 		pr_err("%s: Out of memory in add_to_read_filename\n", DEVICE_NAME);
@@ -501,7 +501,7 @@ void add_to_read_filename_queue(char* filename) {
 	
 	strcpy(save_filename, filename);
 	pr_err("%s: save_filename is now [%s]\n", DEVICE_NAME, save_filename);
-	*/
+	
 	
 	to_add->filename = filename;
 	to_add->next = NULL;
@@ -522,16 +522,16 @@ void add_to_read_filename_queue(char* filename) {
 	pr_err("%s: Front has filename [%s]\n", DEVICE_NAME, peek_read_filename_queue());
 }
 
-// The return value MUST be deallocated by the calling function
-// Before freeing, use strcpy to copy to a local char*
-read_filename* remove_from_read_filename_queue(void) {
+void remove_from_read_filename_queue(void) {
 	read_filename* to_return;
 	
 	if (read_filename_queue_front == NULL) return NULL;
 	
 	to_return = read_filename_queue_front;
 	read_filename_queue_front = read_filename_queue_front->next;
-	return to_return;
+	kfree(to_return->filename);
+	kfree(to_return);
+	to_return = NULL;
 }
 
 // Makes a new pH_profile and stores it in profile
