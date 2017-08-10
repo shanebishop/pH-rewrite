@@ -2469,6 +2469,11 @@ void stack_pop(pH_task_struct* process) {
 	pH_seq* temp;
 	//pH_seq* top = process->seq;
 	
+	if (!process || process == NULL) {
+		pr_err("%s: In stack_pop with NULL process\n", DEVICE_NAME);
+		return;
+	}
+	
 	//pr_err("%s: In stack_pop\n", DEVICE_NAME);
 	//pr_err("%s: top = %p\n", DEVICE_NAME, top);
 
