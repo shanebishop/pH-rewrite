@@ -1716,7 +1716,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		ASSERT(profile != NULL);
 		return -1;
 	}
-	pr_err("%s: grab_profile_from_read_queue returned a profile\n", DEVICE_NAME);
+	pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
 	
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(process_id);
@@ -2485,7 +2485,7 @@ void stack_pop(pH_task_struct* process) {
 	temp = process->seq;
 	process->seq = process->seq->next;
 	process->seq->prev = NULL;
-	process->seq->next->prev = process->seq; // This line might be unecessary
+	if (process->seq->next != NULL) process->seq->next->prev = process->seq; // This line might be unecessary
 	kfree(temp);
 	temp = NULL;
 }
