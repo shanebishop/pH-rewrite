@@ -1251,7 +1251,6 @@ static long jsys_execve(const char __user *filename,
 	if (profile != NULL) {
 		process->profile = profile;
 		pH_refcount_inc(profile);
-		ASSERT(get_refcount(profile) == 1); // I should perform this test whenever I first create a profile
 	}
 	
 	if (!already_had_process) {
