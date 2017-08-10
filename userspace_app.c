@@ -325,7 +325,7 @@ int main(){
 				printf("Failed to find disk profile\n");
 				free(disk_profile);
 				disk_profile = NULL;
-				to_write_back_to_module = "failure";
+				to_write_back_to_module = "Failed to find disk profile";
 			}
 			else {
 				printf("Found disk profile\n");

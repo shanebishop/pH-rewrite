@@ -282,8 +282,8 @@ spinlock_t execve_count_lock;
 struct task_struct* last_task_struct_in_sigreturn = NULL;
 pH_disk_profile* profile_queue_front = NULL;
 pH_disk_profile* profile_queue_rear = NULL;
-pH_profile* read_profile_queue_front = NULL;
-pH_profile* read_profile_queue_rear = NULL;
+//pH_profile* read_profile_queue_front = NULL;
+//pH_profile* read_profile_queue_rear = NULL;
 read_filename* read_filename_queue_front = NULL;
 read_filename* read_filename_queue_rear = NULL;
 
@@ -450,6 +450,7 @@ pH_disk_profile* remove_from_profile_queue(void) {
 	return to_return;
 }
 
+/*
 void add_to_read_profile_queue(pH_profile* profile) {
 	ASSERT(profile != NULL);
 	
@@ -476,6 +477,7 @@ pH_profile* grab_profile_from_read_queue(void) {
 	read_profile_queue_front = read_profile_queue_front->next;
 	return to_return;
 }
+*/
 
 void add_to_read_filename_queue(char* filename) {
 	read_filename* to_add = kmalloc(sizeof(read_filename), GFP_ATOMIC);
@@ -1683,11 +1685,13 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	if (!spin_is_locked(&execve_count_lock)) return 0;
 	
 	spin_lock(&execve_count_lock);
-	
-	profile = grab_profile_from_read_queue();
+	spin_lock(&pH_profile_list_sem);
+	profile = retrieve_pH_profile_by_filename(&output_string[2]);
 	spin_unlock(&execve_count_lock);
+	spin_lock(&pH_profile_list_sem);
+	
 	if (!profile || profile == NULL) {
-		pr_err("%s: ERROR: grab_profile_from_read_queue returned NULL with successful_jsys_execves of %d\n", DEVICE_NAME, successful_jsys_execves);
+		pr_err("%s: ERROR: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, &output_string[2]);
 		ASSERT(profile != NULL);
 		return -1;
 	}
@@ -3218,6 +3222,7 @@ int pH_profile_disk2mem(pH_disk_profile*, pH_profile*);
 static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t *offset) {
 	const char* buffer;
 	int ret;
+	pH_profile* profile = NULL;
 	
 	user_process_has_been_loaded = TRUE;
 	binary_read = FALSE;
@@ -3275,7 +3280,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			pr_err("%s: Received %ld PID from userspace\n", DEVICE_NAME, userspace_pid);
 		}
 		
-		if (strcmp(output_string, READ_PROFILE_FROM_DISK) == 0) {
+		if (output_string[0] == 'r' && output_string[1] == 'b') {
 			pr_err("%s: In READ_PROFILE_FROM_DISK if\n", DEVICE_NAME);
 			
 			if (strcmp("success", message) != 0) {
@@ -3284,6 +3289,19 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				// Send SIGSTOP signal to the userspace app
 				ret = send_signal(SIGSTOP);
 				if (ret < 0) return ret;
+				
+				if (strcmp(message, "Failed to find disk profile") == 0) {
+					profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
+					if (!profile || profile == NULL) {
+						pr_err("%s: Unable to allocate memory for profile in dev_write\n", DEVICE_NAME);
+						return len;
+					}
+					
+					if (spin_is_locked(&execve_count_lock)) {
+						spin_unlock(&execve_count_lock);
+						pr_err("%s: Unlocked execve_count_lock\n", DEVICE_NAME);
+					}
+				}
 				
 				// Depending on the situation, we may want to process what the user sent us before returning
 				return 0;
@@ -3302,7 +3320,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				return 0;
 			}
 		
-			pH_profile* profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
+			profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
 			if (!profile || profile == NULL) {
 				pr_err("%s: Unable to allocate memory for profile in dev_write\n", DEVICE_NAME);
 				return len;
@@ -3311,8 +3329,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			pr_err("%s: Copying from disk to mem...\n", DEVICE_NAME);
 			pH_profile_disk2mem((pH_disk_profile*) buffer, profile);
 		
-			pr_err("%s: Adding to read profile queue...\n", DEVICE_NAME);
-			add_to_read_profile_queue(profile);
+			pr_err("%s: Adding to profile list...\n", DEVICE_NAME);
+			add_to_profile_llist(profile);
 			
 			if (spin_is_locked(&execve_count_lock)) {
 				spin_unlock(&execve_count_lock);
