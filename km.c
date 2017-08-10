@@ -654,9 +654,9 @@ int make_and_push_new_pH_seq(pH_task_struct* process) {
 	ASSERT(process != NULL);
 	
 	profile = process->profile;
-	pH_refcount_inc(profile);
+	if (profile != NULL) pH_refcount_inc(profile);
 	
-	// Checks for NULL profile
+	// Checks for NULL profile - do not change this to an assert
 	if (!profile || profile == NULL) {
 		pr_err("%s: profile is NULL in make_and_push_new_pH_seq\n", DEVICE_NAME);
 		return -1;
