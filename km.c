@@ -3328,6 +3328,9 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 						return len;
 					}
 					
+					pr_err("%s: Making new profile with filename [%s]\n", DEVICE_NAME, &output_string[2]);
+					new_profile(profile, &output_string[2]);
+					
 					if (spin_is_locked(&execve_count_lock)) {
 						spin_unlock(&execve_count_lock);
 						pr_err("%s: Unlocked execve_count_lock\n", DEVICE_NAME);
