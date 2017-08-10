@@ -482,7 +482,7 @@ pH_profile* grab_profile_from_read_queue(void) {
 char* peek_read_filename_queue(void) {
 	if (read_filename_queue_front == NULL) return NULL;
 	
-	read_filename_queue_front->filename;
+	return read_filename_queue_front->filename;
 }
 
 void add_to_read_filename_queue(char* filename) {
@@ -492,6 +492,7 @@ void add_to_read_filename_queue(char* filename) {
 		return;
 	}
 	
+	/*
 	char* save_filename = kmalloc(strlen(filename), GFP_ATOMIC);
 	if (!save_filename || save_filename == NULL) {
 		pr_err("%s: Out of memory in add_to_read_filename\n", DEVICE_NAME);
@@ -500,8 +501,9 @@ void add_to_read_filename_queue(char* filename) {
 	
 	strcpy(save_filename, filename);
 	pr_err("%s: save_filename is now [%s]\n", DEVICE_NAME, save_filename);
+	*/
 	
-	to_add->filename = save_filename;
+	to_add->filename = filename;
 	to_add->next = NULL;
 	
 	if (read_filename_queue_front == NULL) {
