@@ -824,7 +824,7 @@ inline void pH_train(pH_task_struct*);
 // Processes a system call
 int process_syscall(long syscall) {
 	pH_task_struct* process;
-	my_syscall* new_syscall;
+	//my_syscall* new_syscall;
 	pH_profile* profile;
 	int ret;
 	
@@ -862,7 +862,7 @@ int process_syscall(long syscall) {
 	
 	if (!profile || profile == NULL) {
 		pr_err("%s: pH_task_struct corrupted: No profile\n", DEVICE_NAME);
-		ret = 1;
+		ret = -1;
 		goto exit;
 	}
 	/*
@@ -1142,7 +1142,7 @@ no_memory:
 	
 	kfree(path_to_binary);
 	path_to_binary = NULL;
-	free_pH_task_struct(this_process);
+	free_pH_task_struct(this_process); // Potentially at this point the process may not be in the llist, which may cause issues
 	this_process = NULL;
 	
 	return -ENOMEM;
@@ -1751,27 +1751,27 @@ int pH_remove_profile_from_list(pH_profile *profile)
     */
     
     if (pH_profile_list == profile) {
-            pH_profile_list = profile->next;
-            return 0;
+        pH_profile_list = profile->next;
+        return 0;
     } else if (pH_profile_list == NULL) {
-            err("pH_profile_list is NULL when trying to free profile %s",
-                profile->filename);
-            return -1;
+        err("pH_profile_list is NULL when trying to free profile %s",
+            profile->filename);
+        return -1;
     } else {
-            prev_profile = pH_profile_list;
+        prev_profile = pH_profile_list;
+        cur_profile = prev_profile->next;
+        while ((cur_profile != profile) && (cur_profile != NULL)) {
+            prev_profile = cur_profile;
             cur_profile = prev_profile->next;
-            while ((cur_profile != profile) && (cur_profile != NULL)) {
-                    prev_profile = cur_profile;
-                    cur_profile = prev_profile->next;
-            }
-            if (cur_profile == profile) {
-                    prev_profile->next = cur_profile->next;
-                    return 0;
-            } else {
-                    err("while freeing, couldn't find profile %s in "
-                        "pH_profile_list", profile->filename);
-                    return -1;
-            }
+        }
+        if (cur_profile == profile) {
+            prev_profile->next = cur_profile->next;
+            return 0;
+        } else {
+            err("while freeing, couldn't find profile %s in "
+                "pH_profile_list", profile->filename);
+            return -1;
+        }
     }
 }
 
@@ -2131,13 +2131,14 @@ static long jdo_group_exit(int error_code) {
 	
 	//pr_err("%s: In jdo_group_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(p)));
 	
+	/* // I don't think this should be here - it is covered elsewhere, and probably not necessary
 	//preempt_disable();
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
-
 	if (process == NULL) goto not_monitoring;
+	*/
 	
 	//pr_err("%s: In jdo_group_exit for %d %s\n", DEVICE_NAME, pid_vnr(task_tgid(p)), process->profile->filename);
 	
@@ -2147,7 +2148,7 @@ static long jdo_group_exit(int error_code) {
 		
 		//preempt_disable();
 		spin_lock(&pH_task_struct_list_sem);
-		process = llist_retrieve_process(pid_vnr(task_tgid(current)));
+		process = llist_retrieve_process(pid_vnr(task_tgid(current))); // Should this be t?
 		spin_unlock(&pH_task_struct_list_sem);
 		//preempt_enable();
 		
