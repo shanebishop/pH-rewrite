@@ -1348,8 +1348,8 @@ struct my_kretprobe_data {
 	ktime_t entry_stamp;
 };
 
-// Think about what to do on for with a NULL profile
-int handle_new_process_fork(char* path_to_binary, pH_profile* profile, int process_id) {
+// Creates a new process and returns it
+pH_task_struct* handle_new_process_fork(char* path_to_binary, pH_profile* profile, int process_id) {
 	ASSERT(profile != NULL);
 	
 	pH_refcount_inc(profile);
@@ -1390,7 +1390,7 @@ int handle_new_process_fork(char* path_to_binary, pH_profile* profile, int proce
 	//preempt_enable();
 	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
-	return 0;
+	return this_process;
 
 no_memory:	
 	pr_err("%s: Ran out of memory\n", DEVICE_NAME);
@@ -1400,7 +1400,7 @@ no_memory:
 	free_pH_task_struct(this_process); // Potentially at this point the process may not be in the llist, which may cause issues
 	this_process = NULL;
 	
-	return -ENOMEM;
+	return NULL;
 }
 
 // For this to work, I might need to make the stack of pH_seq's doubly-linked
@@ -1435,10 +1435,10 @@ int copy_task_struct_data(pH_task_struct* old, pH_task_struct* new) {
 // to the binary file, which I currently only know how to retrieve from sys_execve calls.
 static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	int retval;
-	pH_task_struct* parent_process;
-	pH_task_struct* child_process;
-	char* path_to_binary;
-	pH_profile* profile;
+	pH_task_struct* parent_process = NULL;
+	pH_task_struct* child_process = NULL;
+	char* path_to_binary = NULL;
+	pH_profile* profile = NULL;
 	
 	// Boolean check
 	if (!done_waiting_for_user) return 0;
@@ -1485,7 +1485,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	// Handle the new process
 	// I will want to change this out so that I copy memory over from the parent pH_task_struct
 	// to the new pH_task_struct that I am creating
-	handle_new_process_fork(path_to_binary, profile, retval);
+	child_process = handle_new_process_fork(path_to_binary, profile, retval);
 	
 	copy_task_struct_data(parent_process, child_process);
 	
