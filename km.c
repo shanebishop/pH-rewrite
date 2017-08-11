@@ -1125,6 +1125,7 @@ static long jsys_execve(const char __user *filename,
 	pH_profile* profile;
 	int ret;
 	bool already_had_process = FALSE;
+	bool lock_execve_lock = FALSE;
 
 	// Boolean checks
 	if (!done_waiting_for_user) goto exit;
@@ -1269,8 +1270,7 @@ static long jsys_execve(const char __user *filename,
 		}
 		pr_err("%s: The userspace process should have received a SIGCONT signal\n", DEVICE_NAME);
 		
-		spin_lock(&execve_count_lock);
-		pr_err("%s: Locked execve_count_lock\n", DEVICE_NAME);
+		lock_execve_lock = TRUE;
 	}
 	else {
 		kfree(path_to_binary);
@@ -1295,6 +1295,11 @@ static long jsys_execve(const char __user *filename,
 	pr_err("%s: Incremented successful_jsys_execves\n", DEVICE_NAME);
 	
 	pr_err("%s: Returning from jsys_execve...\n", DEVICE_NAME);
+	
+	if (lock_execve_lock) {
+		spin_lock(&execve_count_lock);
+		pr_err("%s: Locked execve_count_lock\n", DEVICE_NAME);
+	}
 	
 	jprobe_return();
 	return 0;
@@ -1741,7 +1746,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pr_err("%s: output_string = %s\n", DEVICE_NAME, output_string);
 	//pr_err("%s: read_filename_queue_front = %p\n", DEVICE_NAME, peek_read_filename_queue());
 	//pr_err("%s: read_filename_queue_front = %s\n", DEVICE_NAME, peek_read_filename_queue());
-	pr_err("%s: If all of these lines (including this one) print, then the problem is in retrieve_pH_profile_by_filename\n", DEVICE_NAME);
+	//pr_err("%s: If all of these lines (including this one) print, then the problem is in retrieve_pH_profile_by_filename\n", DEVICE_NAME);
 	
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(process_id);
@@ -3401,12 +3406,10 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 					pr_err("%s: Making new profile with filename [%s]\n", DEVICE_NAME, peek_read_filename_queue());
 					new_profile(profile, peek_read_filename_queue());
 					
-					
 					if (spin_is_locked(&execve_count_lock)) {
 						spin_unlock(&execve_count_lock);
 						pr_err("%s: Unlocked execve_count_lock\n", DEVICE_NAME);
 					}
-					
 				}
 				
 				pr_err("%s: Returing from dev_write...\n", DEVICE_NAME);
