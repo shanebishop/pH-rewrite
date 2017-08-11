@@ -1296,6 +1296,11 @@ static long jsys_execve(const char __user *filename,
 	
 	pr_err("%s: Returning from jsys_execve...\n", DEVICE_NAME);
 	
+	pr_err("%s: Locks held:\n", DEVICE_NAME);
+	if (spin_is_locked(&execve_count_lock)) pr_err("%s: Execve lock is held\n", DEVICE_NAME);
+	if (spin_is_locked(&pH_task_struct_list_sem)) pr_err("%s: Process list lock is held\n", DEVICE_NAME);
+	if (spin_is_locked(&pH_profile_list_sem)) pr_err("%s: Profile list lock is held\n", DEVICE_NAME);
+	
 	if (lock_execve_lock) {
 		spin_lock(&execve_count_lock);
 		pr_err("%s: Locked execve_count_lock\n", DEVICE_NAME);
@@ -1735,6 +1740,11 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	process_id = pid_vnr(task_tgid(current));
 	
 	//if (!spin_is_locked(&execve_count_lock)) return 0; // This line might be incorrect
+	
+	pr_err("%s: Locks held:\n", DEVICE_NAME);
+	if (spin_is_locked(&execve_count_lock)) pr_err("%s: Execve lock is held\n", DEVICE_NAME);
+	if (spin_is_locked(&pH_task_struct_list_sem)) pr_err("%s: Process list lock is held\n", DEVICE_NAME);
+	if (spin_is_locked(&pH_profile_list_sem)) pr_err("%s: Profile list lock is held\n", DEVICE_NAME);
 	
 	spin_lock(&execve_count_lock); // Perhaps we'd rather rearrange the locking
 	spin_unlock(&execve_count_lock);
@@ -3334,6 +3344,11 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 	binary_read = FALSE;
 	
 	pr_err("%s: In dev_write\n", DEVICE_NAME);
+	
+	pr_err("%s: Locks held:\n", DEVICE_NAME);
+	if (spin_is_locked(&execve_count_lock)) pr_err("%s: Execve lock is held\n", DEVICE_NAME);
+	if (spin_is_locked(&pH_task_struct_list_sem)) pr_err("%s: Process list lock is held\n", DEVICE_NAME);
+	if (spin_is_locked(&pH_profile_list_sem)) pr_err("%s: Profile list lock is held\n", DEVICE_NAME);
 	
 	if (numberOpens > 0) {		
 		// Allocate space for buffer
