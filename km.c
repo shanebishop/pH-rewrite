@@ -3458,12 +3458,17 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			pr_err("%s: Adding to profile list...\n", DEVICE_NAME);
 			add_to_profile_llist(profile);
 			
-			if (spin_is_locked(&execve_count_lock)) {
+			//if (spin_is_locked(&execve_count_lock)) {
 				spin_unlock(&execve_count_lock);
 				pr_err("%s: Unlocked execve_count_lock\n", DEVICE_NAME);
-			}
+			//}
 			
 		}
+		
+		// Extra, likely uncessary unlock
+		spin_unlock(&execve_count_lock);
+		pr_err("%s: Unlocked execve_count_lock\n", DEVICE_NAME);
+		
 		pr_err("%s: After READ_PROFILE_FROM_DISK if\n", DEVICE_NAME);
 		
 		// If we have the PID of the userspace process, suspend the process
@@ -3484,6 +3489,10 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			pr_err("%s: Received success message from userspace\n", DEVICE_NAME);
 		}
 	}
+	
+	// Extra, likely uncessary unlock
+	spin_unlock(&execve_count_lock);
+	pr_err("%s: Unlocked execve_count_lock\n", DEVICE_NAME);
 
 	return 0;
 }
