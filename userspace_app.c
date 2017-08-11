@@ -16,6 +16,7 @@ volatile sig_atomic_t terminated = 0;
 void* bin_receive;
 int binary_files_created = 0;
 char* to_write_back_to_module;
+static char nul_string[BUFFER_LENGTH];
 
 // Set terminated to 1 on SIGTERM signal
 void term(int signm) {
@@ -237,7 +238,7 @@ int write_profiles(int fd) {
 }
 
 int main(){
-	int ret, fd;
+	int ret, fd, i;
 	pH_disk_profile* disk_profile;
 	
 	// Register signals
@@ -248,6 +249,10 @@ int main(){
 	//freopen("test_ouput.txt", "w", stdout); // Changes stdout to ./test_output.txt
 
 	printf("Starting device test code example...\n");
+	
+	for (i = 0; i < BUFFER_LENGTH; i++) {
+		nul_string[i] = '\0';
+	}
 	
 	// Open the device with read/write access
 	fd = open("/dev/ebbchar", O_RDWR);
@@ -286,6 +291,7 @@ int main(){
 		// Retrieve information from the device
 		printf("Reading from the device...\n");
 		
+		strcpy(receive, nul_string);
 		ret = read(fd, receive, BUFFER_LENGTH);
 		if (ret < 0 || receive == NULL || strlen(receive) < 1) {
 			printf("Failed to read the message from the device.%d%d%d\n", ret < 0, receive == NULL, strlen(receive) < 1);
