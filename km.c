@@ -197,6 +197,7 @@ typedef struct pH_task_struct { // My own version of a pH_task_state
 	struct task_struct* task_struct; // Pointer to corresponding task_struct
 	struct pid* pid; // Pointer to corresponding struct pid
 	char* filename;
+	bool should_sigcont_this;
 } pH_task_struct;
 
 typedef struct read_filename {
@@ -856,6 +857,7 @@ int send_signal(int signal_to_send) {
 inline void pH_append_call(pH_seq*, int);
 inline void pH_train(pH_task_struct*);
 //void stack_print(pH_task_struct*);
+pH_profile* retrieve_pH_profile_by_filename(char*);
 
 // Processes a system call
 int process_syscall(long syscall) {
@@ -897,11 +899,40 @@ int process_syscall(long syscall) {
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
 	if (!profile || profile == NULL) {
-		pr_err("%s: pH_task_struct corrupted: No profile\n", DEVICE_NAME);
+		pr_err("%s: Fetching profile...\n", DEVICE_NAME);
+		
+		spin_lock(&pH_profile_list_sem);
+		profile = retrieve_pH_profile_by_filename(process->filename);
+		spin_unlock(&pH_profile_list_sem);
+	
+		if (!profile || profile == NULL) {
+			pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
+			ret = -1;
+			goto exit_before_profile;
+		}
+		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
+		remove_from_read_filename_queue();
+	
+		process->should_sigcont_this = FALSE;
+	
+		process->profile = profile;
+		pH_refcount_inc(profile);
+		ASSERT(get_refcount(profile) == 1);
+		pr_err("%s: Added the profile to the process\n", DEVICE_NAME);
+	
+		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
+		if (ret < 0) {
+			pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process->process_id);
+			goto exit_before_profile;
+		}
+		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process->process_id);
+		
 		ret = -1;
 		goto exit_before_profile;
 	}
-	pH_refcount_inc(profile);
+	else {
+		pH_refcount_inc(profile);
+	}
 	
 	/*
 	if (profile->filename == NULL) {
@@ -1170,6 +1201,7 @@ static long jsys_execve(const char __user *filename,
 		process->prev = NULL;
 		process->seq = NULL;
 		process->filename = NULL;
+		process->should_sigcont_this = FALSE;
 		pr_err("%s: Pre-initialized entirely new process\n", DEVICE_NAME);
 	}
 	else {
@@ -1406,6 +1438,7 @@ pH_task_struct* handle_new_process_fork(char* path_to_binary, pH_profile* profil
 	this_process->next = NULL;
 	this_process->prev = NULL;
 	this_process->filename = path_to_binary;
+	this_process->should_sigcont_this = FALSE;
 	//pr_err("%s: Initialized process\n", DEVICE_NAME);
 	
 	// Put this profile in the pH_task_struct struct
@@ -1751,8 +1784,11 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		return -1;
 	}
 	pr_err("%s: Retrieved a process\n", DEVICE_NAME);
+	process->should_sigcont_this = TRUE;
 	
 	if (process->profile != NULL) {
+		process->should_sigcont_this = FALSE;
+		
 		//spin_unlock(&execve_count_lock);
 		pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 		process_syscall(59);
@@ -1774,8 +1810,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	spin_unlock(&pH_profile_list_sem);
 	
 	if (!profile || profile == NULL) {
-		pr_err("%s: ERROR: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
-		ASSERT(profile != NULL);
+		pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
 		return -1;
 	}
 	pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
@@ -1785,6 +1820,8 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pH_refcount_inc(profile);
 	ASSERT(get_refcount(profile) == 1);
 	pr_err("%s: Added the profile to the process\n", DEVICE_NAME);
+	
+	process->should_sigcont_this = FALSE;
 	
 	pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 	process_syscall(59);
@@ -2705,6 +2742,8 @@ int free_pH_task_structs(void) {
 }
 
 // Function responsible for module insertion
+// Instead of having a bunch of uncessary code for every failure, I will want to use a buch of goto
+// statements (see https://www.ccsl.carleton.ca/~falaca/comp3000/a4.html mydev_init() function end)
 static int __init ebbchar_init(void) {
 	int ret, i, j;
 	
