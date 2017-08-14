@@ -2902,6 +2902,8 @@ static long jsys_rt_sigreturn(void) {
 	spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	
+	if (process == NULL) goto not_inserted;
+	
 	if (current->exit_state == EXIT_DEAD || current->exit_state == EXIT_ZOMBIE || current->state == TASK_DEAD) {
 		pr_err("%s: Calling free_pH_task_struct from jsys_rt_sigreturn\n", DEVICE_NAME);
 		free_pH_task_struct(process);
