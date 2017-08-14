@@ -1920,6 +1920,7 @@ static struct kretprobe do_execve_kretprobe = {
 static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	pH_task_struct* process;
 	pH_profile* profile;
+	pH_profile* temp_profile;
 	int ret;
 	int process_id;
 	task_struct_wrapper* to_add;
@@ -1995,9 +1996,24 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	if (profile != NULL) {
 		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
 		remove_from_read_filename_queue();
+		
+		if (process->profile != NULL && process->profile->is_temp_profile) {
+			temp_profile = process->profile;
+			
+			merge_temp_with_disk(temp_profile, profile);
+			pH_refcount_init(temp_profile, 0);
+			vfree(temp_profile);
+			temp_profile = NULL;
+			
+			process->profile = profile;
+			pH_refcount_inc(profile);
+		}
+		
 		if (process->profile == NULL) {
 			process->profile = profile;
+			pH_refcount_inc(profile);
 		}
+		
 		ASSERT(process->profile != NULL);
 		return 0;
 	}
