@@ -1046,7 +1046,8 @@ int process_syscall(long syscall) {
 		pH_refcount_inc(profile);
 	}
 	*/
-	pr_err("%s: Successfully dereferenced proces\n", DEVICE_NAME);
+	pr_err("%s: Successfully dereferenced procces\n", DEVICE_NAME);
+	ASSERT(profile != NULL);
 	pr_err("%s: If this doesn't print, you know what is wrong %d\n", DEVICE_NAME, profile->is_temp_profile);
 	
 	if (profile->is_temp_profile) {
