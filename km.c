@@ -1000,6 +1000,7 @@ int process_syscall(long syscall) {
 		remove_from_read_filename_queue();
 		
 		merge_temp_with_disk(temp_profile, profile);
+		pH_refcount_init(temp_profile, 0);
 		pH_free_profile(temp_profile);
 		vfree(temp_profile);
 		temp_profile = NULL;
