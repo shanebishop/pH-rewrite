@@ -1055,10 +1055,10 @@ int process_syscall(long syscall) {
 		
 		ASSERT(profile->filename != NULL || strlen(profile->filename) > 1);
 		
-		pr_err("%s: Fetching profile using filename [%s] in process_syscall...\n", DEVICE_NAME, profile->filename);
+		pr_err("%s: Fetching profile using filename [%s] in process_syscall...\n", DEVICE_NAME, process->filename);
 		
 		spin_lock(&pH_profile_list_sem);
-		profile = retrieve_pH_profile_by_filename(profile->filename);
+		profile = retrieve_pH_profile_by_filename(process->filename);
 		spin_unlock(&pH_profile_list_sem);
 	
 		if (!profile || profile == NULL) {
