@@ -205,6 +205,11 @@ typedef struct read_filename {
 	struct read_filename* next;
 } read_filename;
 
+typedef struct task_struct_wrapper {
+	struct task_struct* task_struct;
+	struct task_struct_wrapper* next;
+} task_struct_wrapper;
+
 static void jhandle_signal(struct ksignal*, struct pt_regs*);
 
 struct jprobe handle_signal_jprobe = {
@@ -288,6 +293,8 @@ pH_disk_profile* profile_queue_rear = NULL;
 //pH_profile* read_profile_queue_rear = NULL;
 read_filename* read_filename_queue_front = NULL;
 read_filename* read_filename_queue_rear = NULL;
+task_struct_wrapper* task_struct_queue_front = NULL;
+task_struct_wrapper* task_struct_queue_rear = NULL;
 char* nul_string;
 
 // Returns true if the process is being monitored, false otherwise
@@ -535,6 +542,28 @@ void remove_from_read_filename_queue(void) {
 	kfree(to_return->filename);
 	kfree(to_return);
 	to_return = NULL;
+}
+
+void add_to_task_struct_queue(task_struct_wrapper* t) {
+	ASSERT(t != NULL);
+	
+	if (task_struct_queue_front == NULL) {
+		task_struct_queue_front = t;
+		task_struct_queue_rear = t;
+		task_struct_queue_rear->next = NULL;
+	}
+	else {
+		task_struct_queue_rear->next = t;
+		task_struct_queue_rear = t;
+		task_struct_queue_rear->next = NULL;
+	}
+}
+
+void remove_from_task_struct_queue(void) {
+	task_struct_wrapper* to_remove = task_struct_queue_front;
+	task_struct_queue_front = task_struct_queue_front->next;
+	kfree(to_remove);
+	to_remove = NULL;
 }
 
 // Makes a new pH_profile and stores it in profile
@@ -1413,6 +1442,12 @@ static long jsys_execve(const char __user *filename,
 		pr_err("%s: After strcpy, output_string should be rb [%s]\n", DEVICE_NAME, output_string);
 		strcat(output_string, path_to_binary);
 		
+		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
+		if (!profile || profile == NULL) goto exit;
+		
+		new_profile(profile, path_to_binary, TRUE);
+		process->profile = profile;
+		
 		ret = send_signal(SIGCONT);
 		if (ret < 0) {
 			pr_err("%s: The userspace process was not woken for some reason\n", DEVICE_NAME);
@@ -1444,6 +1479,10 @@ static long jsys_execve(const char __user *filename,
 	
 	successful_jsys_execves++;
 	pr_err("%s: Incremented successful_jsys_execves\n", DEVICE_NAME);
+	
+	pr_err("%s: Calling process_syscall from jsys_execve...\n", DEVICE_NAME);
+	process_syscall(59);
+	pr_err("%s: Back in jsys_execve after process_syscall\n", DEVICE_NAME);
 	
 	pr_err("%s: Returning from jsys_execve...\n", DEVICE_NAME);
 	
@@ -1869,6 +1908,7 @@ static struct kretprobe do_execve_kretprobe = {
 };
 */
 
+/*
 static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	pH_task_struct* process;
 	pH_profile* profile;
@@ -1881,12 +1921,13 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	process_id = pid_vnr(task_tgid(current));
 	
-	ret = send_sig(SIGSTOP, current, SIGNAL_PRIVILEGE);
-	if (ret < 0) {
-		pr_err("%s: Failed to send SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
-		return ret;
-	}
-	pr_err("%s: Sent SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
+	
+	//ret = send_sig(SIGSTOP, current, SIGNAL_PRIVILEGE);
+	//if (ret < 0) {
+	//	pr_err("%s: Failed to send SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
+	//	return ret;
+	//}
+	//pr_err("%s: Sent SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
 	
 	pr_err("%s: pH_profile_list_sem = %p\n", DEVICE_NAME, &pH_profile_list_sem);
 	pr_err("%s: output_string = %p\n", DEVICE_NAME, output_string);
@@ -1913,12 +1954,14 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		process_syscall(59);
 		pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 		
-		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
-		if (ret < 0) {
-			pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process_id);
-			return ret;
-		}
-		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+		
+		//ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
+		//if (ret < 0) {
+		//	pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process_id);
+		//	return ret;
+		//}
+		//pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+		
 		
 		return 0;
 	}
@@ -1952,12 +1995,14 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	process_syscall(59);
 	pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 	
-	ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
-	if (ret < 0) {
-		pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process_id);
-		return ret;
-	}
-	pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+	
+	//ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
+	//if (ret < 0) {
+	//	pr_err("%s: Failed to send SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+	//	return ret;
+	//}
+	//pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+	
 	
 	return 0;
 }
@@ -1967,6 +2012,7 @@ static struct kretprobe sys_execve_kretprobe = {
 	.data_size = sizeof(struct my_kretprobe_data),
 	.maxactive = 20,
 };
+*/
 
 // Frees profile storage
 void pH_free_profile_storage(pH_profile *profile)
@@ -2991,6 +3037,7 @@ static int __init ebbchar_init(void) {
 	pr_err("%s: Successfully registered do_execve_kretprobe\n", DEVICE_NAME);
 	*/
 	
+	/*
 	sys_execve_kretprobe.kp.addr = kallsyms_lookup_name("sys_execve");
 	ret = register_kretprobe(&sys_execve_kretprobe);
 	if (ret < 0) {
@@ -3010,6 +3057,7 @@ static int __init ebbchar_init(void) {
 		return PTR_ERR(ebbcharDevice);
 	}
 	pr_err("%s: Successfully registered sys_execve_kretprobe\n", DEVICE_NAME);
+	*/
 	
 	/*
 	free_pid_jprobe.kp.addr = kallsyms_lookup_name("free_pid");
