@@ -1492,10 +1492,6 @@ static long jsys_execve(const char __user *filename,
 	successful_jsys_execves++;
 	pr_err("%s: Incremented successful_jsys_execves\n", DEVICE_NAME);
 	
-	pr_err("%s: Calling process_syscall from jsys_execve...\n", DEVICE_NAME);
-	process_syscall(59);
-	pr_err("%s: Back in jsys_execve after process_syscall\n", DEVICE_NAME);
-	
 	pr_err("%s: Returning from jsys_execve...\n", DEVICE_NAME);
 	
 	jprobe_return();
