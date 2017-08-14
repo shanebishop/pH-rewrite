@@ -1054,10 +1054,10 @@ int process_syscall(long syscall) {
 	if (profile->is_temp_profile) {
 		temp_profile = profile;
 		
-		pr_err("%s: Fetching profile...\n", DEVICE_NAME);
+		pr_err("%s: Fetching profile using filename [%s]...\n", DEVICE_NAME, profile->filename);
 		
 		spin_lock(&pH_profile_list_sem);
-		profile = retrieve_pH_profile_by_filename(process->filename);
+		profile = retrieve_pH_profile_by_filename(profile->filename);
 		spin_unlock(&pH_profile_list_sem);
 	
 		if (!profile || profile == NULL) {
@@ -2023,6 +2023,10 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		
 		ASSERT(process->profile != NULL);
 		
+		pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
+		process_syscall(59);
+		pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
+		
 		return 0;
 	}
 	
@@ -2030,6 +2034,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
 		
 		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
+		pr_err("%s: Making new profile with filename [%s]\n", DEVICE_NAME, process->filename);
 		new_profile(profile, process->filename, TRUE);
 		
 		//return -1;
