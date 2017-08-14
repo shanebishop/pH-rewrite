@@ -1046,7 +1046,7 @@ int process_syscall(long syscall) {
 		pH_refcount_inc(profile);
 	}
 	*/
-	pr_err("%s: Successfully dereferenced procces\n", DEVICE_NAME);
+	pr_err("%s: Successfully dereferenced process\n", DEVICE_NAME);
 	ASSERT(profile != NULL);
 	pr_err("%s: If this doesn't print, you know what is wrong %d\n", DEVICE_NAME, profile->is_temp_profile);
 	
@@ -1962,7 +1962,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pr_err("%s: Retrieved a process\n", DEVICE_NAME);
 	process->should_sigcont_this = TRUE;
 	
-	if (process->profile != NULL) {
+	if (!(process->profile->is_temp_profile)) {
 		process->should_sigcont_this = FALSE;
 		
 		//spin_unlock(&execve_count_lock);
@@ -1987,30 +1987,39 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	//spin_unlock(&execve_count_lock);
 	spin_unlock(&pH_profile_list_sem);
 	
-	if (!profile || profile == NULL) {
+	if (profile != NULL) {
+		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
+		remove_from_read_filename_queue();
+		return 0;
+	}
+	
+	//if (!profile || profile == NULL) {
 		pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
 		
 		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
 		new_profile(profile, process->filename, TRUE);
 		
 		//return -1;
-	}
+	//}
+	/*
 	else {
 		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
 		remove_from_read_filename_queue();
 	}
+	*/
 	
 	process->profile = profile;
 	pH_refcount_inc(profile);
 	ASSERT(get_refcount(profile) == 1);
 	pr_err("%s: Added the profile to the process\n", DEVICE_NAME);
 	
-	process->should_sigcont_this = FALSE;
+	//process->should_sigcont_this = FALSE;
 	
 	pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 	process_syscall(59);
 	pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 	
+	/*
 	ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
 	if (ret < 0) {
 		pr_err("%s: Failed to send SIGCONT signal to %d\n", DEVICE_NAME, process_id);
@@ -2019,6 +2028,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
 	
 	remove_from_task_struct_queue();
+	*/
 	
 	return 0;
 }
