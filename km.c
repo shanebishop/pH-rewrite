@@ -1053,7 +1053,8 @@ int process_syscall(long syscall) {
 	if (profile->is_temp_profile) {
 		temp_profile = profile;
 		
-		ASSERT(profile->filename != NULL && strlen(profile->filename) > 1);
+		ASSERT(profile->filename != NULL);
+		ASSERT(strlen(profile->filename) > 1);
 		
 		pr_err("%s: Fetching profile using filename [%s] in process_syscall...\n", DEVICE_NAME, process->filename);
 		
