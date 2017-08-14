@@ -2057,7 +2057,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	process_syscall(59);
 	pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 	
-	/*
+	/* // Should this be a comment?
 	ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
 	if (ret < 0) {
 		pr_err("%s: Failed to send SIGCONT signal to %d\n", DEVICE_NAME, process_id);
