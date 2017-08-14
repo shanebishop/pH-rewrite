@@ -1047,6 +1047,7 @@ int process_syscall(long syscall) {
 	}
 	*/
 	pr_err("%s: Successfully dereferenced process\n", DEVICE_NAME);
+	pr_err("%s: The process's filename is [%s]\n", DEVICE_NAME, process->filename);
 	ASSERT(profile != NULL);
 	pr_err("%s: If this doesn't print, you know what is wrong %d\n", DEVICE_NAME, profile->is_temp_profile);
 	
