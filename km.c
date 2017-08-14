@@ -632,7 +632,16 @@ int new_profile(pH_profile* profile, char* filename, bool make_temp_profile) {
 
 	profile->next = NULL;
 	pH_refcount_init(profile, 0);
-	profile->filename = filename;
+	
+	profile->filename = kmalloc(strlen(filename) + 1, GFP_ATOMIC);
+	if (profile->filename == NULL) {
+		pr_err("%s: Unable to allocate memory for profile->filename in new_profile()\n", DEVICE_NAME);
+		return -ENOMEM;
+	}
+	strncpy(profile->filename, filename, strlen(filename));
+	profile->filename[strlen(profile->filename)] = '\0';
+	ASSERT(strcmp(filename, profile->filename) == 0);
+	ASSERT(strlen(profile->filename) == strlen(filename));
 	//pr_err("%s: Got here 4 (new_profile)\n", DEVICE_NAME);
 
 	//pH_open_seq_logfile(profile);
@@ -711,6 +720,7 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 	return NULL;
 }
 
+/*
 pH_task_struct* llist_retrieve_process_by_filename(char* filename) {
 	pH_task_struct* iterator = NULL;
 	
@@ -738,6 +748,7 @@ pH_task_struct* llist_retrieve_process_by_filename(char* filename) {
 	pr_err("%s: Process with filename [%s] not found\n", DEVICE_NAME, filename);
 	return NULL;
 }
+*/
 
 void stack_push(pH_task_struct*, pH_seq*);
 
@@ -2459,6 +2470,9 @@ void free_pH_task_struct(pH_task_struct* process) {
 	if (pH_aremonitoring) {
 		//stack_print(process);
 	}
+	
+	kfree(process->filename);
+	process->filename = NULL;
 	
 	// Emtpies stack of pH_seqs
 	while (process->seq != NULL) {
