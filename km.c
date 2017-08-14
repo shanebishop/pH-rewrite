@@ -910,11 +910,11 @@ int send_signal(int signal_to_send) {
 			strcpy(signal_sent, "SIGKILL");
 			break;
 		default:
-			printk(KERN_INFO "%s: %d signal sent to user space process", DEVICE_NAME, signal_to_send);
+			pr_err("%s: %d signal sent to user space process", DEVICE_NAME, signal_to_send);
 			return 0;
 	}
 
-	//printk(KERN_INFO "%s: %s signal sent to user space process", DEVICE_NAME, signal_sent);
+	//pr_err("%s: %s signal sent to user space process", DEVICE_NAME, signal_sent);
 	*/
 	return 0;
 }
