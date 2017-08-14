@@ -1088,6 +1088,8 @@ int process_syscall(long syscall) {
 			goto exit_before_profile;
 		}
 		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process->process_id);
+		
+		remove_from_task_struct_queue();
 	}
 	else {
 		pH_refcount_inc(profile);
@@ -2021,6 +2023,8 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 			return ret;
 		}
 		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+		
+		remove_from_task_struct_queue();
 		
 		ASSERT(process->profile != NULL);
 		
