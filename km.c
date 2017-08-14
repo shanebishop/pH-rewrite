@@ -1055,8 +1055,8 @@ int process_syscall(long syscall) {
 	if (profile->is_temp_profile) {
 		temp_profile = profile;
 		
-		ASSERT(profile->filename != NULL);
-		ASSERT(strlen(profile->filename) > 1);
+		ASSERT(process->filename != NULL);
+		ASSERT(strlen(process->filename) > 1);
 		
 		pr_err("%s: Fetching profile using filename [%s] in process_syscall...\n", DEVICE_NAME, process->filename);
 		
@@ -1071,6 +1071,8 @@ int process_syscall(long syscall) {
 		}
 		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
 		remove_from_read_filename_queue();
+		
+		ASSERT(strcmp(process->filename, profile->filename) == 0);
 		
 		merge_temp_with_disk(temp_profile, profile);
 		pH_refcount_init(temp_profile, 0);
