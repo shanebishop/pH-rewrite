@@ -288,6 +288,7 @@ pH_disk_profile* profile_queue_rear = NULL;
 //pH_profile* read_profile_queue_rear = NULL;
 read_filename* read_filename_queue_front = NULL;
 read_filename* read_filename_queue_rear = NULL;
+char* nul_string;
 
 // Returns true if the process is being monitored, false otherwise
 inline bool pH_monitoring(pH_task_struct* process) {
@@ -1378,6 +1379,7 @@ static long jsys_execve(const char __user *filename,
 	if (!profile || profile == NULL) {
 		add_to_read_filename_queue(path_to_binary);
 		pr_err("%s: path_to_binary was added to the read filename queue\n", DEVICE_NAME);
+		strcpy(output_string, nul_string);
 		strcpy(output_string, READ_PROFILE_FROM_DISK); // Maybe I shouldn't do this if there is another command already
 		output_string[2] = '\0';
 		pr_err("%s: After strcpy, output_string should be rb [%s]\n", DEVICE_NAME, output_string);
@@ -2093,6 +2095,7 @@ int pH_write_profile(pH_profile* profile) {
 	if (!output_string || output_string == NULL) {
 		pr_err("%s: output_string is NULL in pH_write_profile\n", DEVICE_NAME);
 	}
+	strcpy(output_string, nul_string);
 	strcpy(output_string, TRANSFER_OPERATION);
 	output_string[1] = '\0';
 	pr_err("%s: After strcpy, output_string should be t [%s]\n", DEVICE_NAME, output_string);
@@ -3219,6 +3222,16 @@ static int __init ebbchar_init(void) {
 	}
 	pr_err("%s: Registered all syscall probes\n", DEVICE_NAME);
 	
+	nul_string = kmalloc(sizeof(char) * 254, GFP_ATOMIC);
+	if (!nul_string || nul_string == NULL) {
+		pr_err("%s: Unable to allocate space for nul_string in ebbchar_init\n", DEVICE_NAME);
+		return PTR_ERR(ebbcharDevice);
+	}
+	
+	for (i = 0; i < 254; i++) {
+		nul_string[i] = '\0';
+	}
+	
 	pr_err("%s: Successfully initialized %s\n", DEVICE_NAME, DEVICE_NAME);
 	
 	// Set booleans accordingly, now that initialization is complete
@@ -3246,6 +3259,7 @@ static void __exit ebbchar_exit(void){
 	if (send_signal(SIGTERM) < 0) send_signal(SIGKILL);
 	
 	kfree(output_string);
+	kfree(nul_string);
 	pr_err("%s: vfreeing bin_receive_ptr...\n", DEVICE_NAME);
 	vfree(bin_receive_ptr);
 
@@ -3417,6 +3431,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	pr_err("%s: Removed a disk profile from the queue\n", DEVICE_NAME);
 	if (profile_queue_is_empty()) {
 		pr_err("%s: Profile queue is empty\n", DEVICE_NAME);
+		strcpy(output_string, nul_string);
 		strcpy(output_string, STOP_TRANSFER_OPERATION);
 		output_string[2] = '\0';
 		pr_err("%s: After strcpy, ouput_string should be st = [%s]", DEVICE_NAME, output_string);
