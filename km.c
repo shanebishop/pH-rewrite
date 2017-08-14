@@ -566,6 +566,10 @@ void remove_from_task_struct_queue(void) {
 	to_remove = NULL;
 }
 
+struct task_struct* peek_task_struct_queue(void) {
+	return task_struct_queue_front->task_struct;
+}
+
 // Makes a new pH_profile and stores it in profile
 // profile must be allocated before this function is called
 int new_profile(pH_profile* profile, char* filename, bool make_temp_profile) {
@@ -1442,11 +1446,13 @@ static long jsys_execve(const char __user *filename,
 		pr_err("%s: After strcpy, output_string should be rb [%s]\n", DEVICE_NAME, output_string);
 		strcat(output_string, path_to_binary);
 		
+		/*
 		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
 		if (!profile || profile == NULL) goto exit;
 		
 		new_profile(profile, path_to_binary, TRUE);
 		process->profile = profile;
+		*/
 		
 		ret = send_signal(SIGCONT);
 		if (ret < 0) {
@@ -1908,12 +1914,12 @@ static struct kretprobe do_execve_kretprobe = {
 };
 */
 
-/*
 static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	pH_task_struct* process;
 	pH_profile* profile;
 	int ret;
 	int process_id;
+	task_struct_wrapper* to_add;
 	
 	if (!done_waiting_for_user) return 0;
 	
@@ -1921,13 +1927,21 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	process_id = pid_vnr(task_tgid(current));
 	
+	ret = send_sig(SIGSTOP, current, SIGNAL_PRIVILEGE);
+	if (ret < 0) {
+		pr_err("%s: Failed to send SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
+		return ret;
+	}
+	pr_err("%s: Sent SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
 	
-	//ret = send_sig(SIGSTOP, current, SIGNAL_PRIVILEGE);
-	//if (ret < 0) {
-	//	pr_err("%s: Failed to send SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
-	//	return ret;
-	//}
-	//pr_err("%s: Sent SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
+	to_add = kmalloc(sizeof(task_struct_wrapper), GFP_ATOMIC);
+	if (!to_add || to_add == NULL) {
+		pr_err("%s: Unable to allocate memory for to_add in sys_execve_return_handler\n", DEVICE_NAME);
+		return -ENOMEM;
+	}
+	to_add->task_struct = current;
+	
+	add_to_task_struct_queue(to_add);
 	
 	pr_err("%s: pH_profile_list_sem = %p\n", DEVICE_NAME, &pH_profile_list_sem);
 	pr_err("%s: output_string = %p\n", DEVICE_NAME, output_string);
@@ -1954,14 +1968,14 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		process_syscall(59);
 		pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 		
+		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
+		if (ret < 0) {
+			pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process_id);
+			return ret;
+		}
+		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
 		
-		//ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
-		//if (ret < 0) {
-		//	pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process_id);
-		//	return ret;
-		//}
-		//pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
-		
+		remove_from_task_struct_queue();
 		
 		return 0;
 	}
@@ -1995,14 +2009,14 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	process_syscall(59);
 	pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 	
+	ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
+	if (ret < 0) {
+		pr_err("%s: Failed to send SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+		return ret;
+	}
+	pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
 	
-	//ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
-	//if (ret < 0) {
-	//	pr_err("%s: Failed to send SIGCONT signal to %d\n", DEVICE_NAME, process_id);
-	//	return ret;
-	//}
-	//pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
-	
+	remove_from_task_struct_queue();
 	
 	return 0;
 }
@@ -2012,7 +2026,6 @@ static struct kretprobe sys_execve_kretprobe = {
 	.data_size = sizeof(struct my_kretprobe_data),
 	.maxactive = 20,
 };
-*/
 
 // Frees profile storage
 void pH_free_profile_storage(pH_profile *profile)
@@ -3037,7 +3050,7 @@ static int __init ebbchar_init(void) {
 	pr_err("%s: Successfully registered do_execve_kretprobe\n", DEVICE_NAME);
 	*/
 	
-	/*
+	
 	sys_execve_kretprobe.kp.addr = kallsyms_lookup_name("sys_execve");
 	ret = register_kretprobe(&sys_execve_kretprobe);
 	if (ret < 0) {
@@ -3057,7 +3070,7 @@ static int __init ebbchar_init(void) {
 		return PTR_ERR(ebbcharDevice);
 	}
 	pr_err("%s: Successfully registered sys_execve_kretprobe\n", DEVICE_NAME);
-	*/
+	
 	
 	/*
 	free_pid_jprobe.kp.addr = kallsyms_lookup_name("free_pid");
@@ -3643,6 +3656,14 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				
 				pr_err("%s: Removing from read filename queue\n", DEVICE_NAME);
 				remove_from_read_filename_queue();
+				
+				ret = send_sig(SIGCONT, peek_task_struct_queue(), SIGNAL_PRIVILEGE);
+				if (ret < 0) {
+					pr_err("%s: Failed to send SIGCONT signal in dev_write\n", DEVICE_NAME);
+					return len;
+				}
+				pr_err("%s: Sent SIGCONT signal\n", DEVICE_NAME);
+				remove_from_task_struct_queue();
 				
 				pr_err("%s: Returning from dev_write...\n", DEVICE_NAME);
 				
