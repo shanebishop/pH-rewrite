@@ -1961,9 +1961,11 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	}
 	pr_err("%s: Retrieved a process\n", DEVICE_NAME);
 	process->should_sigcont_this = TRUE;
+	pr_err("%s: Set should_sigcont_this to TRUE\n", DEVICE_NAME);
 	
-	if (!(process->profile->is_temp_profile)) {
+	if (process->profile != NULL && !(process->profile->is_temp_profile)) {
 		process->should_sigcont_this = FALSE;
+		pr_err("%s: Set should_sigcont_this to FALSE\n", DEVICE_NAME);
 		
 		//spin_unlock(&execve_count_lock);
 		pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
