@@ -3709,14 +3709,17 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				remove_from_read_filename_queue();
 				pr_err("%s: Removed from read filename queue\n", DEVICE_NAME);
 				
+				// I'm not entirely sure why this is here, actually
 				if (peek_task_struct_queue() != NULL) {
 					pr_err("%s: The task_struct's comm is [%s]\n", DEVICE_NAME, peek_task_struct_queue()->comm);
 					ret = send_sig(SIGCONT, peek_task_struct_queue(), SIGNAL_PRIVILEGE);
 					if (ret < 0) {
 						pr_err("%s: Failed to send SIGCONT signal in dev_write: %d\n", DEVICE_NAME, ret);
-						return len;
+						
+						// Sometimes this fails with -3, so ignore those cases
+						if (ret != -3) return len;
 					}
-					pr_err("%s: Sent SIGCONT signal\n", DEVICE_NAME);
+					else pr_err("%s: Sent SIGCONT signal\n", DEVICE_NAME);
 					remove_from_task_struct_queue();
 				}
 				
