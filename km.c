@@ -567,6 +567,8 @@ void remove_from_task_struct_queue(void) {
 }
 
 struct task_struct* peek_task_struct_queue(void) {
+	if (task_struct_queue_front == NULL) return NULL;
+	
 	return task_struct_queue_front->task_struct;
 }
 
