@@ -638,8 +638,9 @@ int new_profile(pH_profile* profile, char* filename, bool make_temp_profile) {
 		pr_err("%s: Unable to allocate memory for profile->filename in new_profile()\n", DEVICE_NAME);
 		return -ENOMEM;
 	}
-	strncpy(profile->filename, filename, strlen(filename));
-	profile->filename[strlen(profile->filename)] = '\0';
+	//strncpy(profile->filename, filename, strlen(filename));
+	strcpy(profile->filename, filename);
+	//profile->filename[strlen(profile->filename)] = '\0';
 	ASSERT(strcmp(filename, profile->filename) == 0);
 	ASSERT(strlen(profile->filename) == strlen(filename));
 	//pr_err("%s: Got here 4 (new_profile)\n", DEVICE_NAME);
