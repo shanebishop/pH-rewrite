@@ -3656,6 +3656,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				
 				pr_err("%s: Removing from read filename queue\n", DEVICE_NAME);
 				remove_from_read_filename_queue();
+				pr_err("%s: Removed from read filename queue\n", DEVICE_NAME);
 				
 				ret = send_sig(SIGCONT, peek_task_struct_queue(), SIGNAL_PRIVILEGE);
 				if (ret < 0) {
