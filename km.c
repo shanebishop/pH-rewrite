@@ -577,11 +577,10 @@ struct task_struct* peek_task_struct_queue(void) {
 int new_profile(pH_profile* profile, char* filename, bool make_temp_profile) {
 	int i;
 
-	// Checks for NULL
-	if (!profile || profile == NULL) {
-		pr_err("%s: ERROR: NULL profile was passed to new_profile\n", DEVICE_NAME);
-		return -1;
-	}
+	ASSERT(profile != NULL);
+	
+	ASSERT(!(!filename || filename == NULL || strlen(filename) < 1 || 
+		!(*filename == '~' || *filename == '.' || *filename == '/')));
 
 	// Increments profiles_created, and stores it as the identifier
 	profiles_created++;
