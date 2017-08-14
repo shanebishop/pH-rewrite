@@ -3586,7 +3586,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				process = llist_retrieve_process_by_filename(peek_read_filename_queue());
 				spin_lock(&pH_task_struct_list_sem);
 				
-				if (process != NULL) {
+				if (process != NULL && process->profile == NULL) {
 					process->profile = profile;
 					pH_refcount_inc(profile);
 				}
