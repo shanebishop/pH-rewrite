@@ -581,6 +581,8 @@ int new_profile(pH_profile* profile, char* filename, bool make_temp_profile) {
 	
 	ASSERT(!(!filename || filename == NULL || strlen(filename) < 1 || 
 		!(*filename == '~' || *filename == '.' || *filename == '/')));
+		
+	ASSERT(strlen(filename) > 1);
 
 	// Increments profiles_created, and stores it as the identifier
 	profiles_created++;
