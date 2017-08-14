@@ -2014,7 +2014,15 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 			pH_refcount_inc(profile);
 		}
 		
+		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
+		if (ret < 0) {
+			pr_err("%s: Failed to send SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+			return ret;
+		}
+		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+		
 		ASSERT(process->profile != NULL);
+		
 		return 0;
 	}
 	
