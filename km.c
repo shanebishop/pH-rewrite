@@ -1053,7 +1053,7 @@ int process_syscall(long syscall) {
 	if (profile->is_temp_profile) {
 		temp_profile = profile;
 		
-		pr_err("%s: Fetching profile using filename [%s]...\n", DEVICE_NAME, profile->filename);
+		pr_err("%s: Fetching profile using filename [%s] in process_syscall...\n", DEVICE_NAME, profile->filename);
 		
 		spin_lock(&pH_profile_list_sem);
 		profile = retrieve_pH_profile_by_filename(profile->filename);
@@ -2184,8 +2184,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
         pH_profile_list = profile->next;
         return 0;
     } else if (pH_profile_list == NULL) {
-        err("pH_profile_list is NULL when trying to free profile %s",
-            profile->filename);
+        err("pH_profile_list is NULL when trying to free profile %s", profile->filename);
         return -1;
     } else {
         prev_profile = pH_profile_list;
@@ -2198,8 +2197,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
             prev_profile->next = cur_profile->next;
             return 0;
         } else {
-            err("while freeing, couldn't find profile %s in "
-                "pH_profile_list", profile->filename);
+            err("while freeing, couldn't find profile %s in pH_profile_list", profile->filename);
             return -1;
         }
     }
@@ -3748,6 +3746,9 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 		
 			pr_err("%s: Copying from disk to mem...\n", DEVICE_NAME);
 			pH_profile_disk2mem((pH_disk_profile*) buffer, profile);
+			
+			pr_err("%s: The filename we got back from userspace was [%s]\n", DEVICE_NAME);
+			ASSERT(profile->filename != NULL || strlen(profile->filename) > 1);
 		
 			pr_err("%s: Adding to profile list...\n", DEVICE_NAME);
 			add_to_profile_llist(profile);
