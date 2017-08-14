@@ -3348,6 +3348,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 		pr_err("%s: This is not a binary read\n", DEVICE_NAME);
 		
 		// Determine number of bytes to send to userspace
+		// Maybe I should add 1 so that it includes the nul character?
 		size_of_message = strlen(output_string);
 
 		// If we are asking to perform a binary transfer, set binary_read to TRUE

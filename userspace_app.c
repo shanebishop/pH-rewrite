@@ -237,7 +237,7 @@ int write_profiles(int fd) {
 	return 0;
 }
 
-int main(){
+int main() {
 	int ret, fd, i;
 	pH_disk_profile* disk_profile;
 	
@@ -292,6 +292,10 @@ int main(){
 		printf("Reading from the device...\n");
 		
 		strcpy(receive, nul_string);
+		for (i = 0; i < BUFFER_LENGTH; i++) {
+			receive[i] = '\0';
+		}
+		
 		ret = read(fd, receive, BUFFER_LENGTH);
 		if (ret < 0 || receive == NULL || strlen(receive) < 1) {
 			printf("Failed to read the message from the device.%d%d%d\n", ret < 0, receive == NULL, strlen(receive) < 1);
