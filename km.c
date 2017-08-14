@@ -3660,7 +3660,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				remove_from_read_filename_queue();
 				pr_err("%s: Removed from read filename queue\n", DEVICE_NAME);
 				
-				if (peek_task_struct_queue() != NULL)) {
+				if (peek_task_struct_queue() != NULL) {
 					ret = send_sig(SIGCONT, peek_task_struct_queue(), SIGNAL_PRIVILEGE);
 					if (ret < 0) {
 						pr_err("%s: Failed to send SIGCONT signal in dev_write\n", DEVICE_NAME);
