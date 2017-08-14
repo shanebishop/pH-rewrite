@@ -1982,6 +1982,8 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		
 		remove_from_task_struct_queue();
 		
+		ASSERT(process->profile != NULL);
+		
 		return 0;
 	}
 	
@@ -1993,6 +1995,10 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	if (profile != NULL) {
 		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
 		remove_from_read_filename_queue();
+		if (process->profile == NULL) {
+			process->profile = profile;
+		}
+		ASSERT(process->profile != NULL);
 		return 0;
 	}
 	
@@ -2032,6 +2038,8 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	remove_from_task_struct_queue();
 	*/
+	
+	ASSERT(process->profile != NULL);
 	
 	return 0;
 }
