@@ -2036,6 +2036,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		
 		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
 		pr_err("%s: Making new profile with filename [%s]\n", DEVICE_NAME, process->filename);
+		pr_err("\n\n\n\n\n\n\n\%s: No really, the filename is [%s]\n*****************\n*****************\n*****************\n", DEVICE_NAME, process->filename);
 		new_profile(profile, process->filename, TRUE);
 		
 		//return -1;
