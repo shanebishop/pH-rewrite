@@ -142,8 +142,8 @@ struct pH_profile {
 	atomic_t refcount;
 	pH_profile *next;
 	//struct file *seq_logfile;
-	pH_seq seq;
 	spinlock_t* lock;
+	bool is_temp_profile;
 };
 
 typedef struct pH_seq_logrec {
@@ -538,18 +538,19 @@ void remove_from_read_filename_queue(void) {
 
 // Makes a new pH_profile and stores it in profile
 // profile must be allocated before this function is called
-int new_profile(pH_profile* profile, char* filename) {
+int new_profile(pH_profile* profile, char* filename, bool make_temp_profile) {
 	int i;
 
 	// Checks for NULL
 	if (!profile || profile == NULL) {
-		pr_err("%s: ERROR: NULL profile was passed to new_profile()\n", DEVICE_NAME);
+		pr_err("%s: ERROR: NULL profile was passed to new_profile\n", DEVICE_NAME);
 		return -1;
 	}
 
 	// Increments profiles_created, and stores it as the identifier
 	profiles_created++;
 	profile->identifier = profiles_created;
+	profile->is_temp_profile = make_temp_profile;
 
 	profile->normal = 0;  // We just started - not normal yet!
 	profile->frozen = 0;
@@ -563,7 +564,7 @@ int new_profile(pH_profile* profile, char* filename) {
 	// Allocates memory for the lock
 	profile->lock = kmalloc(sizeof(spinlock_t), GFP_ATOMIC);
 	if (!(profile->lock) || profile->lock == NULL) {
-		pr_err("%s: Unable to allocate memory for profile->lock in new_profile()\n", DEVICE_NAME);
+		pr_err("%s: Unable to allocate memory for profile->lock in new_profile\n", DEVICE_NAME);
 		vfree(profile);
 		profile = NULL;
 		return -ENOMEM;
@@ -602,15 +603,17 @@ int new_profile(pH_profile* profile, char* filename) {
 	// Add this new profile to the hashtable
 	//hash_add(profile_hashtable, &profile->hlist, pid_vnr(task_tgid(current)));
 	
-	// Add this new profile to the llist
-	//pr_err("%s: Locking profile list in new_profile on line 460\n", DEVICE_NAME);
-	//preempt_disable();
-	spin_lock(&pH_profile_list_sem);
-	add_to_profile_llist(profile);
-	spin_unlock(&pH_profile_list_sem);
-	//preempt_enable();
-	//pr_err("%s: Unlocking profile list in new_profile on line 462\n", DEVICE_NAME);
-	//pr_err("%s: Got here 5 (new_profile) returning...\n", DEVICE_NAME);
+	if (!make_temp_profile) {
+		// Add this new profile to the llist
+		//pr_err("%s: Locking profile list in new_profile on line 460\n", DEVICE_NAME);
+		//preempt_disable();
+		spin_lock(&pH_profile_list_sem);
+		add_to_profile_llist(profile);
+		spin_unlock(&pH_profile_list_sem);
+		//preempt_enable();
+		//pr_err("%s: Unlocking profile list in new_profile on line 462\n", DEVICE_NAME);
+		//pr_err("%s: Got here 5 (new_profile) returning...\n", DEVICE_NAME);
+	}
 	
 	pr_err("%s: Made new profile with filename [%s]\n", DEVICE_NAME, filename);
 
@@ -853,17 +856,60 @@ int send_signal(int signal_to_send) {
 	return 0;
 }
 
+int pH_add_seq_storage(pH_profile_data*, int);
+
+int copy_pH_profile_data(pH_profile_data* old, pH_profile_data* new) {
+	int i;
+	
+	//sequences
+	if (old->last_mod_count == 0) {
+		new->last_mod_count = 0;
+		new->train_count += old->train_count;
+	}
+	
+	for (i = 0; i < PH_NUM_SYSCALLS; i++) {
+		if (old->entry[i] == NULL) {
+			new->entry[i] = NULL;
+		}
+		else {
+			if (pH_add_seq_storage(new, i)) return -1;
+			memcpy(new->entry[i], old->entry[i], PH_NUM_SYSCALLS);
+		}
+	}
+	
+	return 0;
+}
+
+//void copy_pH_seq(pH_seq* old, pH_seq* new) {}
+
+void merge_temp_with_disk(pH_profile* temp, pH_profile* disk) {
+	ASSERT(temp != NULL);
+	ASSERT(disk != NULL);
+	
+	// int normal
+	// int frozen
+	// time_t normal_time
+	// int length - I think I can just leave this as is
+	//disk->count += temp->count;
+	// int anomalies
+	copy_pH_profile_data(&(temp->train), &(disk->train));
+	copy_pH_profile_data(&(temp->test), &(disk->test));
+	//copy_pH_seq(&(temp->seq), &(disk->seq));
+}
+
 // Function prototypes for process_syscall()
 inline void pH_append_call(pH_seq*, int);
 inline void pH_train(pH_task_struct*);
 //void stack_print(pH_task_struct*);
 pH_profile* retrieve_pH_profile_by_filename(char*);
+void pH_free_profile(pH_profile*);
 
 // Processes a system call
 int process_syscall(long syscall) {
 	pH_task_struct* process;
 	//my_syscall* new_syscall;
 	pH_profile* profile;
+	pH_profile* temp_profile;
 	int ret;
 	
 	// Boolean checks
@@ -898,6 +944,7 @@ int process_syscall(long syscall) {
 	//pr_err("\n\n\n\n\n\n\n\%s: No really, the process was retrieved successfully\n*****************\n*****************\n*****************\n", DEVICE_NAME);
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
+	/*
 	if (!profile || profile == NULL) {
 		pr_err("%s: Fetching profile...\n", DEVICE_NAME);
 		
@@ -929,6 +976,47 @@ int process_syscall(long syscall) {
 		
 		ret = -1;
 		goto exit_before_profile;
+	}
+	else {
+		pH_refcount_inc(profile);
+	}
+	*/
+	
+	if (profile->is_temp_profile) {
+		temp_profile = profile;
+		
+		pr_err("%s: Fetching profile...\n", DEVICE_NAME);
+		
+		spin_lock(&pH_profile_list_sem);
+		profile = retrieve_pH_profile_by_filename(process->filename);
+		spin_unlock(&pH_profile_list_sem);
+	
+		if (!profile || profile == NULL) {
+			pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
+			ret = -1;
+			goto exit_before_profile;
+		}
+		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
+		remove_from_read_filename_queue();
+		
+		merge_temp_with_disk(temp_profile, profile);
+		pH_free_profile(temp_profile);
+		vfree(temp_profile);
+		temp_profile = NULL;
+	
+		process->should_sigcont_this = FALSE;
+	
+		process->profile = profile;
+		pH_refcount_inc(profile);
+		ASSERT(get_refcount(profile) == 1);
+		pr_err("%s: Added the profile to the process\n", DEVICE_NAME);
+	
+		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
+		if (ret < 0) {
+			pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process->process_id);
+			goto exit_before_profile;
+		}
+		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process->process_id);
 	}
 	else {
 		pH_refcount_inc(profile);
@@ -1277,7 +1365,7 @@ static long jsys_execve(const char __user *filename,
 		pr_err("%s: Made new profile for [%s]\n", DEVICE_NAME, path_to_binary);
 		
 		if (!profile || profile == NULL) {
-			pr_err("%s: new_profile() made a corrupted or NULL profile\n", DEVICE_NAME);
+			pr_err("%s: new_profile made a corrupted or NULL profile\n", DEVICE_NAME);
 		}
 	}
 	else {
@@ -1811,10 +1899,16 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	if (!profile || profile == NULL) {
 		pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
-		return -1;
+		
+		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
+		new_profile(profile, process->filename, TRUE);
+		
+		//return -1;
 	}
-	pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
-	remove_from_read_filename_queue();
+	else {
+		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
+		remove_from_read_filename_queue();
+	}
 	
 	process->profile = profile;
 	pH_refcount_inc(profile);
@@ -3439,12 +3533,10 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 					}
 					
 					pr_err("%s: Making new profile with filename [%s]\n", DEVICE_NAME, peek_read_filename_queue());
-					new_profile(profile, peek_read_filename_queue());
-					
-					
+					new_profile(profile, peek_read_filename_queue(), FALSE);
 				}
 				
-				pr_err("%s: Returing from dev_write...\n", DEVICE_NAME);
+				pr_err("%s: Returning from dev_write...\n", DEVICE_NAME);
 				
 				// Depending on the situation, we may want to process what the user sent us before returning
 				return 0;
