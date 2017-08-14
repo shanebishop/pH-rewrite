@@ -643,6 +643,8 @@ int new_profile(pH_profile* profile, char* filename, bool make_temp_profile) {
 	//profile->filename[strlen(profile->filename)] = '\0';
 	ASSERT(strcmp(filename, profile->filename) == 0);
 	ASSERT(strlen(profile->filename) == strlen(filename));
+	ASSERT(!(!profile->filename || profile->filename == NULL || strlen(profile->filename) < 1));
+	ASSERT(strlen(profile->filename) > 1);
 	//pr_err("%s: Got here 4 (new_profile)\n", DEVICE_NAME);
 
 	//pH_open_seq_logfile(profile);
@@ -1077,6 +1079,7 @@ int process_syscall(long syscall) {
 		spin_unlock(&pH_profile_list_sem);
 	
 		if (!profile || profile == NULL) {
+			ASSERT(strlen(process->filename) > 1);
 			pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
 			ret = -1;
 			goto exit_before_profile;
@@ -2053,6 +2056,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	}
 	
 	//if (!profile || profile == NULL) {
+		ASSERT(strlen(process->filename) > 1);
 		pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
 		
 		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
