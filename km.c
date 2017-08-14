@@ -1004,7 +1004,7 @@ int process_syscall(long syscall) {
 		goto exit_before_profile;
 	}
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
-	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
+	pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
 	//pr_err("\n\n\n\n\n\n\n\%s: No really, the process was retrieved successfully\n*****************\n*****************\n*****************\n", DEVICE_NAME);
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
@@ -1045,6 +1045,7 @@ int process_syscall(long syscall) {
 		pH_refcount_inc(profile);
 	}
 	*/
+	pr_err("%s: Successfully dereferenced proces\n", DEVICE_NAME);
 	
 	if (profile->is_temp_profile) {
 		temp_profile = profile;
