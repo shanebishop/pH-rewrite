@@ -1238,32 +1238,32 @@ void add_process_to_llist(pH_task_struct* t) {
 
 // Returns a pH_profile, given a filename
 pH_profile* retrieve_pH_profile_by_filename(char* filename) {
-	pr_err("%s: In retrieve_pH_profile_by_filename\n", DEVICE_NAME);
+	//pr_err("%s: In retrieve_pH_profile_by_filename\n", DEVICE_NAME);
 	
 	ASSERT(spin_is_locked(&pH_profile_list_sem));
 	//ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
-	pr_err("%s: Made it past assertions\n", DEVICE_NAME);
+	//pr_err("%s: Made it past assertions\n", DEVICE_NAME);
 	
 	pH_task_struct* process_list_iterator;
 	pH_profile* profile_list_iterator = pH_profile_list;
-	pr_err("%s: Made it past declarations\n", DEVICE_NAME);
+	//pr_err("%s: Made it past declarations\n", DEVICE_NAME);
 	
 	if (pH_profile_list == NULL) {
 		pr_err("%s: pH_profile_list is NULL\n", DEVICE_NAME);
 		return NULL;
 	}
-	pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
+	//pr_err("%s: pH_profile_list is not NULL\n", DEVICE_NAME);
 	
 	// Search through profile list
 	do {
 		//pr_err("%s: Filename is [%s]\n", DEVICE_NAME, profile_list_iterator->filename);
 		if (strcmp(filename, profile_list_iterator->filename) == 0) {
-			pr_err("%s: Found it! Returning\n", DEVICE_NAME);
+			//pr_err("%s: Found it! Returning\n", DEVICE_NAME);
 			return profile_list_iterator;
 		}
 		
 		profile_list_iterator = profile_list_iterator->next;
-		pr_err("%s: Iterating\n", DEVICE_NAME);
+		//pr_err("%s: Iterating\n", DEVICE_NAME);
 	} while (profile_list_iterator);
 	
 	/*
