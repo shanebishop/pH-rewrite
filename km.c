@@ -3630,6 +3630,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 					new_profile(profile, peek_read_filename_queue(), FALSE);
 				}
 				
+				/*
 				spin_lock(&pH_task_struct_list_sem);
 				process = llist_retrieve_process_by_filename(peek_read_filename_queue());
 				spin_lock(&pH_task_struct_list_sem);
@@ -3638,6 +3639,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 					process->profile = profile;
 					pH_refcount_inc(profile);
 				}
+				*/
 				
 				pr_err("%s: Removing from read filename queue\n", DEVICE_NAME);
 				remove_from_read_filename_queue();
