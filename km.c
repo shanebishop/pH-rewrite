@@ -997,7 +997,7 @@ int process_syscall(long syscall) {
 	spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
 	spin_unlock(&pH_task_struct_list_sem);
-	pr_err("%s: Tried to retrieve process\n", DEVICE_NAME);
+	//pr_err("%s: Tried to retrieve process\n", DEVICE_NAME);
 	//preempt_enable();
 	if (!process) {
 		// Ignore this syscall
