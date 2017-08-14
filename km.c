@@ -1033,7 +1033,7 @@ int process_syscall(long syscall) {
 	
 		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
 		if (ret < 0) {
-			pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process->process_id);
+			pr_err("%s: Failed to send SIGCONT signal to %d\n", DEVICE_NAME, process->process_id);
 			goto exit_before_profile;
 		}
 		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process->process_id);
@@ -3710,9 +3710,10 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				pr_err("%s: Removed from read filename queue\n", DEVICE_NAME);
 				
 				if (peek_task_struct_queue() != NULL) {
+					pr_err("%s: The task_struct's comm is [%s]\n", DEVICE_NAME, peek_task_struct_queue()->comm);
 					ret = send_sig(SIGCONT, peek_task_struct_queue(), SIGNAL_PRIVILEGE);
 					if (ret < 0) {
-						pr_err("%s: Failed to send SIGCONT signal in dev_write\n", DEVICE_NAME);
+						pr_err("%s: Failed to send SIGCONT signal in dev_write: %d\n", DEVICE_NAME, ret);
 						return len;
 					}
 					pr_err("%s: Sent SIGCONT signal\n", DEVICE_NAME);
