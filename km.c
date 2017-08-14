@@ -675,6 +675,34 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 	return NULL;
 }
 
+pH_task_struct* llist_retrieve_process_by_filename(char* filename) {
+	pH_task_struct* iterator = NULL;
+	
+	ASSERT(spin_is_locked(&pH_task_struct_list_sem));
+	
+	iterator = pH_task_struct_list;
+	
+	// Checks to see if this function can execute in this instance
+	if (!module_inserted_successfully || !pH_aremonitoring) {
+		pr_err("%s: ERROR: llist_retrieve_process called before module has been inserted correctly\n", DEVICE_NAME);
+		return NULL;
+	}
+
+	if (pH_task_struct_list == NULL) {
+		return NULL;
+	}
+	
+	do {
+		if (strcmp(iterator->filename, filename) == 0) {
+			return iterator;
+		}
+		iterator = iterator->next;
+	} while (iterator);
+	
+	pr_err("%s: Process with filename [%s] not found\n", DEVICE_NAME, filename);
+	return NULL;
+}
+
 void stack_push(pH_task_struct*, pH_seq*);
 
 // Initializes a new pH_seq and then adds it to the stack of pH_seqs
@@ -3475,6 +3503,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 	const char* buffer;
 	int ret;
 	pH_profile* profile = NULL;
+	pH_task_struct* process = NULL;
 	
 	user_process_has_been_loaded = TRUE;
 	binary_read = FALSE;
@@ -3551,6 +3580,15 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 					
 					pr_err("%s: Making new profile with filename [%s]\n", DEVICE_NAME, peek_read_filename_queue());
 					new_profile(profile, peek_read_filename_queue(), FALSE);
+				}
+				
+				spin_lock(&pH_task_struct_list_sem);
+				process = llist_retrieve_process_by_filename(peek_read_filename_queue());
+				spin_lock(&pH_task_struct_list_sem);
+				
+				if (process != NULL) {
+					process->profile = profile;
+					pH_refcount_inc(profile);
 				}
 				
 				pr_err("%s: Removing from read filename queue\n", DEVICE_NAME);
@@ -3831,7 +3869,7 @@ inline void pH_train(pH_task_struct *s)
                 action("%d (%s) normal cancelled", current->pid, profile->filename);
         }
         pH_add_seq(seq, train);
-        train->sequences++; 
+        train->sequences++;
         train->last_mod_count = 0;
 
         //pH_log_sequence(profile, seq);
