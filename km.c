@@ -3792,7 +3792,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 					ASSERT(task_struct_queue_front != NULL);
 					remove_from_task_struct_queue(); // Should this be commented out?
 					
-					ret = send_sig(SIGCONT, peek_task_struct_queue(), SIGNAL_PRIVILEGE);
+					ret = send_sig(SIGCONT, to_sigcont, SIGNAL_PRIVILEGE);
 					if (ret < 0) {
 						pr_err("%s: Failed to send SIGCONT signal in dev_write: %d\n", DEVICE_NAME, ret);
 						
