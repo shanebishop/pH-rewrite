@@ -288,14 +288,13 @@ int main() {
 	while (!terminated && continueLoop) {
 		to_write_back_to_module = "success";
 		
-		// Retrieve information from the device
-		printf("Reading from the device...\n");
-		
 		strcpy(receive, nul_string);
 		for (i = 0; i < BUFFER_LENGTH; i++) {
 			receive[i] = '\0';
 		}
 		
+		// Retrieve information from the device
+		printf("Reading from the device...\n");
 		ret = read(fd, receive, BUFFER_LENGTH);
 		if (ret < 0 || receive == NULL || strlen(receive) < 1) {
 			printf("Failed to read the message from the device.%d%d%d\n", ret < 0, receive == NULL, strlen(receive) < 1);
