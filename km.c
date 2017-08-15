@@ -539,7 +539,7 @@ void remove_from_read_filename_queue(void) {
 	
 	to_return = read_filename_queue_front;
 	read_filename_queue_front = read_filename_queue_front->next;
-	kfree(to_return->filename);
+	//kfree(to_return->filename);
 	kfree(to_return);
 	to_return = NULL;
 }
@@ -1022,6 +1022,7 @@ int process_syscall(long syscall) {
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
 	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
 	//pr_err("\n\n\n\n\n\n\n\%s: No really, the process was retrieved successfully\n*****************\n*****************\n*****************\n", DEVICE_NAME);
+	//pr_err("%s: The process has PID %d and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
 	/*
