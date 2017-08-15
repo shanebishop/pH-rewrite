@@ -3762,6 +3762,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				if (peek_task_struct_queue() != NULL) {
 					ASSERT(peek_task_struct_queue()->comm != NULL);
 					ASSERT(peek_task_struct_queue()->comm[0] != '\0');
+					ASSERT(task_struct_queue_front != NULL);
 					pr_err("%s: The task_struct's comm is [%s]\n", DEVICE_NAME, peek_task_struct_queue()->comm);
 					ret = send_sig(SIGCONT, peek_task_struct_queue(), SIGNAL_PRIVILEGE);
 					if (ret < 0) {
