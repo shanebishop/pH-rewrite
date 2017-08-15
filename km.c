@@ -1093,6 +1093,7 @@ int process_syscall(long syscall) {
 	
 		if (!profile || profile == NULL) {
 			ASSERT(strlen(process->filename) > 1);
+			profile = temp_profile; // Set the profile back
 			pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
 			//ASSERT(profile != NULL);
 			//ret = -1;
