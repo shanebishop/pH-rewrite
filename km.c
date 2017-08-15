@@ -1516,6 +1516,8 @@ static long jsys_execve(const char __user *filename,
 	successful_jsys_execves++;
 	pr_err("%s: Incremented successful_jsys_execves\n", DEVICE_NAME);
 	
+	pr_err("%s: At end of jsys_execve, process->filename is [%s] for %d\n", DEVICE_NAME, process->filename, process->process_id);
+	
 	pr_err("%s: Returning from jsys_execve...\n", DEVICE_NAME);
 	
 	jprobe_return();
@@ -1989,6 +1991,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		return -1;
 	}
 	pr_err("%s: Retrieved a process\n", DEVICE_NAME);
+	pr_err("%s: The process has PID %d and filename [%s]\n", DEVICE_NAME, process->process_pid, process->filename);
 	process->should_sigcont_this = TRUE;
 	pr_err("%s: Set should_sigcont_this to TRUE\n", DEVICE_NAME);
 	
