@@ -2064,7 +2064,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
 		
 		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
-		pr_err("%s: Making new profile with filename [%s]\n", DEVICE_NAME, process->filename);
+		pr_err("%s: Making new profile with filename [%s] in sys_execve_return_handler\n", DEVICE_NAME, process->filename);
 		pr_err("\n\n\n\n\n\n\n\%s: No really, the filename is [%s]\n*****************\n*****************\n*****************\n", DEVICE_NAME, process->filename);
 		new_profile(profile, process->filename, TRUE);
 		
@@ -3725,7 +3725,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 						return len;
 					}
 					
-					pr_err("%s: Making new profile with filename [%s]\n", DEVICE_NAME, peek_read_filename_queue());
+					pr_err("%s: Making new profile with filename [%s] in dev_write\n", DEVICE_NAME, peek_read_filename_queue());
 					new_profile(profile, peek_read_filename_queue(), FALSE);
 				}
 				
