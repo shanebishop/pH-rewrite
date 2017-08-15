@@ -489,7 +489,7 @@ pH_profile* grab_profile_from_read_queue(void) {
 }
 */
 
-char* peek_read_filename_queue(void) {
+noinline char* peek_read_filename_queue(void) {
 	if (read_filename_queue_front == NULL) return NULL;
 	
 	return read_filename_queue_front->filename;
@@ -532,10 +532,10 @@ void add_to_read_filename_queue(char* filename) {
 	pr_err("%s: Front has filename [%s]\n", DEVICE_NAME, peek_read_filename_queue());
 }
 
-void remove_from_read_filename_queue(void) {
+noinline void remove_from_read_filename_queue(void) {
 	read_filename* to_return;
 	
-	if (read_filename_queue_front == NULL) return NULL;
+	if (read_filename_queue_front == NULL) return;
 	
 	to_return = read_filename_queue_front;
 	read_filename_queue_front = read_filename_queue_front->next;
@@ -559,14 +559,14 @@ void add_to_task_struct_queue(task_struct_wrapper* t) {
 	}
 }
 
-void remove_from_task_struct_queue(void) {
+noinline void remove_from_task_struct_queue(void) {
 	task_struct_wrapper* to_remove = task_struct_queue_front;
 	task_struct_queue_front = task_struct_queue_front->next;
 	kfree(to_remove);
 	to_remove = NULL;
 }
 
-struct task_struct* peek_task_struct_queue(void) {
+noinline struct task_struct* peek_task_struct_queue(void) {
 	if (task_struct_queue_front == NULL) return NULL;
 	
 	return task_struct_queue_front->task_struct;
@@ -574,7 +574,7 @@ struct task_struct* peek_task_struct_queue(void) {
 
 // Makes a new pH_profile and stores it in profile
 // profile must be allocated before this function is called
-int new_profile(pH_profile* profile, char* filename, bool make_temp_profile) {
+noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_profile) {
 	int i;
 
 	ASSERT(profile != NULL);
@@ -893,7 +893,7 @@ struct task_struct* get_userspace_task_struct(void) {
 	return NULL;
 }
 
-int send_signal(int signal_to_send) {
+noinline int send_signal(int signal_to_send) {
 	int ret;
 	struct task_struct* t;
 	
@@ -1022,7 +1022,7 @@ int process_syscall(long syscall) {
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
 	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
 	//pr_err("\n\n\n\n\n\n\n\%s: No really, the process was retrieved successfully\n*****************\n*****************\n*****************\n", DEVICE_NAME);
-	pr_err("%s: The process has PID %d and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
+	pr_err("%s: The process has PID %ld and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
 	/*
@@ -1105,10 +1105,10 @@ int process_syscall(long syscall) {
 	
 		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
 		if (ret < 0) {
-			pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process->process_id);
+			pr_err("%s: Failed to send SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
 			goto exit_before_profile;
 		}
-		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process->process_id);
+		pr_err("%s: Sent SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
 		
 		remove_from_task_struct_queue();
 	}
@@ -1659,7 +1659,7 @@ no_memory:
 }
 
 // For this to work, I might need to make the stack of pH_seq's doubly-linked
-int copy_task_struct_data(pH_task_struct* old, pH_task_struct* new) {
+void copy_task_struct_data(pH_task_struct* old, pH_task_struct* new) {
 	pH_seq* iterator;
 	int i;
 	
@@ -1992,7 +1992,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		return -1;
 	}
 	pr_err("%s: Retrieved a process\n", DEVICE_NAME);
-	pr_err("%s: The process has PID %d and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
+	pr_err("%s: The process has PID %ld and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
 	process->should_sigcont_this = TRUE;
 	pr_err("%s: Set should_sigcont_this to TRUE\n", DEVICE_NAME);
 	
@@ -3753,6 +3753,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				
 				// I'm not entirely sure why this is here, actually
 				if (peek_task_struct_queue() != NULL) {
+					ASSERT(peek_task_struct_queue()->comm != NULL);
+					ASSERT(peek_task_struct_queue()->comm[0] != '\0');
 					pr_err("%s: The task_struct's comm is [%s]\n", DEVICE_NAME, peek_task_struct_queue()->comm);
 					ret = send_sig(SIGCONT, peek_task_struct_queue(), SIGNAL_PRIVILEGE);
 					if (ret < 0) {
@@ -3793,7 +3795,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			pr_err("%s: Copying from disk to mem...\n", DEVICE_NAME);
 			pH_profile_disk2mem((pH_disk_profile*) buffer, profile);
 			
-			pr_err("%s: The filename we got back from userspace was [%s]\n", DEVICE_NAME);
+			pr_err("%s: The filename we got back from userspace was [%s]\n", DEVICE_NAME, profile->filename);
 			ASSERT(profile->filename != NULL && strlen(profile->filename) > 1);
 		
 			pr_err("%s: Adding to profile list...\n", DEVICE_NAME);
