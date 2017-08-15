@@ -1094,6 +1094,7 @@ int process_syscall(long syscall) {
 		if (!profile || profile == NULL) {
 			ASSERT(strlen(process->filename) > 1);
 			pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
+			ASSERT(profile != NULL);
 			ret = -1;
 			goto exit_before_profile;
 		}
@@ -3749,6 +3750,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 						return len;
 					}
 					
+					ASSERT(strlen(peek_read_filename_queue()) > 1);
 					pr_err("%s: Making new profile with filename [%s] in dev_write\n", DEVICE_NAME, peek_read_filename_queue());
 					new_profile(profile, peek_read_filename_queue(), FALSE);
 				}
