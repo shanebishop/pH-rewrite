@@ -1991,7 +1991,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		return -1;
 	}
 	pr_err("%s: Retrieved a process\n", DEVICE_NAME);
-	pr_err("%s: The process has PID %d and filename [%s]\n", DEVICE_NAME, process->process_pid, process->filename);
+	pr_err("%s: The process has PID %d and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
 	process->should_sigcont_this = TRUE;
 	pr_err("%s: Set should_sigcont_this to TRUE\n", DEVICE_NAME);
 	
