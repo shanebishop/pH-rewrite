@@ -560,7 +560,7 @@ void add_to_task_struct_queue(task_struct_wrapper* t) {
 }
 
 noinline void remove_from_task_struct_queue(void) {
-	//ASSERT(task_struct_queue_front != NULL);
+	ASSERT(task_struct_queue_front != NULL);
 	
 	if (task_struct_queue_front == NULL) {
 		pr_err("%s: task_struct_queue_front is NULL in remove_from_task_struct_queue()\n", DEVICE_NAME);
@@ -1110,6 +1110,8 @@ int process_syscall(long syscall) {
 			pH_free_profile(temp_profile);
 			vfree(temp_profile);
 			temp_profile = NULL;
+			ASSERT(strlen(profile->filename) > 1);
+			ASSERT(strcmp(process->filename, profile->filename) == 0);
 	
 			process->should_sigcont_this = FALSE;
 	
@@ -1117,16 +1119,18 @@ int process_syscall(long syscall) {
 			pH_refcount_inc(profile);
 			ASSERT(get_refcount(profile) == 1);
 			pr_err("%s: Added the profile to the process\n", DEVICE_NAME);
-	
-			ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
-			if (ret < 0) {
-				pr_err("%s: Failed to send SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
-				goto exit_before_profile;
-			}
-			pr_err("%s: Sent SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
+			
+			if (peek_task_struct_queue() != NULL) {
+				ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
+				if (ret < 0) {
+					pr_err("%s: Failed to send SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
+					goto exit_before_profile;
+				}
+				pr_err("%s: Sent SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
 		
-			//ASSERT(task_struct_queue_front != NULL);
-			remove_from_task_struct_queue();
+				//ASSERT(task_struct_queue_front != NULL);
+				remove_from_task_struct_queue();
+			}
 		
 			pr_err("%s: Done in profile->is_temp_profile if of process_syscall()\n", DEVICE_NAME);
 		}
