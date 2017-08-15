@@ -3661,8 +3661,6 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 	
 	pr_err("%s: In dev_write\n", DEVICE_NAME);
 	
-	ASSERT(output_string != NULL && *output_string != '\0');
-	
 	if (numberOpens > 0) {		
 		// Allocate space for buffer
 		buffer = kmalloc(sizeof(char) * 254, GFP_ATOMIC);
@@ -3713,6 +3711,9 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			have_userspace_pid = TRUE;
 			pr_err("%s: Received %ld PID from userspace\n", DEVICE_NAME, userspace_pid);
 		}
+		
+		ASSERT(output_string != NULL);
+		ASSERT(*output_string != '\0');
 		
 		if (output_string[0] == 'r' && output_string[1] == 'b') {
 			pr_err("%s: In READ_PROFILE_FROM_DISK if\n", DEVICE_NAME);
