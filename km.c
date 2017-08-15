@@ -561,12 +561,16 @@ void add_to_task_struct_queue(task_struct_wrapper* t) {
 
 noinline void remove_from_task_struct_queue(void) {
 	//ASSERT(task_struct_queue_front != NULL);
+	
+	if (task_struct_queue_front == NULL) {
+		pr_err("%s: task_struct_queue_front is NULL in remove_from_task_struct_queue()\n", DEVICE_NAME);
+		return;
+	}
+	
 	task_struct_wrapper* to_remove = task_struct_queue_front;
 	pr_err("%s: Set to_remove\n", DEVICE_NAME);
-	if (task_struct_queue_front != NULL) {
-		task_struct_queue_front = task_struct_queue_front->next;
-		pr_err("%s: Moved the front\n", DEVICE_NAME);
-	}
+	task_struct_queue_front = task_struct_queue_front->next;
+	pr_err("%s: Moved the front\n", DEVICE_NAME);
 	kfree(to_remove);
 	pr_err("%s: Freed to_remove\n", DEVICE_NAME);
 	to_remove = NULL;
