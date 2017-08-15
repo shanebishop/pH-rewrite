@@ -1094,39 +1094,41 @@ int process_syscall(long syscall) {
 		if (!profile || profile == NULL) {
 			ASSERT(strlen(process->filename) > 1);
 			pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
-			ASSERT(profile != NULL);
-			ret = -1;
-			goto exit_before_profile;
+			//ASSERT(profile != NULL);
+			//ret = -1;
+			//goto exit_before_profile;
 		}
-		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
-		remove_from_read_filename_queue();
+		else {
+			pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
+			remove_from_read_filename_queue();
 		
-		ASSERT(strcmp(process->filename, profile->filename) == 0);
+			ASSERT(strcmp(process->filename, profile->filename) == 0);
 		
-		merge_temp_with_disk(temp_profile, profile);
-		pH_refcount_init(temp_profile, 0);
-		pH_free_profile(temp_profile);
-		vfree(temp_profile);
-		temp_profile = NULL;
+			merge_temp_with_disk(temp_profile, profile);
+			pH_refcount_init(temp_profile, 0);
+			pH_free_profile(temp_profile);
+			vfree(temp_profile);
+			temp_profile = NULL;
 	
-		process->should_sigcont_this = FALSE;
+			process->should_sigcont_this = FALSE;
 	
-		process->profile = profile;
-		pH_refcount_inc(profile);
-		ASSERT(get_refcount(profile) == 1);
-		pr_err("%s: Added the profile to the process\n", DEVICE_NAME);
+			process->profile = profile;
+			pH_refcount_inc(profile);
+			ASSERT(get_refcount(profile) == 1);
+			pr_err("%s: Added the profile to the process\n", DEVICE_NAME);
 	
-		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
-		if (ret < 0) {
-			pr_err("%s: Failed to send SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
-			goto exit_before_profile;
+			ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
+			if (ret < 0) {
+				pr_err("%s: Failed to send SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
+				goto exit_before_profile;
+			}
+			pr_err("%s: Sent SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
+		
+			//ASSERT(task_struct_queue_front != NULL);
+			remove_from_task_struct_queue();
+		
+			pr_err("%s: Done in profile->is_temp_profile if of process_syscall()\n", DEVICE_NAME);
 		}
-		pr_err("%s: Sent SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
-		
-		//ASSERT(task_struct_queue_front != NULL);
-		remove_from_task_struct_queue();
-		
-		pr_err("%s: Done in profile->is_temp_profile if of process_syscall()\n", DEVICE_NAME);
 	}
 	else {
 		pH_refcount_inc(profile);
