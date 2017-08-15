@@ -1114,6 +1114,7 @@ int process_syscall(long syscall) {
 		}
 		pr_err("%s: Sent SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
 		
+		ASSERT(task_struct_queue_front != NULL);
 		remove_from_task_struct_queue();
 	}
 	else {
@@ -2016,6 +2017,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		}
 		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
 		
+		ASSERT(task_struct_queue_front != NULL);
 		remove_from_task_struct_queue();
 		
 		ASSERT(process->profile != NULL);
@@ -2056,6 +2058,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		}
 		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
 		
+		ASSERT(task_struct_queue_front != NULL);
 		remove_from_task_struct_queue();
 		
 		ASSERT(process->profile != NULL);
@@ -3768,6 +3771,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 						if (ret != -3) return len;
 					}
 					else pr_err("%s: Sent SIGCONT signal\n", DEVICE_NAME);
+					
+					ASSERT(task_struct_queue_front != NULL);
 					remove_from_task_struct_queue();
 				}
 				
