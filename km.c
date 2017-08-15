@@ -3713,7 +3713,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 		}
 		
 		ASSERT(output_string != NULL);
-		ASSERT(*output_string != '\0');
+		//ASSERT(*output_string != '\0');
 		
 		if (output_string[0] == 'r' && output_string[1] == 'b') {
 			pr_err("%s: In READ_PROFILE_FROM_DISK if\n", DEVICE_NAME);
