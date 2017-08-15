@@ -502,7 +502,6 @@ void add_to_read_filename_queue(char* filename) {
 		return;
 	}
 	
-	
 	char* save_filename = kmalloc(strlen(filename), GFP_ATOMIC);
 	if (!save_filename || save_filename == NULL) {
 		pr_err("%s: Out of memory in add_to_read_filename\n", DEVICE_NAME);
@@ -511,7 +510,6 @@ void add_to_read_filename_queue(char* filename) {
 	
 	strcpy(save_filename, filename);
 	pr_err("%s: save_filename is now [%s]\n", DEVICE_NAME, save_filename);
-	
 	
 	to_add->filename = filename;
 	to_add->next = NULL;
@@ -1101,6 +1099,7 @@ int process_syscall(long syscall) {
 		}
 		else {
 			pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
+			pr_err("%s: Calling remove_from_read_filename_queue in process_syscall\n", DEVICE_NAME);
 			remove_from_read_filename_queue();
 		
 			ASSERT(strcmp(process->filename, profile->filename) == 0);
@@ -1492,6 +1491,7 @@ static long jsys_execve(const char __user *filename,
 	*/
 	
 	if (!profile || profile == NULL) {
+		ASSERT(strlen(path_to_binary) > 1);
 		add_to_read_filename_queue(path_to_binary);
 		pr_err("%s: path_to_binary was added to the read filename queue\n", DEVICE_NAME);
 		strcpy(output_string, nul_string);
@@ -2050,6 +2050,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	if (profile != NULL) {
 		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
+		pr_err("%s: Calling remove_from_read_filename_queue in sys_execve_return_handler\n", DEVICE_NAME);
 		remove_from_read_filename_queue();
 		
 		if (process->profile != NULL && process->profile->is_temp_profile) {
@@ -3775,7 +3776,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				}
 				*/
 				
-				pr_err("%s: Removing from read filename queue\n", DEVICE_NAME);
+				pr_err("%s: Calling remove_from_read_filename_queue in dev_write\n", DEVICE_NAME);
 				remove_from_read_filename_queue();
 				pr_err("%s: Removed from read filename queue\n", DEVICE_NAME);
 				
