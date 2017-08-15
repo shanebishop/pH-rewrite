@@ -3773,8 +3773,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 					}
 					else pr_err("%s: Sent SIGCONT signal\n", DEVICE_NAME);
 					
-					ASSERT(task_struct_queue_front != NULL);
-					remove_from_task_struct_queue();
+					//ASSERT(task_struct_queue_front != NULL);
+					//remove_from_task_struct_queue(); // What happens when I comment this out?
 				}
 				
 				pr_err("%s: Returning from dev_write...\n", DEVICE_NAME);
