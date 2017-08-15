@@ -1126,7 +1126,7 @@ int process_syscall(long syscall) {
 					pr_err("%s: Failed to send SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
 					goto exit_before_profile;
 				}
-				pr_err("%s: Sent SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
+				pr_err("%s: Sent SIGCONT signal to %ld from process_syscall\n", DEVICE_NAME, process->process_id);
 		
 				//ASSERT(task_struct_queue_front != NULL);
 				remove_from_task_struct_queue();
@@ -2033,7 +2033,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 			pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process_id);
 			return ret;
 		}
-		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+		pr_err("%s: Sent SIGCONT signal to %ld from sys_execve_return_handler\n", DEVICE_NAME, process_id);
 		
 		//ASSERT(task_struct_queue_front != NULL);
 		remove_from_task_struct_queue();
@@ -2074,7 +2074,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 			pr_err("%s: Failed to send SIGCONT signal to %d\n", DEVICE_NAME, process_id);
 			return ret;
 		}
-		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+		pr_err("%s: Sent SIGCONT signal to %ld from sys_execve_return_handler\n", DEVICE_NAME, process_id);
 		
 		//ASSERT(task_struct_queue_front != NULL);
 		remove_from_task_struct_queue();
@@ -3679,6 +3679,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 	const char* buffer;
 	int ret;
 	int pid_to_be_sigconted;
+	struct task_struct* to_sigcont;
 	pH_profile* profile = NULL;
 	pH_task_struct* process = NULL;
 	
@@ -3783,8 +3784,14 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 					ASSERT(peek_task_struct_queue()->comm != NULL);
 					ASSERT(peek_task_struct_queue()->comm[0] != '\0');
 					//ASSERT(task_struct_queue_front != NULL);
+					
 					pid_to_be_sigconted = pid_vnr(task_tgid(peek_task_struct_queue()));
 					pr_err("%s: The task_struct's comm is [%s] (PID = %d)\n", DEVICE_NAME, peek_task_struct_queue()->comm, pid_to_be_sigconted);
+					to_sigcont = peek_task_struct_queue();
+					
+					ASSERT(task_struct_queue_front != NULL);
+					remove_from_task_struct_queue(); // Should this be commented out?
+					
 					ret = send_sig(SIGCONT, peek_task_struct_queue(), SIGNAL_PRIVILEGE);
 					if (ret < 0) {
 						pr_err("%s: Failed to send SIGCONT signal in dev_write: %d\n", DEVICE_NAME, ret);
@@ -3792,10 +3799,10 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 						// Sometimes this fails with -3, so ignore those cases
 						if (ret != -3) return len;
 					}
-					else pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, pid_to_be_sigconted);
+					else pr_err("%s: Sent SIGCONT signal to %ld from dev_write\n", DEVICE_NAME, pid_to_be_sigconted);
 					
 					//ASSERT(task_struct_queue_front != NULL);
-					remove_from_task_struct_queue(); // Should this be commented out?
+					//remove_from_task_struct_queue(); // Should this be commented out?
 				}
 				
 				pr_err("%s: Returning from dev_write...\n", DEVICE_NAME);
