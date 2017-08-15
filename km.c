@@ -1750,10 +1750,11 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	pH_refcount_inc(profile);
 	
 	path_to_binary = profile->filename;
-	ASSERT(!(!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
-		!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/')));
-		
-	ASSERT(strlen(path_to_binary) > 1);
+	
+	// These assertions make no sense, since I am checking immediately below anyway
+	//ASSERT(!(!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
+	//	!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/')));
+	//ASSERT(strlen(path_to_binary) > 1);
 	
 	// Checks to see if path_to_binary is okay - perhaps move this to handle_new_process()
 	if (!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
