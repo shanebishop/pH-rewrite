@@ -1022,7 +1022,7 @@ int process_syscall(long syscall) {
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
 	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
 	//pr_err("\n\n\n\n\n\n\n\%s: No really, the process was retrieved successfully\n*****************\n*****************\n*****************\n", DEVICE_NAME);
-	//pr_err("%s: The process has PID %d and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
+	pr_err("%s: The process has PID %d and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
 	
 	profile = process->profile; // Store process->profile in profile for shorter reference
 	/*
@@ -1222,7 +1222,7 @@ int process_syscall(long syscall) {
 	add_to_my_syscall_llist(process, new_syscall);
 	*/
 	
-	//pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
+	pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
 	
 	ret = 0;
 
@@ -3660,6 +3660,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 	binary_read = FALSE;
 	
 	pr_err("%s: In dev_write\n", DEVICE_NAME);
+	
+	ASSERT(output_string != NULL && *output_string != '\0');
 	
 	if (numberOpens > 0) {		
 		// Allocate space for buffer
