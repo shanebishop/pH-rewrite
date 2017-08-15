@@ -560,11 +560,13 @@ void add_to_task_struct_queue(task_struct_wrapper* t) {
 }
 
 noinline void remove_from_task_struct_queue(void) {
-	ASSERT(task_struct_queue_front != NULL);
+	//ASSERT(task_struct_queue_front != NULL);
 	task_struct_wrapper* to_remove = task_struct_queue_front;
 	pr_err("%s: Set to_remove\n", DEVICE_NAME);
-	task_struct_queue_front = task_struct_queue_front->next;
-	pr_err("%s: Moved the front\n", DEVICE_NAME);
+	if (task_struct_queue_front != NULL) {
+		task_struct_queue_front = task_struct_queue_front->next;
+		pr_err("%s: Moved the front\n", DEVICE_NAME);
+	}
 	kfree(to_remove);
 	pr_err("%s: Freed to_remove\n", DEVICE_NAME);
 	to_remove = NULL;
@@ -1114,7 +1116,7 @@ int process_syscall(long syscall) {
 		}
 		pr_err("%s: Sent SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
 		
-		ASSERT(task_struct_queue_front != NULL);
+		//ASSERT(task_struct_queue_front != NULL);
 		remove_from_task_struct_queue();
 	}
 	else {
@@ -2017,7 +2019,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		}
 		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
 		
-		ASSERT(task_struct_queue_front != NULL);
+		//ASSERT(task_struct_queue_front != NULL);
 		remove_from_task_struct_queue();
 		
 		ASSERT(process->profile != NULL);
@@ -2058,7 +2060,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		}
 		pr_err("%s: Sent SIGCONT signal to %d\n", DEVICE_NAME, process_id);
 		
-		ASSERT(task_struct_queue_front != NULL);
+		//ASSERT(task_struct_queue_front != NULL);
 		remove_from_task_struct_queue();
 		
 		ASSERT(process->profile != NULL);
@@ -3762,7 +3764,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				if (peek_task_struct_queue() != NULL) {
 					ASSERT(peek_task_struct_queue()->comm != NULL);
 					ASSERT(peek_task_struct_queue()->comm[0] != '\0');
-					ASSERT(task_struct_queue_front != NULL);
+					//ASSERT(task_struct_queue_front != NULL);
 					pr_err("%s: The task_struct's comm is [%s]\n", DEVICE_NAME, peek_task_struct_queue()->comm);
 					ret = send_sig(SIGCONT, peek_task_struct_queue(), SIGNAL_PRIVILEGE);
 					if (ret < 0) {
@@ -3774,7 +3776,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 					else pr_err("%s: Sent SIGCONT signal\n", DEVICE_NAME);
 					
 					//ASSERT(task_struct_queue_front != NULL);
-					//remove_from_task_struct_queue(); // What happens when I comment this out?
+					remove_from_task_struct_queue(); // Should this be commented out?
 				}
 				
 				pr_err("%s: Returning from dev_write...\n", DEVICE_NAME);
