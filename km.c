@@ -1458,13 +1458,13 @@ static long jsys_execve(const char __user *filename,
 	// Grab the profile from memory - if this fails, I would want to do a read, but since I am not
 	// implementing that right now, then make a new profile
 	pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
-	pr_err("%s: Locking profile list in jsys_execve on line 1070\n", DEVICE_NAME);
+	pr_err("%s: Locking profile list in jsys_execve on line 1463\n", DEVICE_NAME);
 	//preempt_disable();
 	spin_lock(&pH_profile_list_sem);
 	profile = retrieve_pH_profile_by_filename(path_to_binary);
 	spin_unlock(&pH_profile_list_sem);
 	//preempt_enable();
-	pr_err("%s: Unlocking profile list in jsys_execve on line 1072\n", DEVICE_NAME);
+	pr_err("%s: Unlocking profile list in jsys_execve on line 1465\n", DEVICE_NAME);
 	pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
 	
 	/*
@@ -3838,7 +3838,9 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			ASSERT(profile->filename != NULL && strlen(profile->filename) > 1);
 		
 			pr_err("%s: Adding to profile list...\n", DEVICE_NAME);
+			spin_lock(&pH_profile_list_sem);
 			add_to_profile_llist(profile);
+			spin_unlock(&pH_profile_list_sem);
 		}
 		
 		pr_err("%s: After READ_PROFILE_FROM_DISK if\n", DEVICE_NAME);
