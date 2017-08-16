@@ -509,7 +509,7 @@ void add_to_read_filename_queue(char* filename) {
 		return;
 	}
 	
-	strlcpy(save_filename, filename, strlen(filename));
+	strlcpy(save_filename, filename, strlen(filename)+1);
 	pr_err("%s: save_filename is now [%s]\n", DEVICE_NAME, save_filename);
 	
 	to_add->filename = filename;
@@ -1519,7 +1519,7 @@ static long jsys_execve(const char __user *filename,
 		add_to_read_filename_queue(path_to_binary);
 		pr_err("%s: path_to_binary was added to the read filename queue\n", DEVICE_NAME);
 		strlcpy(output_string, nul_string, 254);
-		strlcpy(output_string, READ_PROFILE_FROM_DISK, strlen(READ_PROFILE_FROM_DISK)); // Maybe I shouldn't do this if there is another command already
+		strlcpy(output_string, READ_PROFILE_FROM_DISK, strlen(READ_PROFILE_FROM_DISK)+1); // Maybe I shouldn't do this if there is another command already
 		output_string[strlen(READ_PROFILE_FROM_DISK)] = '\0';
 		pr_err("%s: After strlcpy, output_string should be rb [%s]\n", DEVICE_NAME, output_string);
 		strlcat(output_string, path_to_binary, 254);
@@ -2318,7 +2318,7 @@ int pH_write_profile(pH_profile* profile) {
 		pr_err("%s: output_string is NULL in pH_write_profile\n", DEVICE_NAME);
 	}
 	strlcpy(output_string, nul_string, 254);
-	strlcpy(output_string, TRANSFER_OPERATION, strlen(TRANSFER_OPERATION));
+	strlcpy(output_string, TRANSFER_OPERATION, strlen(TRANSFER_OPERATION)+1);
 	output_string[strlen(TRANSFER_OPERATION)] = '\0';
 	pr_err("%s: After strlcpy, output_string should be t [%s]\n", DEVICE_NAME, output_string);
 	
@@ -3658,7 +3658,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	if (profile_queue_is_empty()) {
 		pr_err("%s: Profile queue is empty\n", DEVICE_NAME);
 		strlcpy(output_string, nul_string, 254);
-		strlcpy(output_string, STOP_TRANSFER_OPERATION, strlen(STOP_TRANSFER_OPERATION));
+		strlcpy(output_string, STOP_TRANSFER_OPERATION, strlen(STOP_TRANSFER_OPERATION)+1);
 		output_string[strlen(STOP_TRANSFER_OPERATION)] = '\0';
 		pr_err("%s: After strlcpy, ouput_string should be st = [%s]", DEVICE_NAME, output_string);
 	}
@@ -4158,7 +4158,7 @@ void pH_profile_data_mem2disk(pH_profile_data *mem, pH_disk_profile_data *disk)
 void pH_profile_mem2disk(pH_profile *profile, pH_disk_profile *disk_profile)
 {
     /* make sure magic is less than PH_FILE_MAGIC_LEN! */
-    strlcpy(disk_profile->magic, PH_FILE_MAGIC, strlen(PH_FILE_MAGIC));
+    strlcpy(disk_profile->magic, PH_FILE_MAGIC, strlen(PH_FILE_MAGIC)+1);
     disk_profile->normal = profile->normal;
 	pr_err("%s: original normal is %d\n", DEVICE_NAME, profile->normal);
     disk_profile->frozen = profile->frozen;
