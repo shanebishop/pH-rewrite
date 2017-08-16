@@ -1105,6 +1105,7 @@ int process_syscall(long syscall) {
 			//ASSERT(profile != NULL);
 			//ret = -1;
 			//goto exit_before_profile;
+			pH_refcount_inc(profile); // Temp line (or should this always be here?)
 		} else {
 			pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
 			pr_err("%s: Calling remove_from_read_filename_queue in process_syscall\n", DEVICE_NAME);
@@ -1157,7 +1158,7 @@ int process_syscall(long syscall) {
 		return -1;
 	}
 	*/
-	//pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
+	pr_err("%s: Retrieved profile successfully\n", DEVICE_NAME);
 	
 	// Check to see if this profile is still in use
 	if (!pH_profile_in_use(profile) || !(profile->lock) || profile->lock == NULL) {
@@ -1175,7 +1176,7 @@ int process_syscall(long syscall) {
 	}
 	*/
 	
-	//pr_err("%s: Locking profile->lock\n", DEVICE_NAME);
+	pr_err("%s: Locking profile->lock\n", DEVICE_NAME);
 	spin_lock(profile->lock); // Grabs the lock to this profile
 	
 	if (profile->lock == NULL) {
@@ -1217,7 +1218,7 @@ int process_syscall(long syscall) {
 	
 	if (process) process->count++;
 	if (process) pH_append_call(process->seq, syscall);
-	//pr_err("%s: Successfully appended call %ld\n", DEVICE_NAME, syscall);
+	pr_err("%s: Successfully appended call %ld\n", DEVICE_NAME, syscall);
 	
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
@@ -1237,7 +1238,7 @@ int process_syscall(long syscall) {
 		ret = -1;
 		goto exit;
 	}
-	//pr_err("%s: Trained process\n", DEVICE_NAME);
+	pr_err("%s: Trained process\n", DEVICE_NAME);
 	
 	/* // Since this is just for seeing if my code seems to be working, I don't need it
 	// Allocate space for new_syscall
@@ -1248,14 +1249,14 @@ int process_syscall(long syscall) {
 		ret = -ENOMEM;
 		goto exit;
 	}
-	//pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
+	pr_err("%s: Successfully allocated space for new_syscall\n", DEVICE_NAME);
 	
 	// Add new_syscall to the linked list of syscalls
 	new_syscall->syscall_num = syscall;
 	add_to_my_syscall_llist(process, new_syscall);
 	*/
 	
-	//pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
+	pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
 	
 	ret = 0;
 
