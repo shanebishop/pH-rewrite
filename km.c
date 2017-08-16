@@ -652,6 +652,7 @@ noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_pro
 	//profile->filename[strlen(profile->filename)] = '\0';
 	pr_err("%s: Length of profile->filename is %d\n", DEVICE_NAME, strlen(profile->filename));
 	pr_err("%s: Length of filename is %d\n", DEVICE_NAME, strlen(filename));
+	pr_err("%s: profile: %s arg: %s\n", DEVICE_NAME, profile->filename, filename);
 	ASSERT(strlen(profile->filename) == strlen(filename));
 	for (i = 0; i < strlen(filename); i++) {
 		if (filename[i] != profile->filename[i]) {
