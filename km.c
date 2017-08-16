@@ -1443,7 +1443,15 @@ static long jsys_execve(const char __user *filename,
 		goto corrupted_path_to_binary;
 	}
 	pr_err("%s: My code thinks path_to_binary is not corrupted\n", DEVICE_NAME);
-	process->filename = path_to_binary;
+	process->filename = kmalloc(strlen(path_to_binary)+1, GFP_ATOMIC);
+	if (process->filename == NULL) {
+		pr_err("%s: Unable to allocate space for process->filename in jsys_execve\n", DEVICE_NAME);
+		goto exit;
+	}
+	
+	strlcpy(process->filename, path_to_binary, strlen(path_to_binary)+1);
+	ASSERT(strlen(process->filename) == strlen(path_to_binary));
+	ASSERT(strcmp(process->filename, path_to_binary) == 0);
 	
 	// Emtpies stack of pH_seqs
 	while (already_had_process && process->seq != NULL) {
@@ -3666,6 +3674,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 
 int pH_profile_disk2mem(pH_disk_profile*, pH_profile*);
 
+// Since the pointers are coming from userspace, should I use copy_from_user?
 static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t *offset) {
 	const char* buffer;
 	int ret;
