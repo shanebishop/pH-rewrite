@@ -392,8 +392,7 @@ void add_to_profile_llist(pH_profile* p) {
 		pr_err("%s: First element added to list\n", DEVICE_NAME);
 		pH_profile_list = p;
 		p->next = NULL;
-	}
-	else {
+	} else {
 		/* // Old implementation
 		pH_profile* iterator = pH_profile_list;
 		
@@ -432,8 +431,7 @@ void add_to_profile_queue(pH_disk_profile* disk_profile) {
 		profile_queue_front = disk_profile;
 		profile_queue_rear = disk_profile;
 		profile_queue_rear->next = NULL;
-	}
-	else {
+	} else {
 		profile_queue_rear->next = disk_profile;
 		profile_queue_rear = disk_profile;
 		profile_queue_rear->next = NULL;
@@ -469,8 +467,7 @@ void add_to_read_profile_queue(pH_profile* profile) {
 		read_profile_queue_front = profile;
 		read_profile_queue_rear = profile;
 		read_profile_queue_rear->next = NULL;
-	}
-	else {
+	} else {
 		read_profile_queue_rear->next = profile;
 		read_profile_queue_rear = profile;
 		read_profile_queue_rear->next = NULL;
@@ -519,8 +516,7 @@ void add_to_read_filename_queue(char* filename) {
 		read_filename_queue_front = to_add;
 		read_filename_queue_rear = to_add;
 		read_filename_queue_rear->next = NULL;
-	}
-	else {
+	} else {
 		read_filename_queue_rear->next = to_add;
 		read_filename_queue_rear = to_add;
 		read_filename_queue_rear->next = NULL;
@@ -550,8 +546,7 @@ void add_to_task_struct_queue(task_struct_wrapper* t) {
 		task_struct_queue_front = t;
 		task_struct_queue_rear = t;
 		task_struct_queue_rear->next = NULL;
-	}
-	else {
+	} else {
 		task_struct_queue_rear->next = t;
 		task_struct_queue_rear = t;
 		task_struct_queue_rear->next = NULL;
@@ -696,8 +691,7 @@ void add_to_my_syscall_llist(pH_task_struct* t, my_syscall* s) {
 	if (t->syscall_llist == NULL) {
 		t->syscall_llist = s;
 		s->next = NULL;
-	}
-	else {
+	} else {
 		s->next = t->syscall_llist;
 		t->syscall_llist = s;
 	}
@@ -880,16 +874,14 @@ void clean_processes(void) {
 				if (iterator == NULL) {
 					return;
 				}
-			}
-			else {
+			} else {
 				pr_err("%s: Got here 4\n", DEVICE_NAME);
 				iterator = iterator->prev;
 				pr_err("%s: Got here 5\n", DEVICE_NAME);
 				free_pH_task_struct(iterator->next);
 				pr_err("%s: Got here 6\n", DEVICE_NAME);
 			}
-		}
-		else {
+		} else {
 			pr_err("%s: comm is %s\n", DEVICE_NAME, iterator->task_struct->comm);
 		}
 	}
@@ -901,8 +893,7 @@ void clean_processes(void) {
 bool message_received(void) {
 	if (message == NULL || message[0] == '\0') {
 		return FALSE;
-	}
-	else return TRUE;
+	} else return TRUE;
 }
 */
 
@@ -974,8 +965,7 @@ int copy_pH_profile_data(pH_profile_data* old, pH_profile_data* new) {
 	for (i = 0; i < PH_NUM_SYSCALLS; i++) {
 		if (old->entry[i] == NULL) {
 			new->entry[i] = NULL;
-		}
-		else {
+		} else {
 			if (pH_add_seq_storage(new, i)) return -1;
 			memcpy(new->entry[i], old->entry[i], PH_NUM_SYSCALLS);
 		}
@@ -1083,8 +1073,7 @@ int process_syscall(long syscall) {
 		
 		ret = -1;
 		goto exit_before_profile;
-	}
-	else {
+	} else {
 		pH_refcount_inc(profile);
 	}
 	*/
@@ -1116,8 +1105,7 @@ int process_syscall(long syscall) {
 			//ASSERT(profile != NULL);
 			//ret = -1;
 			//goto exit_before_profile;
-		}
-		else {
+		} else {
 			pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
 			pr_err("%s: Calling remove_from_read_filename_queue in process_syscall\n", DEVICE_NAME);
 			//remove_from_read_filename_queue(); // Removes from read filename queue (should this be done already?)
@@ -1157,8 +1145,7 @@ int process_syscall(long syscall) {
 		
 			pr_err("%s: Done in profile->is_temp_profile if of process_syscall()\n", DEVICE_NAME);
 		}
-	}
-	else {
+	} else {
 		pH_refcount_inc(profile);
 	}
 	
@@ -1298,8 +1285,7 @@ void add_process_to_llist(pH_task_struct* t) {
 		pH_task_struct_list = t;
 		t->next = NULL;
 		t->prev = NULL;
-	}
-	else {
+	} else {
 		/* // Old implementation
 		pH_task_struct* iterator = pH_task_struct_list;
 		
@@ -1431,8 +1417,7 @@ static long jsys_execve(const char __user *filename,
 		process->filename = NULL;
 		process->should_sigcont_this = FALSE;
 		pr_err("%s: Pre-initialized entirely new process\n", DEVICE_NAME);
-	}
-	else {
+	} else {
 		already_had_process = TRUE;
 		pH_refcount_dec(process->profile);
 		pr_err("%s: Decremented old profile refcount\n", DEVICE_NAME);
@@ -1507,8 +1492,7 @@ static long jsys_execve(const char __user *filename,
 		if (!profile || profile == NULL) {
 			pr_err("%s: new_profile made a corrupted or NULL profile\n", DEVICE_NAME);
 		}
-	}
-	else {
+	} else {
 		kfree(path_to_binary);
 		path_to_binary = NULL;
 	}
@@ -1895,8 +1879,7 @@ static int sys_rt_sigreturn_handler(struct kretprobe_instance* ri, struct pt_reg
 	
 	if (current == last_task_struct_in_sigreturn) {
 		pr_err("%s: The task structs are the same\n", DEVICE_NAME);
-	}
-	else {
+	} else {
 		pr_err("%s: The task structs are different\n", DEVICE_NAME);
 	}
 	
@@ -1916,8 +1899,7 @@ static int sys_rt_sigreturn_handler(struct kretprobe_instance* ri, struct pt_reg
 	if (sigismember(&current->pending.signal, SIGKILL)) {
 		pr_err("%s: Freeing task_struct...\n", DEVICE_NAME);
 		free_pH_task_struct(process);
-	}
-	else {
+	} else {
 		pr_err("%s: SIGKILL is not a member of current->pending.signal\n", DEVICE_NAME);
 	}
 	
@@ -2241,13 +2223,11 @@ int pH_remove_profile_from_list(pH_profile *profile)
     	err("pH_profile_list is empty (NULL) when trying to free profile %s", profile->filename);
     	//spin_unlock(&pH_profile_list_sem);
     	return -1;
-    }
-    else if (pH_profile_list == profile) {
+    } else if (pH_profile_list == profile) {
     	pH_profile_list = pH_profile_list->next;
     	//spin_unlock(&pH_profile_list_sem);
     	return 0;
-    }
-    else {
+    } else {
     	prev_profile = pH_profile_list;
     	cur_profile = pH_profile_list->next;
     	while (cur_profile != NULL) {
@@ -2411,8 +2391,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 		err("pH_task_struct_list is empty (NULL) when trying to free process %ld", process->process_id);
 		//spin_unlock(&pH_task_struct_list_sem);
 		return -1;
-	}
-	else if (pH_task_struct_list == process) {
+	} else if (pH_task_struct_list == process) {
 		//pr_err("%s: pH_task_struct_list == process\n", DEVICE_NAME);
 		pH_task_struct_list = pH_task_struct_list->next;
 		//pr_err("%s: Got here 1\n", DEVICE_NAME);
@@ -2426,8 +2405,7 @@ int remove_process_from_llist(pH_task_struct* process) {
 		//pr_err("%s: Returning from remove_process_from_llist\n", DEVICE_NAME);
 		//spin_unlock(&pH_task_struct_list_sem);
 		return 0;
-	}
-	else {
+	} else {
 		//pr_err("%s: In else of remove_process_from_llist\n", DEVICE_NAME);
 		prev_task_struct = pH_task_struct_list;
 		cur_task_struct = pH_task_struct_list->next;
@@ -2576,8 +2554,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 				profile = NULL; // Okay because the profile is removed from llist in pH_free_profile
 				pr_err("%s: Freed profile\n", DEVICE_NAME);
 			}
-		}
-		else {
+		} else {
 			pr_err("%s: ERROR: Corrupt process in free_pH_task_struct: No profile\n", DEVICE_NAME);
 			ASSERT(profile != NULL);
 			return;
@@ -2720,8 +2697,7 @@ static int jwait_consider_task(struct wait_opts *wo, int ptrace, struct task_str
 	if (exit_state == EXIT_DEAD) {
 		if (process != NULL) {
 			pr_err("%s: Freeing process\n", DEVICE_NAME);
-		}
-		else {
+		} else {
 			pr_err("%s: No process to free\n", DEVICE_NAME);
 		}
 	
@@ -2781,8 +2757,7 @@ static void jfree_pid(struct pid* pid) {
 					spin_unlock(&pH_task_struct_list_sem);
 					goto exit;
 				}
-			}
-			else {
+			} else {
 				pr_err("%s: Got here 5\n", DEVICE_NAME);
 				iterator = iterator->prev;
 				pr_err("%s: Got here 6\n", DEVICE_NAME);
@@ -2831,8 +2806,7 @@ void stack_print(pH_task_struct* process) {
 		if (process->profile != NULL && module_inserted_successfully) {
 			//pr_err("%s: process->profile != NULL\n", DEVICE_NAME);
 			pr_err("%s: Printing stack for process %s: Stack is empty\n", DEVICE_NAME, process->profile->filename);
-		}
-		else {
+		} else {
 			pr_err("%s: Printing stack for process %ld: Stack is empty\n", DEVICE_NAME, process->process_id);
 		}
 		return;
@@ -2844,8 +2818,7 @@ void stack_print(pH_task_struct* process) {
 	
 	if (process->profile != NULL && process->profile->filename != NULL) {
 		pr_err("%s: Printing stack for process %s...\n", DEVICE_NAME, process->profile->filename);
-	}
-	else {
+	} else {
 		pr_err("%s: Printing stack for process %ld...\n", DEVICE_NAME, process->process_id);
 	}
 	do {
@@ -2870,8 +2843,7 @@ void stack_push(pH_task_struct* process, pH_seq* new_node) {
 		new_node->next = NULL;
 		new_node->prev = NULL;
 		process->seq = new_node;
-	}
-	else {
+	} else {
 		new_node->next = process->seq;
 		process->seq = new_node;
 		new_node->prev = NULL;
@@ -3036,8 +3008,7 @@ static long jsys_rt_sigreturn(void) {
 	if (sigismember(&current->pending.signal, SIGKILL)) {
 		pr_err("%s: Calling free_pH_task_struct from jsys_rt_sigreturn\n", DEVICE_NAME);
 		free_pH_task_struct(process);
-	}
-	else {
+	} else {
 		//pr_err("%s: SIGKILL is not a member of current->pending.signal\n", DEVICE_NAME);
 	}
 	
@@ -3588,8 +3559,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 			pr_err("%s: Successfully sent [%s] message to the user\n", DEVICE_NAME, output_string);
 			pr_err("%s: Exiting dev_read...\n", DEVICE_NAME);
 			return 0;
-		}
-		else {
+		} else {
 			pr_err("%s: Failed to send %d bytes to the user\n", DEVICE_NAME, error_count);
 			return -EFAULT;      // Failed - return a bad address message
 		}
@@ -3669,8 +3639,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 		/*
 		if (profile_queue_is_empty()) {
 			pr_err("%s: ...so the userspace app should stop reads\n", DEVICE_NAME);
-		}
-		else { // Perhaps add an intential descriptive panic here for debugging purposes?
+		} else { // Perhaps add an intential descriptive panic here for debugging purposes?
 			pr_err("%s: ...but this should not have happened (ERROR)!\n", DEVICE_NAME);
 			return -EFAULT;
 		}
@@ -3689,8 +3658,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	if (error_count == 0) {           // success!
 		pr_err("%s: Successfully performed binary write to user space app\n", DEVICE_NAME);	  
 		return 0; // clear the position to the start and return 0
-	}
-	else {
+	} else {
 		pr_err("%s: Failed to send %d bytes to the user\n", DEVICE_NAME, error_count);	  
 		return -EFAULT;      // Failed - return a bad address message
 	}
@@ -3768,7 +3736,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 		if (output_string[0] == 'r' && output_string[1] == 'b') {
 			pr_err("%s: In READ_PROFILE_FROM_DISK if\n", DEVICE_NAME);
 			
-			if (strcmp("success", buffer) != 0) {
+			// Temporarily commenting out the branching, to pretend it always fails
+			//if (strcmp("success", buffer) != 0) {
 				pr_err("%s: Received non-success message from userspace [%s]\n", DEVICE_NAME, buffer);
 				
 				// Send SIGSTOP signal to the userspace app
@@ -3820,8 +3789,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 						
 						// Sometimes this fails with -3, so ignore those cases
 						if (ret != -3) return len;
-					}
-					else pr_err("%s: Sent SIGCONT signal to %d from dev_write\n", DEVICE_NAME, pid_to_be_sigconted);
+					} else pr_err("%s: Sent SIGCONT signal to %d from dev_write\n", DEVICE_NAME, pid_to_be_sigconted);
 					
 					//ASSERT(task_struct_queue_front != NULL);
 					//remove_from_task_struct_queue(); // Should this be commented out?
@@ -3831,7 +3799,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				
 				// Depending on the situation, we may want to process what the user sent us before returning
 				return 0;
-			}
+			//}
 			
 			if (buffer == NULL) {
 				pr_err("%s: Received NULL from userspace\n", DEVICE_NAME);
@@ -3852,6 +3820,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				return len;
 			}
 		
+			/* // For now, don't read anything
 			pr_err("%s: Copying from disk to mem...\n", DEVICE_NAME);
 			pH_profile_disk2mem((pH_disk_profile*) buffer, profile);
 			
@@ -3862,6 +3831,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			spin_lock(&pH_profile_list_sem);
 			add_to_profile_llist(profile);
 			spin_unlock(&pH_profile_list_sem);
+			*/
 		}
 		
 		pr_err("%s: After READ_PROFILE_FROM_DISK if\n", DEVICE_NAME);
