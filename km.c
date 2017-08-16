@@ -650,8 +650,15 @@ noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_pro
 	//strncpy(profile->filename, filename, strlen(filename));
 	strlcpy(profile->filename, filename, strlen(filename));
 	//profile->filename[strlen(profile->filename)] = '\0';
-	ASSERT(strcmp(filename, profile->filename) == 0);
 	ASSERT(strlen(profile->filename) == strlen(filename));
+	for (i = 0; i < strlen(filename); i++) {
+		if (filename[i] != profile->filename[i]) {
+			pr_err("%s: Filenames do not match at position %d\n", DEVICE_NAME, i);
+			pr_err("%s: The length of the filenames is %d\n", DEVICE_NAME, strlen(filename));
+			ASSERT(filename[i] == profile->filename[i]);
+		}
+	}
+	ASSERT(strcmp(filename, profile->filename) == 0);
 	ASSERT(!(!profile->filename || profile->filename == NULL || strlen(profile->filename) < 1));
 	ASSERT(strlen(profile->filename) > 1);
 	//pr_err("%s: Got here 4 (new_profile)\n", DEVICE_NAME);
