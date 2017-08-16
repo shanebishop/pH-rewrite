@@ -509,7 +509,7 @@ void add_to_read_filename_queue(char* filename) {
 		return;
 	}
 	
-	strcpy(save_filename, filename);
+	strlcpy(save_filename, filename, strlen(filename));
 	pr_err("%s: save_filename is now [%s]\n", DEVICE_NAME, save_filename);
 	
 	to_add->filename = filename;
@@ -648,7 +648,7 @@ noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_pro
 		return -ENOMEM;
 	}
 	//strncpy(profile->filename, filename, strlen(filename));
-	strcpy(profile->filename, filename);
+	strlcpy(profile->filename, filename, strlen(filename));
 	//profile->filename[strlen(profile->filename)] = '\0';
 	ASSERT(strcmp(filename, profile->filename) == 0);
 	ASSERT(strlen(profile->filename) == strlen(filename));
@@ -886,6 +886,7 @@ void clean_processes(void) {
 }
 */
 
+/*
 // Returns true if a message was received from the user, false otherwise
 bool message_received(void) {
 	if (message == NULL || message[0] == '\0') {
@@ -893,13 +894,14 @@ bool message_received(void) {
 	}
 	else return TRUE;
 }
+*/
 
 // Retruns the task_struct of the userspace app
 struct task_struct* get_userspace_task_struct(void) {
-	if (message_received()) {
+	//if (message_received()) {
 		return pid_task(find_pid_ns(userspace_pid, &init_pid_ns), PIDTYPE_PID);
-	}
-	return NULL;
+	//}
+	//return NULL;
 }
 
 noinline int send_signal(int signal_to_send) {
@@ -923,16 +925,16 @@ noinline int send_signal(int signal_to_send) {
 	char signal_sent[8];
 	switch (signal_to_send) {
 		case SIGSTOP:
-			strcpy(signal_sent, "SIGSTOP");
+			strlcpy(signal_sent, "SIGSTOP", 7);
 			break;
 		case SIGCONT:
-			strcpy(signal_sent, "SIGCONT");
+			strlcpy(signal_sent, "SIGCONT", 7);
 			break;
 		case SIGTERM:
-			strcpy(signal_sent, "SIGTERM");
+			strlcpy(signal_sent, "SIGTERM", 7);
 			break;
 		case SIGKILL:
-			strcpy(signal_sent, "SIGKILL");
+			strlcpy(signal_sent, "SIGKILL", 7);
 			break;
 		default:
 			pr_err("%s: %d signal sent to user space process", DEVICE_NAME, signal_to_send);
@@ -1506,11 +1508,11 @@ static long jsys_execve(const char __user *filename,
 		ASSERT(strlen(path_to_binary) > 1);
 		add_to_read_filename_queue(path_to_binary);
 		pr_err("%s: path_to_binary was added to the read filename queue\n", DEVICE_NAME);
-		strcpy(output_string, nul_string);
-		strcpy(output_string, READ_PROFILE_FROM_DISK); // Maybe I shouldn't do this if there is another command already
-		output_string[2] = '\0';
-		pr_err("%s: After strcpy, output_string should be rb [%s]\n", DEVICE_NAME, output_string);
-		strcat(output_string, path_to_binary);
+		strlcpy(output_string, nul_string, 254);
+		strlcpy(output_string, READ_PROFILE_FROM_DISK, strlen(READ_PROFILE_FROM_DISK)); // Maybe I shouldn't do this if there is another command already
+		output_string[strlen(READ_PROFILE_FROM_DISK)] = '\0';
+		pr_err("%s: After strlcpy, output_string should be rb [%s]\n", DEVICE_NAME, output_string);
+		strlcat(output_string, path_to_binary, 254);
 		
 		/*
 		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
@@ -1529,8 +1531,7 @@ static long jsys_execve(const char __user *filename,
 		pr_err("%s: The userspace process should have received a SIGCONT signal\n", DEVICE_NAME);
 		
 		lock_execve_lock = TRUE;
-	}
-	else {
+	} else {
 		kfree(path_to_binary);
 		path_to_binary = NULL;
 	}
@@ -1552,7 +1553,7 @@ static long jsys_execve(const char __user *filename,
 	successful_jsys_execves++;
 	pr_err("%s: Incremented successful_jsys_execves\n", DEVICE_NAME);
 	
-	pr_err("%s: At end of jsys_execve, process->filename is [%s] for %d\n", DEVICE_NAME, process->filename, process->process_id);
+	pr_err("%s: At end of jsys_execve, process->filename is [%s] for %ld\n", DEVICE_NAME, process->filename, process->process_id);
 	
 	pr_err("%s: Returning from jsys_execve...\n", DEVICE_NAME);
 	
@@ -2046,7 +2047,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 			pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process_id);
 			return ret;
 		}
-		pr_err("%s: Sent SIGCONT signal to %ld from sys_execve_return_handler\n", DEVICE_NAME, process_id);
+		pr_err("%s: Sent SIGCONT signal to %d from sys_execve_return_handler\n", DEVICE_NAME, process_id);
 		
 		//ASSERT(task_struct_queue_front != NULL);
 		remove_from_task_struct_queue();
@@ -2088,7 +2089,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 			pr_err("%s: Failed to send SIGCONT signal to %d\n", DEVICE_NAME, process_id);
 			return ret;
 		}
-		pr_err("%s: Sent SIGCONT signal to %ld from sys_execve_return_handler\n", DEVICE_NAME, process_id);
+		pr_err("%s: Sent SIGCONT signal to %d from sys_execve_return_handler\n", DEVICE_NAME, process_id);
 		
 		//ASSERT(task_struct_queue_front != NULL);
 		remove_from_task_struct_queue();
@@ -2306,10 +2307,10 @@ int pH_write_profile(pH_profile* profile) {
 	if (!output_string || output_string == NULL) {
 		pr_err("%s: output_string is NULL in pH_write_profile\n", DEVICE_NAME);
 	}
-	strcpy(output_string, nul_string);
-	strcpy(output_string, TRANSFER_OPERATION);
-	output_string[1] = '\0';
-	pr_err("%s: After strcpy, output_string should be t [%s]\n", DEVICE_NAME, output_string);
+	strlcpy(output_string, nul_string, 254);
+	strlcpy(output_string, TRANSFER_OPERATION, strlen(TRANSFER_OPERATION));
+	output_string[strlen(TRANSFER_OPERATION)] = '\0';
+	pr_err("%s: After strlcpy, output_string should be t [%s]\n", DEVICE_NAME, output_string);
 	
 	// The use of SIGCONT here might not be correct. Perhaps the userspace app is already running,
 	// in which case sending it a signal might be a bad idea and might cause problems. I will need
@@ -3440,7 +3441,7 @@ static int __init ebbchar_init(void) {
 	}
 	pr_err("%s: Registered all syscall probes\n", DEVICE_NAME);
 	
-	nul_string = kmalloc(sizeof(char) * 254, GFP_ATOMIC);
+	nul_string = kmalloc(sizeof(char) * 254, GFP_KERNEL);
 	if (!nul_string || nul_string == NULL) {
 		pr_err("%s: Unable to allocate space for nul_string in ebbchar_init\n", DEVICE_NAME);
 		return PTR_ERR(ebbcharDevice);
@@ -3534,13 +3535,13 @@ static int dev_open(struct inode *inodep, struct file *filep){
 		return -EBUSY;
 	}
 	
-	output_string = kmalloc(sizeof(char) * 254, GFP_ATOMIC);
+	output_string = kmalloc(sizeof(char) * 254, GFP_KERNEL);
 	if (!output_string) {
 		pr_err("%s: Unable to allocate memory for output_string", DEVICE_NAME);
 		return -EFAULT;
 	}
 	
-	bin_receive_ptr = __vmalloc(sizeof(pH_disk_profile), GFP_ATOMIC, PAGE_KERNEL);
+	bin_receive_ptr = vmalloc(sizeof(pH_disk_profile));
 	if (!bin_receive_ptr) {
 		pr_err("%s: Unable to allocate memory for bin_receive_ptr", DEVICE_NAME);
 		return -EFAULT;
@@ -3551,7 +3552,7 @@ static int dev_open(struct inode *inodep, struct file *filep){
 	return 0;
 }
 
-static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
+static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *offset) {
 	pH_disk_profile* disk_profile;
 	int error_count = 0;
 	
@@ -3564,10 +3565,6 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	
 	if (!binary_read) {
 		pr_err("%s: This is not a binary read\n", DEVICE_NAME);
-		
-		// Determine number of bytes to send to userspace
-		// Maybe I should add 1 so that it includes the nul character?
-		size_of_message = strlen(output_string);
 
 		// If we are asking to perform a binary transfer, set binary_read to TRUE
 		if (strcmp(output_string, TRANSFER_OPERATION) == 0 || strcmp(output_string, READ_PROFILE_FROM_DISK) == 0) {
@@ -3575,11 +3572,11 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 		}			
 
 		// Copy the data to the user
-		error_count = copy_to_user(buffer, output_string, size_of_message);
+		error_count = copy_to_user(buffer, output_string, strlen(output_string));
 		if (error_count == 0) {           // success
 			pr_err("%s: Successfully sent [%s] message to the user\n", DEVICE_NAME, output_string);
 			pr_err("%s: Exiting dev_read...\n", DEVICE_NAME);
-			return (size_of_message = 0); // clear the position to the start and return 0
+			return 0;
 		}
 		else {
 			pr_err("%s: Failed to send %d bytes to the user\n", DEVICE_NAME, error_count);
@@ -3650,10 +3647,10 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	pr_err("%s: Removed a disk profile from the queue\n", DEVICE_NAME);
 	if (profile_queue_is_empty()) {
 		pr_err("%s: Profile queue is empty\n", DEVICE_NAME);
-		strcpy(output_string, nul_string);
-		strcpy(output_string, STOP_TRANSFER_OPERATION);
-		output_string[2] = '\0';
-		pr_err("%s: After strcpy, ouput_string should be st = [%s]", DEVICE_NAME, output_string);
+		strlcpy(output_string, nul_string, 254);
+		strlcpy(output_string, STOP_TRANSFER_OPERATION, strlen(STOP_TRANSFER_OPERATION));
+		output_string[strlen(STOP_TRANSFER_OPERATION)] = '\0';
+		pr_err("%s: After strlcpy, ouput_string should be st = [%s]", DEVICE_NAME, output_string);
 	}
 	if (!disk_profile || disk_profile == NULL) {
 		pr_err("%s: Retrieved a NULL disk profile from the queue...\n", DEVICE_NAME);
@@ -3704,21 +3701,21 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 	
 	if (numberOpens > 0) {		
 		// Allocate space for buffer
-		buffer = kmalloc(sizeof(char) * 254, GFP_ATOMIC);
+		buffer = kmalloc(sizeof(char) * 254, GFP_KERNEL);
 		if (!buffer) {
 			pr_err("%s: Unable to allocate memory for dev_write buffer", DEVICE_NAME);
 			return len;
 		}
 		
 		buffer = (char*) buf;
-		strcpy(message, buffer);
+		//strlcpy(message, buffer, len); // maybe use copy_from_user instead
 		//kfree(buffer); // Freeing this causes an error for some reason?
-		size_of_message = strlen(message); // Store the length of the stored message
+		//size_of_message = strlen(message); // Store the length of the stored message
 		pr_err("%s: Did some setup\n", DEVICE_NAME);
 		
 		// If we failed to receive a message, kill the userspace app and return -1
-		if (message == NULL || size_of_message < 1) {
-            pr_err("%s: Failed to read the message from userspace.%d%d\n", DEVICE_NAME, message == NULL, size_of_message < 1);
+		if (buffer == NULL || strlen(buffer) < 1) {
+            pr_err("%s: Failed to read the message from userspace.%d%d\n", DEVICE_NAME, buffer == NULL, strlen(buffer) < 1);
             
             if (send_signal(SIGTERM) < 0) send_signal(SIGKILL);
             
@@ -3727,7 +3724,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
             return -1;
         }
         
-        pr_err("%s: Received message [%s] from userspace app\n", DEVICE_NAME, message);
+        pr_err("%s: Received message [%s] from userspace app\n", DEVICE_NAME, buffer);
 		
 		/*
 		// If we have the PID of the userspace process, suspend the process
@@ -3747,8 +3744,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 		
 		// If you do not have the userspace pid, then you must be getting it right now
 		if (!have_userspace_pid) {
-			// Convert the string message to a long and store it in userspace_pid
-			kstrtol(message, 10, &userspace_pid);
+			// Convert the string buffer to a long and store it in userspace_pid
+			kstrtol(buffer, 10, &userspace_pid);
 			have_userspace_pid = TRUE;
 			pr_err("%s: Received %ld PID from userspace\n", DEVICE_NAME, userspace_pid);
 		}
@@ -3759,15 +3756,15 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 		if (output_string[0] == 'r' && output_string[1] == 'b') {
 			pr_err("%s: In READ_PROFILE_FROM_DISK if\n", DEVICE_NAME);
 			
-			if (strcmp("success", message) != 0) {
-				pr_err("%s: Received non-success message from userspace [%s]\n", DEVICE_NAME, message);
+			if (strcmp("success", buffer) != 0) {
+				pr_err("%s: Received non-success message from userspace [%s]\n", DEVICE_NAME, buffer);
 				
 				// Send SIGSTOP signal to the userspace app
 				ret = send_signal(SIGSTOP);
 				if (ret < 0) return ret;
 				
-				if (strcmp(message, "Failed to find disk profile") == 0) {
-					profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
+				if (strcmp(buffer, "Failed to find disk profile") == 0) {
+					profile = vmalloc(sizeof(pH_profile));
 					if (!profile || profile == NULL) {
 						pr_err("%s: Unable to allocate memory for profile in dev_write\n", DEVICE_NAME);
 						return len;
@@ -3793,7 +3790,6 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				remove_from_read_filename_queue();
 				pr_err("%s: Removed from read filename queue\n", DEVICE_NAME);
 				
-				// I'm not entirely sure why this is here, actually
 				if (peek_task_struct_queue() != NULL) {
 					ASSERT(peek_task_struct_queue()->comm != NULL);
 					ASSERT(peek_task_struct_queue()->comm[0] != '\0');
@@ -3813,7 +3809,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 						// Sometimes this fails with -3, so ignore those cases
 						if (ret != -3) return len;
 					}
-					else pr_err("%s: Sent SIGCONT signal to %ld from dev_write\n", DEVICE_NAME, pid_to_be_sigconted);
+					else pr_err("%s: Sent SIGCONT signal to %d from dev_write\n", DEVICE_NAME, pid_to_be_sigconted);
 					
 					//ASSERT(task_struct_queue_front != NULL);
 					//remove_from_task_struct_queue(); // Should this be commented out?
@@ -3838,7 +3834,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				return 0;
 			}
 		
-			profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
+			profile = vmalloc(sizeof(pH_profile));
 			if (!profile || profile == NULL) {
 				pr_err("%s: Unable to allocate memory for profile in dev_write\n", DEVICE_NAME);
 				return len;
@@ -3869,8 +3865,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			return 0;
 			
 			// Depending on the situation, we may want to process what the user sent us before returning
-			if (strcmp("success", message) == 0) {
-				pr_err("%s: Received non-success message from userspace [%s]\n", DEVICE_NAME, message);
+			if (strcmp("success", buffer) == 0) {
+				pr_err("%s: Received non-success message from userspace [%s]\n", DEVICE_NAME, buffer);
 				return 0;
 			}
 			pr_err("%s: Received success message from userspace\n", DEVICE_NAME);
@@ -4152,7 +4148,7 @@ void pH_profile_data_mem2disk(pH_profile_data *mem, pH_disk_profile_data *disk)
 void pH_profile_mem2disk(pH_profile *profile, pH_disk_profile *disk_profile)
 {
     /* make sure magic is less than PH_FILE_MAGIC_LEN! */
-    strcpy(disk_profile->magic, PH_FILE_MAGIC);
+    strlcpy(disk_profile->magic, PH_FILE_MAGIC, strlen(PH_FILE_MAGIC));
     disk_profile->normal = profile->normal;
 	pr_err("%s: original normal is %d\n", DEVICE_NAME, profile->normal);
     disk_profile->frozen = profile->frozen;

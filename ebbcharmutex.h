@@ -32,12 +32,12 @@
 #define BUFFER_LENGTH 256 // The buffer length
 
 static int	majorNumber;
-static char	message[256] = {0};
-static short	size_of_message;
+//static char	message[256] = {0};
+//static short	size_of_message;
 static int	numberOpens = 0;
 static struct class*	ebbcharClass = NULL;
 static struct device*	ebbcharDevice = NULL;
-char*         test_string = "If this string is returned, that is awesome!!!";
+//char*         test_string = "If this string is returned, that is awesome!!!";
 
 static DEFINE_MUTEX(ebbchar_mutex);	    // Macro to declare a new mutex
 
