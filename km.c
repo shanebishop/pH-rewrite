@@ -657,10 +657,11 @@ noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_pro
 	//strncpy(profile->filename, filename, strlen(filename));
 	strlcpy(profile->filename, filename, strlen(filename)+1);
 	//profile->filename[strlen(profile->filename)] = '\0';
-	pr_err("%s: Length of profile->filename is %d\n", DEVICE_NAME, strlen(profile->filename));
-	pr_err("%s: Length of filename is %d\n", DEVICE_NAME, strlen(filename));
-	pr_err("%s: profile: %s arg: %s\n", DEVICE_NAME, profile->filename, filename);
+	//pr_err("%s: Length of profile->filename is %d\n", DEVICE_NAME, strlen(profile->filename));
+	//pr_err("%s: Length of filename is %d\n", DEVICE_NAME, strlen(filename));
+	//pr_err("%s: profile: %s arg: %s\n", DEVICE_NAME, profile->filename, filename);
 	ASSERT(strlen(profile->filename) == strlen(filename));
+	/*
 	for (i = 0; i < strlen(filename); i++) {
 		if (filename[i] != profile->filename[i]) {
 			pr_err("%s: Filenames do not match at position %d\n", DEVICE_NAME, i);
@@ -668,6 +669,7 @@ noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_pro
 			ASSERT(filename[i] == profile->filename[i]);
 		}
 	}
+	*/
 	ASSERT(strcmp(filename, profile->filename) == 0);
 	ASSERT(!(!profile->filename || profile->filename == NULL || strlen(profile->filename) < 1));
 	ASSERT(strlen(profile->filename) > 1);
@@ -2123,7 +2125,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		
 		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
 		pr_err("%s: Making new profile with filename [%s] in sys_execve_return_handler\n", DEVICE_NAME, process->filename);
-		pr_err("\n\n\n\n\n\n\n\%s: No really, the filename is [%s]\n*****************\n*****************\n*****************\n", DEVICE_NAME, process->filename);
+		//pr_err("\n\n\n\n\n\n\n\%s: No really, the filename is [%s]\n*****************\n*****************\n*****************\n", DEVICE_NAME, process->filename);
 		new_profile(profile, process->filename, TRUE);
 		
 		//return -1;
@@ -2892,20 +2894,20 @@ void stack_pop(pH_task_struct* process) {
 		return;
 	}
 	
-	pr_err("%s: Made it to beginning of main part of stack_pop\n", DEVICE_NAME);
+	//pr_err("%s: Made it to beginning of main part of stack_pop\n", DEVICE_NAME);
 	temp = process->seq;
-	pr_err("%s: temp = process->seq;\n", DEVICE_NAME);
+	//pr_err("%s: temp = process->seq;\n", DEVICE_NAME);
 	process->seq = process->seq->next;
-	pr_err("%s: process->seq = process->seq->next;\n", DEVICE_NAME);
+	//pr_err("%s: process->seq = process->seq->next;\n", DEVICE_NAME);
 	if (process->seq != NULL) {
 		process->seq->prev = NULL;
 		pr_err("%s: process->seq->prev = NULL;\n", DEVICE_NAME);
 		if (process->seq->next != NULL) process->seq->next->prev = process->seq; // This line might be unecessary
 	}
 	kfree(temp);
-	pr_err("%s: kfree(temp);\n", DEVICE_NAME);
+	//pr_err("%s: kfree(temp);\n", DEVICE_NAME);
 	temp = NULL;
-	pr_err("%s: temp = NULL;\n", DEVICE_NAME);
+	//pr_err("%s: temp = NULL;\n", DEVICE_NAME);
 }
 
 pH_seq* stack_peek(pH_task_struct* process) {
