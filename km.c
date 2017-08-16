@@ -1520,8 +1520,9 @@ static long jsys_execve(const char __user *filename,
 		pr_err("%s: path_to_binary was added to the read filename queue\n", DEVICE_NAME);
 		strlcpy(output_string, nul_string, 254);
 		strlcpy(output_string, READ_PROFILE_FROM_DISK, strlen(READ_PROFILE_FROM_DISK)+1); // Maybe I shouldn't do this if there is another command already
-		output_string[strlen(READ_PROFILE_FROM_DISK)] = '\0';
+		//output_string[strlen(READ_PROFILE_FROM_DISK)] = '\0';
 		pr_err("%s: After strlcpy, output_string should be rb [%s]\n", DEVICE_NAME, output_string);
+		ASSERT(output_string[1] == 'b');
 		strlcat(output_string, path_to_binary, 254);
 		
 		/*
@@ -2319,7 +2320,7 @@ int pH_write_profile(pH_profile* profile) {
 	}
 	strlcpy(output_string, nul_string, 254);
 	strlcpy(output_string, TRANSFER_OPERATION, strlen(TRANSFER_OPERATION)+1);
-	output_string[strlen(TRANSFER_OPERATION)] = '\0';
+	//output_string[strlen(TRANSFER_OPERATION)] = '\0';
 	pr_err("%s: After strlcpy, output_string should be t [%s]\n", DEVICE_NAME, output_string);
 	
 	// The use of SIGCONT here might not be correct. Perhaps the userspace app is already running,
@@ -3659,8 +3660,9 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 		pr_err("%s: Profile queue is empty\n", DEVICE_NAME);
 		strlcpy(output_string, nul_string, 254);
 		strlcpy(output_string, STOP_TRANSFER_OPERATION, strlen(STOP_TRANSFER_OPERATION)+1);
-		output_string[strlen(STOP_TRANSFER_OPERATION)] = '\0';
+		//output_string[strlen(STOP_TRANSFER_OPERATION)] = '\0';
 		pr_err("%s: After strlcpy, ouput_string should be st = [%s]", DEVICE_NAME, output_string);
+		ASSERT(output_string[1] == 't');
 	}
 	if (!disk_profile || disk_profile == NULL) {
 		pr_err("%s: Retrieved a NULL disk profile from the queue...\n", DEVICE_NAME);
