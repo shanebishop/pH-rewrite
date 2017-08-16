@@ -1083,7 +1083,7 @@ int process_syscall(long syscall) {
 	//pr_err("%s: If this doesn't print, you know what is wrong %d\n", DEVICE_NAME, profile->is_temp_profile);
 	
 	if (profile->is_temp_profile) {
-		pr_err("%s: The process has PID %ld and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
+		//pr_err("%s: The process has PID %ld and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
 		
 		// Store the profile in a temporary variable to allow it to be reset below
 		temp_profile = profile;
@@ -1091,7 +1091,7 @@ int process_syscall(long syscall) {
 		ASSERT(process->filename != NULL);
 		ASSERT(strlen(process->filename) > 1);
 		
-		pr_err("%s: Fetching profile using filename [%s] in process_syscall...\n", DEVICE_NAME, process->filename);
+		//pr_err("%s: Fetching profile using filename [%s] in process_syscall...\n", DEVICE_NAME, process->filename);
 		
 		// Retrieve the disk profile
 		spin_lock(&pH_profile_list_sem);
@@ -1101,7 +1101,7 @@ int process_syscall(long syscall) {
 		if (!profile || profile == NULL) {
 			ASSERT(strlen(process->filename) > 1);
 			profile = temp_profile; // Set the profile back
-			pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
+			//pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
 			//ASSERT(profile != NULL);
 			//ret = -1;
 			//goto exit_before_profile;
@@ -1161,7 +1161,7 @@ int process_syscall(long syscall) {
 	
 	// Check to see if this profile is still in use
 	if (!pH_profile_in_use(profile) || !(profile->lock) || profile->lock == NULL) {
-		pr_err("%s: profile->lock is NULL in process_syscall\n", DEVICE_NAME);
+		//pr_err("%s: profile->lock is NULL in process_syscall\n", DEVICE_NAME);
 		//vfree(profile); // Don't bother freeing, since this is the only remaining pointer
 		//profile = NULL;
 		ret = -1;
