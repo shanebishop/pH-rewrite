@@ -493,34 +493,44 @@ noinline char* peek_read_filename_queue(void) {
 	return read_filename_queue_front->filename;
 }
 
+// I saw an "unable to handle kernel paging request error" occur that came from this function before,
+// but the error actually happened in __kmalloc after a call to printk, so the problem may not stem
+// from this function but rather from somewhere else
 void add_to_read_filename_queue(char* filename) {
+	pr_err("%s: In add_to_read_filename_queue\n", DEVICE_NAME);
 	read_filename* to_add = kmalloc(sizeof(read_filename), GFP_ATOMIC);
 	if (!to_add || to_add == NULL) {
 		pr_err("%s: Out of memory in add_to_read_filename\n", DEVICE_NAME);
 		return;
 	}
+	pr_err("%s: Allocated memory for to_add\n", DEVICE_NAME);
 	
 	char* save_filename = kmalloc(strlen(filename), GFP_ATOMIC);
 	if (!save_filename || save_filename == NULL) {
 		pr_err("%s: Out of memory in add_to_read_filename\n", DEVICE_NAME);
 		return;
 	}
+	pr_err("%s: Allocated memory for save_filename\n", DEVICE_NAME);
 	
 	strlcpy(save_filename, filename, strlen(filename)+1);
 	pr_err("%s: save_filename is now [%s]\n", DEVICE_NAME, save_filename);
 	
 	to_add->filename = filename;
 	to_add->next = NULL;
+	pr_err("%s: Performed some setup in add_to_read_filename_queue\n", DEVICE_NAME);
 	
 	if (read_filename_queue_front == NULL) {
 		read_filename_queue_front = to_add;
 		read_filename_queue_rear = to_add;
 		read_filename_queue_rear->next = NULL;
+		pr_err("%s: Made it to end of if in add_to_read_filename_queue\n", DEVICE_NAME);
 	} else {
 		read_filename_queue_rear->next = to_add;
 		read_filename_queue_rear = to_add;
 		read_filename_queue_rear->next = NULL;
+		pr_err("%s: Made it to end of else in add_to_read_filename_queue\n", DEVICE_NAME);
 	}
+	pr_err("%s: Made it past branching in add_to_read_filename_queue\n", DEVICE_NAME);
 	
 	ASSERT(read_filename_queue_front != NULL);
 	
