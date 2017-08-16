@@ -327,6 +327,7 @@ inline void pH_refcount_init(pH_profile *profile, int i)
     profile->refcount.counter = i;
 }
 
+// Returns the current refcount value
 inline int get_refcount(pH_profile* profile) {
 	return atomic_read(&(profile->refcount));
 }
@@ -945,15 +946,19 @@ noinline int send_signal(int signal_to_send) {
 
 int pH_add_seq_storage(pH_profile_data*, int);
 
+// Copies data from an old instance of pH_profile_data to a new instance
 int copy_pH_profile_data(pH_profile_data* old, pH_profile_data* new) {
 	int i;
 	
-	//sequences
+	// sequences - not copied
+	
+	// If old->last_mod_count is 0, set the new->last_mod_count to 0 and add together the train_counts
 	if (old->last_mod_count == 0) {
 		new->last_mod_count = 0;
 		new->train_count += old->train_count;
 	}
 	
+	// Copy each non-NULL entry over
 	for (i = 0; i < PH_NUM_SYSCALLS; i++) {
 		if (old->entry[i] == NULL) {
 			new->entry[i] = NULL;
@@ -969,6 +974,7 @@ int copy_pH_profile_data(pH_profile_data* old, pH_profile_data* new) {
 
 //void copy_pH_seq(pH_seq* old, pH_seq* new) {}
 
+// Merges a temporary profile with a profile that has been read from disk
 void merge_temp_with_disk(pH_profile* temp, pH_profile* disk) {
 	ASSERT(temp != NULL);
 	ASSERT(disk != NULL);
@@ -1078,6 +1084,7 @@ int process_syscall(long syscall) {
 	if (profile->is_temp_profile) {
 		pr_err("%s: The process has PID %ld and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
 		
+		// Store the profile in a temporary variable to allow it to be reset below
 		temp_profile = profile;
 		
 		ASSERT(process->filename != NULL);
@@ -1085,6 +1092,7 @@ int process_syscall(long syscall) {
 		
 		pr_err("%s: Fetching profile using filename [%s] in process_syscall...\n", DEVICE_NAME, process->filename);
 		
+		// Retrieve the disk profile
 		spin_lock(&pH_profile_list_sem);
 		profile = retrieve_pH_profile_by_filename(process->filename);
 		spin_unlock(&pH_profile_list_sem);
@@ -1100,10 +1108,11 @@ int process_syscall(long syscall) {
 		else {
 			pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
 			pr_err("%s: Calling remove_from_read_filename_queue in process_syscall\n", DEVICE_NAME);
-			remove_from_read_filename_queue();
+			//remove_from_read_filename_queue(); // Removes from read filename queue (should this be done already?)
 		
 			ASSERT(strcmp(process->filename, profile->filename) == 0);
-		
+			
+			// Merge the profiles and get rid of the temp profile
 			merge_temp_with_disk(temp_profile, profile);
 			pH_refcount_init(temp_profile, 0);
 			pH_free_profile(temp_profile);
@@ -1113,13 +1122,16 @@ int process_syscall(long syscall) {
 			ASSERT(strcmp(process->filename, profile->filename) == 0);
 	
 			process->should_sigcont_this = FALSE;
-	
+
+			// Add this profile to the process and increment its refcount
 			process->profile = profile;
 			pH_refcount_inc(profile);
 			ASSERT(get_refcount(profile) == 1);
 			pr_err("%s: Added the profile to the process\n", DEVICE_NAME);
 			
+			// Continues the process if it needs to be continued
 			if (peek_task_struct_queue() != NULL) {
+				ASSERT(peek_task_struct_queue() == current);
 				ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
 				if (ret < 0) {
 					pr_err("%s: Failed to send SIGCONT signal to %ld\n", DEVICE_NAME, process->process_id);
@@ -3448,7 +3460,7 @@ static int __init ebbchar_init(void) {
 }
 
 // Perhaps the best way to remove the module is just to reboot?
-static void __exit ebbchar_exit(void){
+static void __exit ebbchar_exit(void) {
 	int i, profiles_freed, pH_task_structs_freed;
 	
 	// Set all booleans accordingly - this should be the first thing you do to prevent any more code from running
