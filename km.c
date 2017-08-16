@@ -591,6 +591,8 @@ noinline struct task_struct* peek_task_struct_queue(void) {
 noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_profile) {
 	int i;
 
+	pr_err("%s: In new_profile\n", DEVICE_NAME);
+
 	ASSERT(profile != NULL);
 	
 	ASSERT(!(!filename || filename == NULL || strlen(filename) < 1 || 
@@ -610,7 +612,7 @@ noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_pro
 	profile->length = pH_default_looklen;
 	ASSERT(profile->length >= 1);
 	profile->count = 0;
-	//pr_err("%s: Got here 1 (new_profile)\n", DEVICE_NAME);
+	pr_err("%s: Got here 1 (new_profile)\n", DEVICE_NAME);
 
 	// Allocates memory for the lock
 	profile->lock = kmalloc(sizeof(spinlock_t), GFP_ATOMIC);
@@ -622,7 +624,7 @@ noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_pro
 	}
 	spin_lock_init(profile->lock);
 	spin_lock_init(&(profile->freeing_lock));
-	//pr_err("%s: Got here 2 (new_profile)\n", DEVICE_NAME);
+	pr_err("%s: Got here 2 (new_profile)\n", DEVICE_NAME);
 
 	profile->train.sequences = 0;
 	profile->train.last_mod_count = 0;
@@ -669,7 +671,7 @@ noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_pro
 	ASSERT(strcmp(filename, profile->filename) == 0);
 	ASSERT(!(!profile->filename || profile->filename == NULL || strlen(profile->filename) < 1));
 	ASSERT(strlen(profile->filename) > 1);
-	//pr_err("%s: Got here 4 (new_profile)\n", DEVICE_NAME);
+	pr_err("%s: Got here 4 (new_profile)\n", DEVICE_NAME);
 
 	//pH_open_seq_logfile(profile);
 
