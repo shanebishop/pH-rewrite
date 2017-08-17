@@ -3815,7 +3815,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 						pr_err("%s: Failed to send SIGCONT signal in dev_write: %d\n", DEVICE_NAME, ret);
 						
 						// Sometimes this fails with -3, so ignore those cases
-						if (ret != -3) return len;
+						if (ret != -3) return 0;
 					} else pr_err("%s: Sent SIGCONT signal to %d from dev_write\n", DEVICE_NAME, pid_to_be_sigconted);
 					
 					//ASSERT(task_struct_queue_front != NULL);
