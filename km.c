@@ -281,8 +281,8 @@ bool have_userspace_pid           = FALSE;
 bool binary_read                  = FALSE;
 bool user_process_has_been_loaded = FALSE;
 bool module_inserted_successfully = FALSE;
-spinlock_t pH_profile_list_sem;             // Lock for list of profiles
-spinlock_t pH_task_struct_list_sem;         // Lock for process list
+//spinlock_t pH_profile_list_sem;             // Lock for list of profiles
+//spinlock_t pH_task_struct_list_sem;         // Lock for process list
 int profiles_created = 0;                   // Number of profiles that have been created
 int successful_jsys_execves = 0;            // Number of successful jsys_execves
 //spinlock_t execve_count_lock;
@@ -296,6 +296,7 @@ read_filename* read_filename_queue_rear = NULL;
 task_struct_wrapper* task_struct_queue_front = NULL;
 task_struct_wrapper* task_struct_queue_rear = NULL;
 char* nul_string;
+spinlock_t master_lock;
 
 // Returns true if the process is being monitored, false otherwise
 inline bool pH_monitoring(pH_task_struct* process) {
@@ -374,7 +375,7 @@ int pH_task_struct_list_length(void) {
 void add_to_profile_llist(pH_profile* p) {
 	pH_refcount_inc(p);
 	
-	ASSERT(spin_is_locked(&pH_profile_list_sem));
+	//ASSERT(spin_is_locked(&pH_profile_list_sem));
 	//ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
 	
 	//pr_err("%s: In add_to_profile_llist\n", DEVICE_NAME);
@@ -685,9 +686,9 @@ noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_pro
 		// Add this new profile to the llist
 		//pr_err("%s: Locking profile list in new_profile on line 460\n", DEVICE_NAME);
 		//preempt_disable();
-		spin_lock(&pH_profile_list_sem);
+		//spin_lock(&pH_profile_list_sem);
 		add_to_profile_llist(profile);
-		spin_unlock(&pH_profile_list_sem);
+		//spin_unlock(&pH_profile_list_sem);
 		//preempt_enable();
 		//pr_err("%s: Unlocking profile list in new_profile on line 462\n", DEVICE_NAME);
 		//pr_err("%s: Got here 5 (new_profile) returning...\n", DEVICE_NAME);
@@ -720,7 +721,7 @@ pH_task_struct* llist_retrieve_process(int process_id) {
 	
 	//pr_err("%s: In llist_retrieve_process\n", DEVICE_NAME);
 	
-	ASSERT(spin_is_locked(&pH_task_struct_list_sem));
+	//ASSERT(spin_is_locked(&pH_task_struct_list_sem));
 	//ASSERT(!spin_is_locked(&pH_profile_list_sem));
 	
 	iterator = pH_task_struct_list;
@@ -1033,6 +1034,8 @@ int process_syscall(long syscall) {
 	
 	if (!pH_profile_list || pH_profile_list == NULL) return 0;
 
+	if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
+
 	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
 	// Check to see if a process went out of use
@@ -1040,9 +1043,9 @@ int process_syscall(long syscall) {
 	
 	// Retrieve process
 	//preempt_disable();
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	//pr_err("%s: Tried to retrieve process\n", DEVICE_NAME);
 	//preempt_enable();
 	if (!process) {
@@ -1109,9 +1112,9 @@ int process_syscall(long syscall) {
 		//pr_err("%s: Fetching profile using filename [%s] in process_syscall...\n", DEVICE_NAME, process->filename);
 		
 		// Retrieve the disk profile
-		spin_lock(&pH_profile_list_sem);
+		//spin_lock(&pH_profile_list_sem);
 		profile = retrieve_pH_profile_by_filename(process->filename);
-		spin_unlock(&pH_profile_list_sem);
+		//spin_unlock(&pH_profile_list_sem);
 	
 		if (!profile || profile == NULL) {
 			ASSERT(strlen(process->filename) > 1);
@@ -1277,9 +1280,11 @@ int process_syscall(long syscall) {
 	ret = 0;
 
 exit_before_profile:
+	spin_unlock(&master_lock);
 	return ret;
 
 exit:
+	spin_unlock(&master_lock);
 	pH_refcount_dec(profile);
 	return ret;
 }
@@ -1288,7 +1293,7 @@ exit:
 void add_process_to_llist(pH_task_struct* t) {
 	//pr_err("%s: In add_process_to_llist\n", DEVICE_NAME);
 
-	ASSERT(spin_is_locked(&pH_task_struct_list_sem));
+	//ASSERT(spin_is_locked(&pH_task_struct_list_sem));
 	//ASSERT(!spin_is_locked(&pH_profile_list_sem));
 	
 	// Checks for NULL
@@ -1324,7 +1329,7 @@ void add_process_to_llist(pH_task_struct* t) {
 pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 	//pr_err("%s: In retrieve_pH_profile_by_filename\n", DEVICE_NAME);
 	
-	ASSERT(spin_is_locked(&pH_profile_list_sem));
+	//ASSERT(spin_is_locked(&pH_profile_list_sem));
 	//ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
 	//pr_err("%s: Made it past assertions\n", DEVICE_NAME);
 	
@@ -1396,6 +1401,8 @@ static long jsys_execve(const char __user *filename,
 	
 	if (!pH_aremonitoring) goto exit;
 
+	spin_lock(&master_lock);
+
 	pr_err("%s: In jsys_execve\n", DEVICE_NAME);
 	
 	current_process_id = pid_vnr(task_tgid(current)); // Grab the process ID right now
@@ -1407,9 +1414,9 @@ static long jsys_execve(const char __user *filename,
 	
 	//pr_err("%s: Calling llist_retrieve_process from jsys_execve\n", DEVICE_NAME);
 	//preempt_disable();
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(current_process_id);
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	if (!process || process == NULL) {
 		pr_err("%s: Unable to find process in jsys_execve\n", DEVICE_NAME);
@@ -1494,9 +1501,9 @@ static long jsys_execve(const char __user *filename,
 	pr_err("%s: Attempting to retrieve profile...\n", DEVICE_NAME);
 	pr_err("%s: Locking profile list in jsys_execve on line 1463\n", DEVICE_NAME);
 	//preempt_disable();
-	spin_lock(&pH_profile_list_sem);
+	//spin_lock(&pH_profile_list_sem);
 	profile = retrieve_pH_profile_by_filename(path_to_binary);
-	spin_unlock(&pH_profile_list_sem);
+	//spin_unlock(&pH_profile_list_sem);
 	//preempt_enable();
 	pr_err("%s: Unlocking profile list in jsys_execve on line 1465\n", DEVICE_NAME);
 	pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
@@ -1563,9 +1570,9 @@ static long jsys_execve(const char __user *filename,
 	
 	if (!already_had_process) {
 		//preempt_disable();
-		spin_lock(&pH_task_struct_list_sem);
+		//spin_lock(&pH_task_struct_list_sem);
 		add_process_to_llist(process);
-		spin_unlock(&pH_task_struct_list_sem);
+		//spin_unlock(&pH_task_struct_list_sem);
 		//preempt_enable();
 		pr_err("%s: process has been added to the llist\n", DEVICE_NAME);
 	}
@@ -1576,6 +1583,8 @@ static long jsys_execve(const char __user *filename,
 	pr_err("%s: At end of jsys_execve, process->filename is [%s] for %ld\n", DEVICE_NAME, process->filename, process->process_id);
 	
 	pr_err("%s: Returning from jsys_execve...\n", DEVICE_NAME);
+	
+	spin_unlock(&master_lock);
 	
 	jprobe_return();
 	return 0;
@@ -1589,6 +1598,8 @@ exit:
 	}
 	process = NULL;
 	
+	spin_unlock(&master_lock);
+	
 	jprobe_return();
 	return 0;
 	
@@ -1596,6 +1607,8 @@ corrupted_path_to_binary:
 	kfree(path_to_binary);
 	path_to_binary = NULL;
 	process = NULL;
+	
+	spin_unlock(&master_lock);
 	
 	jprobe_return();
 	return 0;
@@ -1665,6 +1678,8 @@ pH_task_struct* handle_new_process_fork(char* path_to_binary, pH_profile* profil
 	
 	pH_task_struct* this_process;
 	
+	spin_lock(&master_lock);
+	
 	//pr_err("%s: In handle_new_process for %d %s\n", DEVICE_NAME, process_id, path_to_binary);
 	
 	// Allocate memory for this process
@@ -1695,13 +1710,15 @@ pH_task_struct* handle_new_process_fork(char* path_to_binary, pH_profile* profil
 	pH_refcount_inc(profile);
 
 	//preempt_disable();
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	add_process_to_llist(this_process); // Add this process to the list of processes
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
 	pH_refcount_dec(profile);
+	
+	spin_unlock(&master_lock);
 	
 	return this_process;
 
@@ -1713,6 +1730,8 @@ no_memory:
 	this_process = NULL;
 	
 	pH_refcount_dec(profile);
+	
+	spin_unlock(&master_lock);
 	
 	return NULL;
 }
@@ -1768,19 +1787,23 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 		return retval;
 	}
 	
+	spin_lock(&master_lock);
+	
 	//preempt_disable();
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	parent_process = llist_retrieve_process(pid_vnr(task_tgid(current)));
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	if (!parent_process || parent_process == NULL) {
 		//pr_err("%s: In fork_handler with NULL parent_process\n", DEVICE_NAME);
+		spin_unlock(&master_lock);
 		return -1;
 	}
 	
 	profile = parent_process->profile;
 	if (!profile || profile == NULL) {
 		pr_err("%s: In fork_handler with NULL parent_process->profile\n", DEVICE_NAME);
+		spin_unlock(&master_lock);
 		return -1;
 	}
 	pH_refcount_inc(profile);
@@ -1798,6 +1821,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	{
 		//pr_err("%s: In fork_handler with corrupted path_to_binary: [%s]\n", DEVICE_NAME, path_to_binary);
 		pH_refcount_dec(profile);
+		spin_unlock(&master_lock);
 		return -1;
 	}
 	
@@ -1811,6 +1835,8 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	pH_refcount_dec(profile);
 	
 	//pr_err("%s: Got through all of fork_handler\n", DEVICE_NAME);
+	
+	spin_unlock(&master_lock);
 	
 	return 0;
 }
@@ -1958,14 +1984,18 @@ static int do_execveat_common_handler(struct kretprobe_instance* ri, struct pt_r
 	if (retval < 0) {
 		pr_err("%s: execve failed\n", DEVICE_NAME);
 		
+		spin_lock(&master_lock);
+		
 		//preempt_disable();
-		spin_lock(&pH_task_struct_list_sem);
+		//spin_lock(&pH_task_struct_list_sem);
 		process = llist_retrieve_process(pid_vnr(task_tgid(current)));
-		spin_unlock(&pH_task_struct_list_sem);
+		//spin_unlock(&pH_task_struct_list_sem);
 		//preempt_enable();
 		pr_err("%s: Calling free_pH_task_struct from do_execveat_common_handler\n", DEVICE_NAME);
 		free_pH_task_struct(process);
 		process = NULL;
+		
+		spin_unlock(&master_lock);
 		
 		return retval;
 	}
@@ -2019,11 +2049,14 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	if (!module_inserted_successfully) return 0;
 	
+	spin_lock(&master_lock);
+	
 	process_id = pid_vnr(task_tgid(current));
 	
 	ret = send_sig(SIGSTOP, current, SIGNAL_PRIVILEGE);
 	if (ret < 0) {
 		pr_err("%s: Failed to send SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
+		spin_unlock(&master_lock);
 		return ret;
 	}
 	pr_err("%s: Sent SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
@@ -2031,6 +2064,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	to_add = kmalloc(sizeof(task_struct_wrapper), GFP_ATOMIC);
 	if (!to_add || to_add == NULL) {
 		pr_err("%s: Unable to allocate memory for to_add in sys_execve_return_handler\n", DEVICE_NAME);
+		spin_unlock(&master_lock);
 		return -ENOMEM;
 	}
 	to_add->task_struct = current;
@@ -2044,11 +2078,12 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	//pr_err("%s: read_filename_queue_front = %s\n", DEVICE_NAME, peek_read_filename_queue());
 	//pr_err("%s: If all of these lines (including this one) print, then the problem is in retrieve_pH_profile_by_filename\n", DEVICE_NAME);
 	
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(process_id);
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	if (!process || process == NULL) {
 		pr_err("%s: Got NULL process in sys_execve_return_handler\n", DEVICE_NAME);
+		spin_unlock(&master_lock);
 		return -1;
 	}
 	pr_err("%s: Retrieved a process\n", DEVICE_NAME);
@@ -2068,6 +2103,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
 		if (ret < 0) {
 			pr_err("%s: Failed to send SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+			spin_unlock(&master_lock);
 			return ret;
 		}
 		pr_err("%s: Sent SIGCONT signal to %d from sys_execve_return_handler\n", DEVICE_NAME, process_id);
@@ -2077,13 +2113,15 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		
 		ASSERT(process->profile != NULL);
 		
+		spin_unlock(&master_lock);
+		
 		return 0;
 	}
 	
-	spin_lock(&pH_profile_list_sem);
+	//spin_lock(&pH_profile_list_sem);
 	profile = retrieve_pH_profile_by_filename(process->filename);
 	//spin_unlock(&execve_count_lock);
-	spin_unlock(&pH_profile_list_sem);
+	//spin_unlock(&pH_profile_list_sem);
 	
 	if (profile != NULL) {
 		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
@@ -2110,6 +2148,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
 		if (ret < 0) {
 			pr_err("%s: Failed to send SIGCONT signal to %d\n", DEVICE_NAME, process_id);
+			spin_unlock(&master_lock);
 			return ret;
 		}
 		pr_err("%s: Sent SIGCONT signal to %d from sys_execve_return_handler\n", DEVICE_NAME, process_id);
@@ -2122,6 +2161,8 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 		process_syscall(59);
 		pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
+		
+		spin_unlock(&master_lock);
 		
 		return 0;
 	}
@@ -2167,6 +2208,8 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	*/
 	
 	ASSERT(process->profile != NULL);
+	
+	spin_unlock(&master_lock);
 	
 	return 0;
 }
@@ -2240,7 +2283,7 @@ int pH_remove_profile_from_list(pH_profile *profile)
 {
     pH_profile *prev_profile, *cur_profile;
     
-    ASSERT(spin_is_locked(&pH_profile_list_sem));
+    //ASSERT(spin_is_locked(&pH_profile_list_sem));
 	//ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
     ASSERT(profile != NULL);
 	ASSERT(!pH_profile_in_use(profile));
@@ -2410,7 +2453,7 @@ void pH_free_profile(pH_profile *profile)
 int remove_process_from_llist(pH_task_struct* process) {
 	pH_task_struct *prev_task_struct, *cur_task_struct;
 	
-	ASSERT(spin_is_locked(&pH_task_struct_list_sem));
+	//ASSERT(spin_is_locked(&pH_task_struct_list_sem));
 	//ASSERT(!spin_is_locked(&pH_profile_list_sem));
 	ASSERT(process != NULL);
 	
@@ -2595,9 +2638,9 @@ void free_pH_task_struct(pH_task_struct* process) {
 	// When everything else is done, remove process from llist, kfree process
 	// (maybe remove the process from the llist earlier?)
 	//preempt_disable();
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	remove_process_from_llist(process);
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	kfree(process);
 	process = NULL; // Okay because process is removed from llist above
@@ -2613,10 +2656,12 @@ static long jsys_exit(int error_code) {
 	
 	//pr_err("%s: In jsys_exit for %d\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
 	
+	spin_lock(&master_lock);
+	
 	//preempt_disable();
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	
 	if (process == NULL) goto not_monitoring;
@@ -2629,15 +2674,20 @@ static long jsys_exit(int error_code) {
 	pr_err("%s: Calling free_pH_task_struct from jsys_exit\n", DEVICE_NAME);
 	free_pH_task_struct(process);
 	
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return 0;
 	
 not_monitoring:
 	//pr_err("%s: %d had no pH_task_struct associated with it\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
+	
+	spin_unlock(&master_lock);
+	
 	jprobe_return();
 	return 0;
 	
 not_inserted:
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return 0;
 }
@@ -2654,6 +2704,8 @@ static long jdo_group_exit(int error_code) {
 	if (!done_waiting_for_user) goto not_inserted;
 	
 	if (!module_inserted_successfully) goto not_inserted;
+	
+	spin_lock(&master_lock);
 	
 	p = current;
 	
@@ -2675,9 +2727,9 @@ static long jdo_group_exit(int error_code) {
 		if (t->exit_state) continue;
 		
 		//preempt_disable();
-		spin_lock(&pH_task_struct_list_sem);
+		//spin_lock(&pH_task_struct_list_sem);
 		process = llist_retrieve_process(pid_vnr(task_tgid(t)));
-		spin_unlock(&pH_task_struct_list_sem);
+		//spin_unlock(&pH_task_struct_list_sem);
 		//preempt_enable();
 		
 		if (process != NULL) {
@@ -2686,9 +2738,9 @@ static long jdo_group_exit(int error_code) {
 		}
 	}
 	//preempt_disable();
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	
 	if (process != NULL) {
@@ -2696,15 +2748,18 @@ static long jdo_group_exit(int error_code) {
 		free_pH_task_struct(process);
 	}
 	
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return 0;
 	
 not_monitoring:
 	//pr_err("%s: %d had no pH_task_struct associated with it\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return 0;
 	
 not_inserted:
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return 0;
 }
@@ -2756,18 +2811,20 @@ static void jfree_pid(struct pid* pid) {
 	
 	if (!module_inserted_successfully) goto exit;
 	
+	spin_lock(&master_lock);
+	
 	//pr_err("%s: In jfree_pid\n", DEVICE_NAME);
 	
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	for (iterator = pH_task_struct_list; iterator != NULL; iterator = iterator->next) {
 		if (i > 10000) {
 			pr_err("%s: ERROR: Got stuck in jfree_pid for loop\n", DEVICE_NAME);
-			spin_unlock(&pH_task_struct_list_sem);
+			//spin_unlock(&pH_task_struct_list_sem);
 			ASSERT(i <= 10000);
 			goto exit;
 		}
 		if (iterator->pid == pid) {
-			spin_unlock(&pH_task_struct_list_sem);
+			//spin_unlock(&pH_task_struct_list_sem);
 			pr_err("%s: Calling free_pH_task_struct from jfree_pid\n", DEVICE_NAME);
 			free_pH_task_struct(iterator);
 			iterator = NULL;
@@ -2798,14 +2855,16 @@ static void jfree_pid(struct pid* pid) {
 		}
 		i++;
 	}
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	
 	ASSERT(freed_anything);
 	
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return;
 
 exit:
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return;
 }
@@ -2930,24 +2989,28 @@ static void jhandle_signal(struct ksignal* ksig, struct pt_regs* regs) {
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
+	spin_lock(&master_lock);
+	
 	//pr_err("%s: In jhandle_signal\n", DEVICE_NAME);
 	
 	// Will this retrieve the process that the signal is being sent to, or will it retrieve the
 	// process that is sending the signal?
 	//preempt_disable();
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	
 	if (process != NULL && process->profile != NULL && process->seq != NULL) {
 		make_and_push_new_pH_seq(process);
 	}
 	
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return;
 	
 not_inserted:
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return;
 }
@@ -2959,14 +3022,16 @@ static void jdo_signal(struct pt_regs* regs) {
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
+	spin_lock(&master_lock);
+	
 	//pr_err("%s: In jdo_signal\n", DEVICE_NAME);
 	
 	// Will this retrieve the process that the signal is being sent to, or will it retrieve the
 	// process that is sending the signal?
 	//preempt_disable();
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	
 	if (process != NULL && process->profile != NULL && process->seq != NULL) {
@@ -2974,10 +3039,12 @@ static void jdo_signal(struct pt_regs* regs) {
 	}
 	
 	//pr_err("%s: Exiting jdo_signal\n", DEVICE_NAME);
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return;
 	
 not_inserted:
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return;
 }
@@ -3015,6 +3082,8 @@ static long jsys_rt_sigreturn(void) {
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
+	spin_lock(&master_lock);
+	
 	last_task_struct_in_sigreturn = current;
 	
 	//pr_err("%s: In jsys_rt_sigreturn\n", DEVICE_NAME);
@@ -3023,9 +3092,9 @@ static long jsys_rt_sigreturn(void) {
 	//pr_err("%s: Back in jsys_rt_sigreturn after processing syscall\n", DEVICE_NAME);
 	
 	//preempt_disable();
-	spin_lock(&pH_task_struct_list_sem);
+	//spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(pid_vnr(task_tgid(current)));
-	spin_unlock(&pH_task_struct_list_sem);
+	//spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
 	
 	if (process == NULL) goto not_inserted;
@@ -3048,10 +3117,12 @@ static long jsys_rt_sigreturn(void) {
 	
 	//pr_err("%s: Got through all of jsys_rt_sigreturn\n", DEVICE_NAME);
 	
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return 0;
 	
 not_inserted:
+	spin_unlock(&master_lock);
 	jprobe_return();
 	return 0;
 }
@@ -3451,6 +3522,8 @@ static int __init ebbchar_init(void) {
 	}
 	pr_err("%s: Registered all syscall probes\n", DEVICE_NAME);
 	
+	spin_lock_init(&master_lock);
+	
 	nul_string = kmalloc(sizeof(char) * 254, GFP_KERNEL);
 	if (!nul_string || nul_string == NULL) {
 		pr_err("%s: Unable to allocate space for nul_string in ebbchar_init\n", DEVICE_NAME);
@@ -3566,10 +3639,13 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	pH_disk_profile* disk_profile;
 	int error_count = 0;
 	
+	spin_lock(&master_lock);
+	
 	pr_err("%s: In dev_read\n", DEVICE_NAME);
 
 	if (!buffer || buffer == NULL) {
 		pr_err("%s: In dev_read with NULL buffer\n", DEVICE_NAME);
+		spin_unlock(&master_lock);
 		return -EFAULT;
 	}
 	
@@ -3586,9 +3662,11 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 		if (error_count == 0) {           // success
 			pr_err("%s: Successfully sent [%s] message to the user\n", DEVICE_NAME, output_string);
 			pr_err("%s: Exiting dev_read...\n", DEVICE_NAME);
+			spin_unlock(&master_lock);
 			return 0;
 		} else {
 			pr_err("%s: Failed to send %d bytes to the user\n", DEVICE_NAME, error_count);
+			spin_unlock(&master_lock);
 			return -EFAULT;      // Failed - return a bad address message
 		}
 	}
@@ -3673,6 +3751,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 		}
 		*/
 		pr_err("%s: ...but this should not have happened (ERROR)!\n", DEVICE_NAME);
+		spin_unlock(&master_lock);
 		return -EFAULT;
 	}
 	pr_err("%s: Successfully removed a disk profile from the queue\n", DEVICE_NAME);
@@ -3685,9 +3764,11 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	disk_profile = NULL;
 	if (error_count == 0) {           // success!
 		pr_err("%s: Successfully performed binary write to user space app\n", DEVICE_NAME);	  
+		spin_unlock(&master_lock);
 		return 0; // clear the position to the start and return 0
 	} else {
 		pr_err("%s: Failed to send %d bytes to the user\n", DEVICE_NAME, error_count);	  
+		spin_unlock(&master_lock);
 		return -EFAULT;      // Failed - return a bad address message
 	}
 }
@@ -3703,6 +3784,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 	pH_profile* profile = NULL;
 	pH_task_struct* process = NULL;
 	
+	spin_lock(&master_lock);
+	
 	user_process_has_been_loaded = TRUE;
 	binary_read = FALSE;
 	
@@ -3713,6 +3796,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 		buffer = kmalloc(sizeof(char) * 254, GFP_KERNEL);
 		if (!buffer) {
 			pr_err("%s: Unable to allocate memory for dev_write buffer", DEVICE_NAME);
+			spin_unlock(&master_lock);
 			return len;
 		}
 		
@@ -3730,6 +3814,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
             
             pr_err("%s: Userspace process killed\n", DEVICE_NAME);
             
+            spin_unlock(&master_lock);
             return -1;
         }
         
@@ -3771,12 +3856,16 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				
 				// Send SIGSTOP signal to the userspace app
 				ret = send_signal(SIGSTOP);
-				if (ret < 0) return ret;
+				if (ret < 0) {
+					spin_unlock(&master_lock);
+					return ret;
+				}
 				
 				if (strcmp(buffer, "Failed to find disk profile") == 0) {
 					profile = vmalloc(sizeof(pH_profile));
 					if (!profile || profile == NULL) {
 						pr_err("%s: Unable to allocate memory for profile in dev_write\n", DEVICE_NAME);
+						spin_unlock(&master_lock);
 						return len;
 					}
 					
@@ -3817,7 +3906,10 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 						pr_err("%s: Failed to send SIGCONT signal in dev_write: %d\n", DEVICE_NAME, ret);
 						
 						// Sometimes this fails with -3, so ignore those cases
-						if (ret != -3) return 0;
+						if (ret != -3) {
+							spin_unlock(&master_lock);
+							return 0;
+						}
 					} else pr_err("%s: Sent SIGCONT signal to %d from dev_write\n", DEVICE_NAME, pid_to_be_sigconted);
 					
 					//ASSERT(task_struct_queue_front != NULL);
@@ -3827,6 +3919,7 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 				pr_err("%s: Returning from dev_write...\n", DEVICE_NAME);
 				
 				// Depending on the situation, we may want to process what the user sent us before returning
+				spin_unlock(&master_lock);
 				return 0;
 			//}
 			
@@ -3837,15 +3930,20 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			
 				// Send SIGSTOP signal to the userspace app
 				ret = send_signal(SIGSTOP);
-				if (ret < 0) return ret;
+				if (ret < 0) {
+					spin_unlock(&master_lock);
+					return ret;
+				}
 			
 				// Depending on the situation, we may want to process what the user sent us before returning
+				spin_unlock(&master_lock);
 				return 0;
 			}
 		
 			profile = vmalloc(sizeof(pH_profile));
 			if (!profile || profile == NULL) {
 				pr_err("%s: Unable to allocate memory for profile in dev_write\n", DEVICE_NAME);
+				spin_unlock(&master_lock);
 				return len;
 			}
 		
@@ -3869,27 +3967,35 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 		if (profile_queue_is_empty()) {
 			// Send SIGSTOP signal to the userspace app
 			ret = send_signal(SIGSTOP);
-			if (ret < 0) return ret;
+			if (ret < 0) {
+				spin_unlock(&master_lock);
+				return ret;
+			}
 		
 			// We are done waiting for the user now
 			done_waiting_for_user = TRUE;
+			spin_unlock(&master_lock);
 			return 0;
 			
 			// Depending on the situation, we may want to process what the user sent us before returning
 			if (strcmp("success", buffer) == 0) {
 				pr_err("%s: Received non-success message from userspace [%s]\n", DEVICE_NAME, buffer);
+				spin_unlock(&master_lock);
 				return 0;
 			}
 			pr_err("%s: Received success message from userspace\n", DEVICE_NAME);
 		}
 	}
 
+	spin_unlock(&master_lock);
 	return 0;
 }
 
 // This shares some code with ebbchar_exit, so perhaps I will want to use a helper function for
 // both of them to limit duplicated code
 static int dev_release(struct inode *inodep, struct file *filep) {
+	spin_lock(&master_lock);
+	
 	// Set all booleans to FALSE
 	module_inserted_successfully = FALSE;
 	pH_aremonitoring             = 0;
@@ -3919,7 +4025,8 @@ static int dev_release(struct inode *inodep, struct file *filep) {
 	mutex_unlock(&ebbchar_mutex);
 	
 	pr_err("%s: Device has been released (please reinsert for further testing)\n", DEVICE_NAME);
-	
+
+	spin_unlock(&master_lock); // Perhaps this lock should be moved up to just after the last use of a global variable
 	return 0;
 }
 
