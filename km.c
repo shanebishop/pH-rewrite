@@ -1008,7 +1008,7 @@ void merge_temp_with_disk(pH_profile* temp, pH_profile* disk) {
 	//copy_pH_seq(&(temp->seq), &(disk->seq));
 }
 
-// Function prototypes for process_syscall()
+// Function prototypes for process_syscall
 inline void pH_append_call(pH_seq*, int);
 inline void pH_train(pH_task_struct*);
 //void stack_print(pH_task_struct*);
@@ -1162,7 +1162,7 @@ int process_syscall(long syscall) {
 				remove_from_task_struct_queue();
 			}
 		
-			pr_err("%s: Done in profile->is_temp_profile if of process_syscall()\n", DEVICE_NAME);
+			pr_err("%s: Done in profile->is_temp_profile if of process_syscall\n", DEVICE_NAME);
 		}
 	} else {
 		pH_refcount_inc(profile);
@@ -1277,7 +1277,9 @@ int process_syscall(long syscall) {
 	
 	//pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
 	
+	spin_unlock(&master_lock);
 	ret = 0;
+	return ret;
 
 exit_before_profile:
 	spin_unlock(&master_lock);
@@ -1390,7 +1392,7 @@ static long jsys_execve(const char __user *filename,
 	int list_length;
 	pH_task_struct* process;
 	pH_profile* profile;
-	int ret;
+	int ret = 0;
 	bool already_had_process = FALSE;
 	bool lock_execve_lock = FALSE;
 
@@ -1553,7 +1555,8 @@ static long jsys_execve(const char __user *filename,
 		if (ret < 0) {
 			pr_err("%s: The userspace process was not woken for some reason\n", DEVICE_NAME);
 			ASSERT(ret >= 0);
-			return ret; // Maybe I will want to handle this more drastically
+			spin_unlock(&master_lock);
+			goto exit; // Maybe I will want to handle this more drastically
 		}
 		pr_err("%s: The userspace process should have received a SIGCONT signal\n", DEVICE_NAME);
 		
@@ -1585,7 +1588,6 @@ static long jsys_execve(const char __user *filename,
 	pr_err("%s: Returning from jsys_execve...\n", DEVICE_NAME);
 	
 	spin_unlock(&master_lock);
-	
 	jprobe_return();
 	return 0;
 	
@@ -1599,7 +1601,6 @@ exit:
 	process = NULL;
 	
 	spin_unlock(&master_lock);
-	
 	jprobe_return();
 	return 0;
 	
@@ -1609,7 +1610,6 @@ corrupted_path_to_binary:
 	process = NULL;
 	
 	spin_unlock(&master_lock);
-	
 	jprobe_return();
 	return 0;
 }
@@ -1719,7 +1719,6 @@ pH_task_struct* handle_new_process_fork(char* path_to_binary, pH_profile* profil
 	pH_refcount_dec(profile);
 	
 	spin_unlock(&master_lock);
-	
 	return this_process;
 
 no_memory:	
@@ -1732,7 +1731,6 @@ no_memory:
 	pH_refcount_dec(profile);
 	
 	spin_unlock(&master_lock);
-	
 	return NULL;
 }
 
@@ -1837,7 +1835,6 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	//pr_err("%s: Got through all of fork_handler\n", DEVICE_NAME);
 	
 	spin_unlock(&master_lock);
-	
 	return 0;
 }
 
@@ -1996,7 +1993,6 @@ static int do_execveat_common_handler(struct kretprobe_instance* ri, struct pt_r
 		process = NULL;
 		
 		spin_unlock(&master_lock);
-		
 		return retval;
 	}
 	pr_err("%s: execve succeeded\n", DEVICE_NAME);
@@ -2098,6 +2094,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		//spin_unlock(&execve_count_lock);
 		pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 		process_syscall(59);
+		if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
 		pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 		
 		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
@@ -2114,7 +2111,6 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		ASSERT(process->profile != NULL);
 		
 		spin_unlock(&master_lock);
-		
 		return 0;
 	}
 	
@@ -2160,10 +2156,10 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		
 		pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 		process_syscall(59);
+		if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
 		pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 		
 		spin_unlock(&master_lock);
-		
 		return 0;
 	}
 	
@@ -2194,6 +2190,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 	process_syscall(59);
+	if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
 	pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 	
 	/* // Should this be a comment?
@@ -2210,7 +2207,6 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	ASSERT(process->profile != NULL);
 	
 	spin_unlock(&master_lock);
-	
 	return 0;
 }
 
@@ -2682,7 +2678,6 @@ not_monitoring:
 	//pr_err("%s: %d had no pH_task_struct associated with it\n", DEVICE_NAME, pid_vnr(task_tgid(current)));
 	
 	spin_unlock(&master_lock);
-	
 	jprobe_return();
 	return 0;
 	
@@ -3089,6 +3084,7 @@ static long jsys_rt_sigreturn(void) {
 	//pr_err("%s: In jsys_rt_sigreturn\n", DEVICE_NAME);
 	
 	process_syscall(383);
+	if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
 	//pr_err("%s: Back in jsys_rt_sigreturn after processing syscall\n", DEVICE_NAME);
 	
 	//preempt_disable();
@@ -3612,7 +3608,8 @@ static void __exit ebbchar_exit(void) {
 	pr_err("%s: %s successfully removed\n", DEVICE_NAME, DEVICE_NAME);
 }
 
-static int dev_open(struct inode *inodep, struct file *filep){
+// This will not work if I open this device more than once
+static int dev_open(struct inode *inodep, struct file *filep) {
 	if (!mutex_trylock(&ebbchar_mutex)) {
 		pr_err("%s: Device in use by another process\n", DEVICE_NAME);
 		return -EBUSY;
@@ -3771,6 +3768,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 		spin_unlock(&master_lock);
 		return -EFAULT;      // Failed - return a bad address message
 	}
+	spin_unlock(&master_lock);
 }
 
 int pH_profile_disk2mem(pH_disk_profile*, pH_profile*);
@@ -4020,13 +4018,14 @@ static int dev_release(struct inode *inodep, struct file *filep) {
 	
 	pr_err("%s: Freeing pH_task_structs...\n", DEVICE_NAME);
 	free_pH_task_structs();
+	spin_unlock(&master_lock); // Maybe this should be down below?
 	
 	// Unlock the mutex
 	mutex_unlock(&ebbchar_mutex);
 	
 	pr_err("%s: Device has been released (please reinsert for further testing)\n", DEVICE_NAME);
 
-	spin_unlock(&master_lock); // Perhaps this lock should be moved up to just after the last use of a global variable
+	//spin_unlock(&master_lock); // Perhaps this lock should be moved up to just after the last use of a global variable
 	return 0;
 }
 
