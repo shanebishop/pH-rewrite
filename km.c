@@ -1051,7 +1051,7 @@ int process_syscall(long syscall) {
 		goto exit_before_profile;
 	}
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
-	pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
+	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
 	//pr_err("\n\n\n\n\n\n\n\%s: No really, the process was retrieved successfully\n*****************\n*****************\n*****************\n", DEVICE_NAME);
 	//pr_err("%s: The process has PID %ld and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
 	
@@ -1092,8 +1092,8 @@ int process_syscall(long syscall) {
 		pH_refcount_inc(profile);
 	}
 	*/
-	pr_err("%s: Successfully dereferenced process\n", DEVICE_NAME);
-	pr_err("%s: The process's filename is [%s]\n", DEVICE_NAME, process->filename);
+	//pr_err("%s: Successfully dereferenced process\n", DEVICE_NAME);
+	//pr_err("%s: The process's filename is [%s]\n", DEVICE_NAME, process->filename);
 	ASSERT(profile != NULL);
 	//pr_err("%s: If this doesn't print, you know what is wrong %d\n", DEVICE_NAME, profile->is_temp_profile);
 	
@@ -1234,7 +1234,7 @@ int process_syscall(long syscall) {
 	
 	if (process) process->count++;
 	if (process) pH_append_call(process->seq, syscall);
-	pr_err("%s: Successfully appended call %ld\n", DEVICE_NAME, syscall);
+	//pr_err("%s: Successfully appended call %ld\n", DEVICE_NAME, syscall);
 	
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
@@ -1254,7 +1254,7 @@ int process_syscall(long syscall) {
 		ret = -1;
 		goto exit;
 	}
-	pr_err("%s: Trained process\n", DEVICE_NAME);
+	//pr_err("%s: Trained process\n", DEVICE_NAME);
 	
 	/* // Since this is just for seeing if my code seems to be working, I don't need it
 	// Allocate space for new_syscall
@@ -1272,7 +1272,7 @@ int process_syscall(long syscall) {
 	add_to_my_syscall_llist(process, new_syscall);
 	*/
 	
-	pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
+	//pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
 	
 	ret = 0;
 
