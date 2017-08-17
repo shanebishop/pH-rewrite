@@ -648,11 +648,13 @@ noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_pro
 	profile->next = NULL;
 	pH_refcount_init(profile, 0);
 	
+	pr_err("%s: About to attempt to kmalloc profile->filename\n", DEVICE_NAME);
 	profile->filename = kmalloc(strlen(filename) + 1, GFP_ATOMIC);
 	if (profile->filename == NULL) {
 		pr_err("%s: Unable to allocate memory for profile->filename in new_profile\n", DEVICE_NAME);
 		return -ENOMEM;
 	}
+	pr_err("%s: Successfully allocated memory for profile->filename\n", DEVICE_NAME);
 	//strncpy(profile->filename, filename, strlen(filename));
 	strlcpy(profile->filename, filename, strlen(filename)+1);
 	//profile->filename[strlen(profile->filename)] = '\0';
