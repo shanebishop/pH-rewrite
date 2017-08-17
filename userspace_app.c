@@ -256,7 +256,7 @@ int main() {
 	
 	// Open the device with read/write access
 	fd = open("/dev/ebbchar", O_RDWR);
-	if (fd < 0){
+	if (fd < 0) {
 	  perror("Failed to open the device");
 	  return errno;
 	}
@@ -280,6 +280,7 @@ int main() {
 	ret = write(fd, pid_as_string, strlen(pid_as_string));
 	if (ret < 0) {
 		perror("Failed to write this process's PID to the device");
+		close(fd);
 		return errno;
 	}
 
@@ -346,6 +347,7 @@ int main() {
 				
 				if (ret < 0) {
 					perror("Failed to write back to the device");
+					close(fd);
 					return errno;
 				}
 			}
@@ -411,6 +413,7 @@ int main() {
 		ret = write(fd, to_write_back_to_module, strlen(to_write_back_to_module));
 		if (ret < 0) {
 			perror("Failed to write back to the device");
+			close(fd);
 			return errno;
 		}
 	}
