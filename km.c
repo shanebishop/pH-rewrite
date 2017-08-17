@@ -409,12 +409,11 @@ void add_to_profile_llist(pH_profile* p) {
 	}
 	//spin_unlock(&pH_profile_list_sem);
 	
-	pH_refcount_dec(p);
-	
 	ASSERT(pH_profile_list != NULL);
 	ASSERT(pH_profile_list == p);
 	
 	//pr_err("%s: Returning from add_to_profile_llist()...\n", DEVICE_NAME);
+	pH_refcount_dec(p);
 }
 
 bool profile_queue_is_empty(void) {
@@ -651,7 +650,7 @@ noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_pro
 	
 	profile->filename = kmalloc(strlen(filename) + 1, GFP_ATOMIC);
 	if (profile->filename == NULL) {
-		pr_err("%s: Unable to allocate memory for profile->filename in new_profile()\n", DEVICE_NAME);
+		pr_err("%s: Unable to allocate memory for profile->filename in new_profile\n", DEVICE_NAME);
 		return -ENOMEM;
 	}
 	//strncpy(profile->filename, filename, strlen(filename));
@@ -1216,23 +1215,24 @@ int process_syscall(long syscall) {
 			ret = -ENOMEM;
 			goto exit;
 		}
+		pr_err("%s: Allocated memory for temp in process_syscall\n", DEVICE_NAME);
 
 		temp->next = NULL;
 		temp->length = profile->length;
 		temp->last = profile->length - 1;
 		
-		//pr_err("%s: Got here 1\n", DEVICE_NAME);
+		pr_err("%s: Got here 1 in process_syscall\n", DEVICE_NAME);
 		//process->seq = temp;
 		//INIT_LIST_HEAD(&temp->seqList);
 		if (process) stack_push(process, temp);
-		//pr_err("%s: Got here 2\n", DEVICE_NAME);
+		pr_err("%s: Got here 2 in process_syscall\n", DEVICE_NAME);
 		INIT_LIST_HEAD(&temp->seqList);
-		//pr_err("%s: Successfully allocated memory for temp in process_syscall\n", DEVICE_NAME);
+		pr_err("%s: Successfully intialized temp in process_syscall\n", DEVICE_NAME);
 	}
 	
 	if (process) process->count++;
 	if (process) pH_append_call(process->seq, syscall);
-	//pr_err("%s: Successfully appended call %ld\n", DEVICE_NAME, syscall);
+	pr_err("%s: Successfully appended call %ld\n", DEVICE_NAME, syscall);
 	
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
@@ -1699,6 +1699,8 @@ pH_task_struct* handle_new_process_fork(char* path_to_binary, pH_profile* profil
 	//preempt_enable();
 	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
+	pH_refcount_dec(profile);
+	
 	return this_process;
 
 no_memory:	
@@ -1706,8 +1708,9 @@ no_memory:
 	
 	kfree(path_to_binary);
 	path_to_binary = NULL;
-	free_pH_task_struct(this_process); // Potentially at this point the process may not be in the llist, which may cause issues
 	this_process = NULL;
+	
+	pH_refcount_dec(profile);
 	
 	return NULL;
 }
@@ -1936,6 +1939,8 @@ static struct kretprobe sys_rt_sigreturn_kretprobe = {
 };
 */
 
+// I theorize that perhaps this is where my code is messing up, since perhaps the struct filename
+// is held in the kretprobe_instance, or something?
 static int do_execveat_common_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	int retval;
 	pH_task_struct* process;
@@ -2060,7 +2065,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		
 		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
 		if (ret < 0) {
-			pr_err("%s: Failed to send SIGSCONT signal to %d\n", DEVICE_NAME, process_id);
+			pr_err("%s: Failed to send SIGCONT signal to %d\n", DEVICE_NAME, process_id);
 			return ret;
 		}
 		pr_err("%s: Sent SIGCONT signal to %d from sys_execve_return_handler\n", DEVICE_NAME, process_id);
@@ -2669,7 +2674,7 @@ static long jdo_group_exit(int error_code) {
 		
 		//preempt_disable();
 		spin_lock(&pH_task_struct_list_sem);
-		process = llist_retrieve_process(pid_vnr(task_tgid(current))); // Should this be t?
+		process = llist_retrieve_process(pid_vnr(task_tgid(t)));
 		spin_unlock(&pH_task_struct_list_sem);
 		//preempt_enable();
 		
@@ -3185,7 +3190,6 @@ static int __init ebbchar_init(void) {
 	pr_err("%s: Successfully registered do_execve_kretprobe\n", DEVICE_NAME);
 	*/
 	
-	
 	sys_execve_kretprobe.kp.addr = kallsyms_lookup_name("sys_execve");
 	ret = register_kretprobe(&sys_execve_kretprobe);
 	if (ret < 0) {
@@ -3205,7 +3209,6 @@ static int __init ebbchar_init(void) {
 		return PTR_ERR(ebbcharDevice);
 	}
 	pr_err("%s: Successfully registered sys_execve_kretprobe\n", DEVICE_NAME);
-	
 	
 	/*
 	free_pid_jprobe.kp.addr = kallsyms_lookup_name("free_pid");
