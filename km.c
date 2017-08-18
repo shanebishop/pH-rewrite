@@ -1701,9 +1701,19 @@ pH_task_struct* handle_new_process_fork(char* path_to_binary, pH_profile* profil
 	this_process->count = 0;
 	this_process->next = NULL;
 	this_process->prev = NULL;
-	this_process->filename = path_to_binary;
+	this_process->filename = NULL;
 	this_process->should_sigcont_this = FALSE;
 	//pr_err("%s: Initialized process\n", DEVICE_NAME);
+	
+	this_process->filename = kmalloc(strlen(path_to_binary)+1, GFP_ATOMIC);
+	if (this_process->filename == NULL) {
+		pr_err("%s: Unable to allocate space for process->filename in handle_new_process_fork\n", DEVICE_NAME);
+		goto no_memory;
+	}
+	
+	strlcpy(this_process->filename, path_to_binary, strlen(path_to_binary)+1);
+	ASSERT(strlen(this_process->filename) == strlen(path_to_binary));
+	ASSERT(strcmp(this_process->filename, path_to_binary) == 0);
 	
 	// Put this profile in the pH_task_struct struct
 	this_process->profile = profile;
