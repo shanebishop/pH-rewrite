@@ -1034,7 +1034,7 @@ int process_syscall(long syscall) {
 	//my_syscall* new_syscall;
 	pH_profile* profile;
 	pH_profile* temp_profile;
-	int ret;
+	int ret = -1;
 	bool master_lock_was_locked = TRUE;
 	
 	// Boolean checks
@@ -1409,10 +1409,10 @@ static long jsys_execve(const char __user *filename,
 	const char __user *const __user *argv,
 	const char __user *const __user *envp)
 {
-	char* path_to_binary;
+	char* path_to_binary = NULL;
 	int current_process_id;
 	int list_length;
-	pH_task_struct* process;
+	pH_task_struct* process = NULL;
 	pH_profile* profile;
 	int ret = 0;
 	bool already_had_process = FALSE;
@@ -3676,7 +3676,7 @@ static int dev_open(struct inode *inodep, struct file *filep) {
 }
 
 static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *offset) {
-	pH_disk_profile* disk_profile;
+	pH_disk_profile* disk_profile = NULL;
 	int error_count = 0;
 	
 	spin_lock(&master_lock);
