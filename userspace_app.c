@@ -322,6 +322,7 @@ int main() {
 			printf("Successfully performed binary read on device.\n");
 			*/
 			
+			/* // Commented out until dev_write is added back
 			disk_profile = malloc(sizeof(pH_disk_profile));
 			if (!disk_profile || disk_profile == NULL) {
 				printf("Unable to allocate memory for disk_profile in main\n");
@@ -351,6 +352,7 @@ int main() {
 					return errno;
 				}
 			}
+			*/
 		}
 		else if (receive[0] == 'w') { // w stands for write
 			write_ascii_file(&receive[1], fd);

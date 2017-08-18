@@ -1119,6 +1119,7 @@ int process_syscall(long syscall) {
 	ASSERT(profile != NULL);
 	//pr_err("%s: If this doesn't print, you know what is wrong %d\n", DEVICE_NAME, profile->is_temp_profile);
 	
+	/* // For when I add dev_write back
 	if (profile->is_temp_profile) {
 		//pr_err("%s: The process has PID %ld and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
 		
@@ -1189,6 +1190,7 @@ int process_syscall(long syscall) {
 	} else {
 		pH_refcount_inc(profile);
 	}
+	*/
 	
 	/*
 	if (profile->filename == NULL) {
@@ -2084,6 +2086,10 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	if (!done_waiting_for_user) return 0;
 	
 	if (!module_inserted_successfully) return 0;
+	
+	pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
+	process_syscall(59);
+	return 0; // Temp to bypass the rest of this function until I add dev_write back
 	
 	process_id = pid_vnr(task_tgid(current));
 	
