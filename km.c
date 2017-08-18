@@ -1444,6 +1444,7 @@ static long jsys_execve(const char __user *filename,
 	process = llist_retrieve_process(current_process_id);
 	//spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
+	pr_err("%s: Attempted to retrieve process\n", DEVICE_NAME);
 	if (!process || process == NULL) {
 		pr_err("%s: Unable to find process in jsys_execve\n", DEVICE_NAME);
 		pr_err("%s: Continuing anyway...\n", DEVICE_NAME);
@@ -1468,10 +1469,12 @@ static long jsys_execve(const char __user *filename,
 		process->should_sigcont_this = FALSE;
 		pr_err("%s: Pre-initialized entirely new process\n", DEVICE_NAME);
 	} else {
+		pr_err("%s: In else\n", DEVICE_NAME);
 		already_had_process = TRUE;
 		pH_refcount_dec(process->profile);
 		pr_err("%s: Decremented old profile refcount\n", DEVICE_NAME);
 	}
+	pr_err("%s: Got through branching statement\n", DEVICE_NAME);
 	
 	// Allocate space for path_to_binary
 	path_to_binary = kmalloc(sizeof(char) * 4000, GFP_ATOMIC);
