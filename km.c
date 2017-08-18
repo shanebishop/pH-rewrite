@@ -1472,16 +1472,16 @@ static long jsys_execve(const char __user *filename,
 		goto corrupted_path_to_binary;
 	}
 	pr_err("%s: My code thinks path_to_binary is not corrupted\n", DEVICE_NAME);
+	//int path_to_binary_len = strlen(path_to_binary);
+	//pr_err("%s: Successfully found length of path_to_binary\n", DEVICE_NAME);
 	process->filename = kmalloc(strlen(path_to_binary)+1, GFP_ATOMIC);
 	if (process->filename == NULL) {
 		pr_err("%s: Unable to allocate space for process->filename in jsys_execve\n", DEVICE_NAME);
 		goto exit;
 	}
+	//pr_err("%s: Successfully allocated space for process->filename\n", DEVICE_NAME);
 	
 	strlcpy(process->filename, path_to_binary, strlen(path_to_binary)+1);
-	
-	kfree(path_to_binary);
-	path_to_binary = NULL;
 	
 	ASSERT(strlen(process->filename) == strlen(path_to_binary));
 	ASSERT(strcmp(process->filename, path_to_binary) == 0);
@@ -1568,10 +1568,10 @@ static long jsys_execve(const char __user *filename,
 		pr_err("%s: The userspace process should have received a SIGCONT signal\n", DEVICE_NAME);
 		
 		lock_execve_lock = TRUE;
-	} else {
-		kfree(path_to_binary);
-		path_to_binary = NULL;
 	}
+	
+	kfree(path_to_binary);
+	path_to_binary = NULL;
 	
 	if (profile != NULL) {
 		process->profile = profile;
