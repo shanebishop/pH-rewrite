@@ -1545,9 +1545,8 @@ static long jsys_execve(const char __user *filename,
 	pr_err("%s: Unlocking profile list in jsys_execve on line 1465\n", DEVICE_NAME);
 	pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
 	
-	/*
-	// If there is no corresponding profile, make a new one - this should actually start a read
-	// request, once I have got to implementing that
+	
+	// Temp code for getting dev_writing working --------------------------------
 	if (!profile || profile == NULL) {
 		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
 		if (!profile) {
@@ -1555,17 +1554,13 @@ static long jsys_execve(const char __user *filename,
 			goto exit;
 		}
 		
-		new_profile(profile, path_to_binary);
+		new_profile(profile, path_to_binary, TRUE);
 		pr_err("%s: Made new profile for [%s]\n", DEVICE_NAME, path_to_binary);
 		
-		if (!profile || profile == NULL) {
-			pr_err("%s: new_profile made a corrupted or NULL profile\n", DEVICE_NAME);
-		}
-	} else {
-		kfree(path_to_binary);
-		path_to_binary = NULL;
+		ASSERT(profile != NULL);
 	}
-	*/
+	// End of temp code ---------------------------------------------------------
+	
 	
 	/* Uncomment after we are sure dev_write can work again
 	if (!profile || profile == NULL) {
