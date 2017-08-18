@@ -563,6 +563,7 @@ noinline void remove_from_read_filename_queue(void) {
 
 void add_to_task_struct_queue(task_struct_wrapper* t) {
 	ASSERT(t != NULL);
+	ASSERT(t->task_struct != NULL);
 	
 	if (task_struct_queue_front == NULL) {
 		task_struct_queue_front = t;
@@ -1034,6 +1035,7 @@ int process_syscall(long syscall) {
 	pH_profile* profile;
 	pH_profile* temp_profile;
 	int ret;
+	bool master_lock_was_locked = TRUE;
 	
 	// Boolean checks
 	if (!done_waiting_for_user) return 0;
@@ -1046,7 +1048,10 @@ int process_syscall(long syscall) {
 	
 	if (!pH_profile_list || pH_profile_list == NULL) return 0;
 
-	if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
+	if (!spin_is_locked(&master_lock)) {
+		spin_lock(&master_lock);
+		master_lock_was_locked = FALSE;
+	}
 
 	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
@@ -1297,11 +1302,11 @@ int process_syscall(long syscall) {
 	return ret;
 
 exit_before_profile:
-	spin_unlock(&master_lock);
+	if (!master_lock_was_locked) spin_unlock(&master_lock);
 	return ret;
 
 exit:
-	spin_unlock(&master_lock);
+	if (!master_lock_was_locked) spin_unlock(&master_lock);
 	pH_refcount_dec(profile);
 	return ret;
 }
@@ -1577,7 +1582,6 @@ static long jsys_execve(const char __user *filename,
 		if (ret < 0) {
 			pr_err("%s: The userspace process was not woken for some reason\n", DEVICE_NAME);
 			ASSERT(ret >= 0);
-			spin_unlock(&master_lock);
 			goto exit; // Maybe I will want to handle this more drastically
 		}
 		pr_err("%s: The userspace process should have received a SIGCONT signal\n", DEVICE_NAME);
@@ -2077,14 +2081,11 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	if (!module_inserted_successfully) return 0;
 	
-	spin_lock(&master_lock);
-	
 	process_id = pid_vnr(task_tgid(current));
 	
 	ret = send_sig(SIGSTOP, current, SIGNAL_PRIVILEGE);
 	if (ret < 0) {
 		pr_err("%s: Failed to send SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
-		spin_unlock(&master_lock);
 		return ret;
 	}
 	pr_err("%s: Sent SIGSTOP signal to %d\n", DEVICE_NAME, process_id);
@@ -2092,10 +2093,11 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	to_add = kmalloc(sizeof(task_struct_wrapper), GFP_ATOMIC);
 	if (!to_add || to_add == NULL) {
 		pr_err("%s: Unable to allocate memory for to_add in sys_execve_return_handler\n", DEVICE_NAME);
-		spin_unlock(&master_lock);
 		return -ENOMEM;
 	}
 	to_add->task_struct = current;
+	
+	spin_lock(&master_lock);
 	
 	add_to_task_struct_queue(to_add);
 	
@@ -2152,6 +2154,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	//spin_unlock(&pH_profile_list_sem);
 	
 	if (profile != NULL) {
+		ASSERT(!(profile->is_temp_profile));
 		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
 		pr_err("%s: Calling remove_from_read_filename_queue in sys_execve_return_handler\n", DEVICE_NAME);
 		//remove_from_read_filename_queue(); // This should be covered by dev_write
