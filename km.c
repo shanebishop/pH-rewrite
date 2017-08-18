@@ -1116,8 +1116,8 @@ int process_syscall(long syscall) {
 		profile = retrieve_pH_profile_by_filename(process->filename);
 		//spin_unlock(&pH_profile_list_sem);
 	
-		pr_err("%s: Asserting that the profile is not NULL...\n", DEVICE_NAME);
-		ASSERT(profile != NULL);
+		//pr_err("%s: Asserting that the profile is not NULL...\n", DEVICE_NAME);
+		//ASSERT(profile != NULL);
 	
 		if (!profile || profile == NULL) {
 			ASSERT(strlen(process->filename) > 1);

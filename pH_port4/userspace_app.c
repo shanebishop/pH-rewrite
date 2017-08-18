@@ -8,7 +8,7 @@
 #define BUFFER_LENGTH 256
 static char receive[BUFFER_LENGTH];
 
-int main(){
+int main() {
    int ret, fd;
    char stringToSend[BUFFER_LENGTH];
    printf("Starting device test code example...\n");
