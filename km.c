@@ -1567,6 +1567,7 @@ static long jsys_execve(const char __user *filename,
 	}
 	*/
 	
+	/* Uncomment after we are sure dev_write can work again
 	if (!profile || profile == NULL) {
 		pr_err("%s: Adding [%s] to filename queue...\n", DEVICE_NAME, path_to_binary);
 		ASSERT(strlen(path_to_binary) > 1);
@@ -1581,13 +1582,13 @@ static long jsys_execve(const char __user *filename,
 		ASSERT(output_string[1] == 'b');
 		strlcat(output_string, path_to_binary, 254);
 		
-		/*
-		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
-		if (!profile || profile == NULL) goto exit;
 		
-		new_profile(profile, path_to_binary, TRUE);
-		process->profile = profile;
-		*/
+		//profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
+		//if (!profile || profile == NULL) goto exit;
+		//
+		//new_profile(profile, path_to_binary, TRUE);
+		//process->profile = profile;
+		
 		
 		ret = send_signal(SIGCONT);
 		if (ret < 0) {
@@ -1599,6 +1600,7 @@ static long jsys_execve(const char __user *filename,
 		
 		lock_execve_lock = TRUE;
 	}
+	*/
 	
 	kfree(path_to_binary);
 	path_to_binary = NULL;
