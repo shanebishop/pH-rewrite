@@ -3893,6 +3893,22 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 			pr_err("%s: Received %ld PID from userspace\n", DEVICE_NAME, userspace_pid);
 		}
 		
+		// Start of temp code for early exit -----------------------
+		
+		// Send SIGSTOP signal to the userspace app
+		ret = send_signal(SIGSTOP);
+		if (ret < 0) {
+			spin_unlock(&master_lock);
+			return ret;
+		}
+	
+		// We are done waiting for the user now
+		done_waiting_for_user = TRUE;
+		spin_unlock(&master_lock);
+		return 0;
+		
+		// End of temp code for early exit -------------------------
+		
 		ASSERT(output_string != NULL);
 		//ASSERT(*output_string != '\0');
 		
