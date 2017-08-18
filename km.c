@@ -128,7 +128,7 @@ struct pH_profile {
 	// My new fields
 	struct hlist_node hlist; // Must be first field
 	int identifier;
-	spinlock_t freeing_lock;
+	//spinlock_t freeing_lock;
 	
 	// Anil's old fields
 	int normal;			// Is test profile normal?
@@ -636,7 +636,7 @@ noinline int new_profile(pH_profile* profile, const char* filename, bool make_te
 		return -ENOMEM;
 	}
 	spin_lock_init(profile->lock);
-	spin_lock_init(&(profile->freeing_lock));
+	//spin_lock_init(&(profile->freeing_lock));
 	pr_err("%s: Got here 2 (new_profile)\n", DEVICE_NAME);
 
 	profile->train.sequences = 0;
@@ -1052,6 +1052,8 @@ int process_syscall(long syscall) {
 		spin_lock(&master_lock);
 		master_lock_was_locked = FALSE;
 	}
+	
+	ASSERT(spin_is_locked(&master_lock));
 
 	//pr_err("%s: In process_syscall\n", DEVICE_NAME);
 	
@@ -2433,10 +2435,11 @@ void pH_free_profile(pH_profile *profile)
     
     ASSERT(profile != NULL);
 	ASSERT(!pH_profile_in_use(profile));
+	ASSERT(spin_is_locked(&master_lock));
     
     //pr_err("%s: In pH_free_profile for %d\n", DEVICE_NAME, profile->identifier);
     
-    spin_lock(&(profile->freeing_lock));
+    //spin_lock(&(profile->freeing_lock));
     
     if (profile->lock == NULL) {
     	return;
@@ -2479,7 +2482,7 @@ void pH_free_profile(pH_profile *profile)
     //kfree(profile->lock); // Do not do this - the profile lock cannot come out from under another functions feet
     //profile->lock = NULL; // Instead, check to see if the profile is still around
     //pr_err("%s: Freed profile->lock\n", DEVICE_NAME);
-    spin_unlock(&(profile->freeing_lock));
+    //spin_unlock(&(profile->freeing_lock));
     //vfree(profile); // For now, don't free any profiles
     //profile = NULL; // This is okay, because profile was removed from the linked list above
     //pr_err("%s: Freed pH_profile (end of function)\n", DEVICE_NAME);
