@@ -2125,6 +2125,11 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		process->should_sigcont_this = FALSE;
 		pr_err("%s: Set should_sigcont_this to FALSE\n", DEVICE_NAME);
 		
+		// If this is in the read filename queue (which it shouldn't), remove it from the queue
+		if (strcmp(peek_read_filename_queue(), process->filename)) {
+			remove_from_read_filename_queue();
+		}
+		
 		//spin_unlock(&execve_count_lock);
 		pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 		process_syscall(59);
