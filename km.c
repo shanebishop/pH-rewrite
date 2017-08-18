@@ -519,8 +519,13 @@ noinline void add_to_read_filename_queue(char* filename) {
 	
 	strlcpy(save_filename, filename, strlen(filename)+1);
 	pr_err("%s: save_filename is now [%s]\n", DEVICE_NAME, save_filename);
+	ASSERT(save_filename != NULL);
+	ASSERT(strlen(save_filename) > 1);
+	ASSERT(!(!save_filename || save_filename == NULL || strlen(save_filename) < 1 || 
+		!(*save_filename == '~' || *save_filename == '.' || *save_filename == '/')));
 	
 	to_add->filename = filename;
+	ASSERT(strlen(to_add->filename) > 1);
 	to_add->next = NULL;
 	pr_err("%s: Performed some setup in add_to_read_filename_queue\n", DEVICE_NAME);
 	
@@ -538,6 +543,7 @@ noinline void add_to_read_filename_queue(char* filename) {
 	pr_err("%s: Made it past branching in add_to_read_filename_queue\n", DEVICE_NAME);
 	
 	ASSERT(read_filename_queue_front != NULL);
+	ASSERT(strlen(read_filename_queue_front->filename) > 1);
 	
 	pr_err("%s: Front has filename [%s]\n", DEVICE_NAME, peek_read_filename_queue());
 }
