@@ -1120,9 +1120,9 @@ int process_syscall(long syscall) {
 			ASSERT(strlen(process->filename) > 1);
 			profile = temp_profile; // Set the profile back
 			pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
-			//ASSERT(profile != NULL);
-			//ret = -1;
-			//goto exit_before_profile;
+			ASSERT(profile != NULL);
+			ret = -1;
+			goto exit_before_profile;
 			pH_refcount_inc(profile); // Temp line (or should this always be here?)
 		} else {
 			pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
