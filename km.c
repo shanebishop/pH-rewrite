@@ -2175,7 +2175,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	//if (!profile || profile == NULL) {
 		ASSERT(strlen(process->filename) > 1);
-		pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
+		//pr_err("%s: Unable to find profile with filename [%s] in list\n", DEVICE_NAME, process->filename);
 		
 		profile = __vmalloc(sizeof(pH_profile), GFP_ATOMIC, PAGE_KERNEL);
 		pr_err("%s: Making new profile with filename [%s] in sys_execve_return_handler\n", DEVICE_NAME, process->filename);
