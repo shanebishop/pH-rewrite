@@ -2002,6 +2002,7 @@ static struct kretprobe sys_rt_sigreturn_kretprobe = {
 };
 */
 
+/* // Commented out since registration of its kretprobe is not working for some reason
 // I theorize that perhaps this is where my code is messing up, since perhaps the struct filename
 // is held in the kretprobe_instance, or something?
 static int do_execveat_common_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
@@ -2043,6 +2044,7 @@ static struct kretprobe do_execveat_common_kretprobe = {
 	.data_size = sizeof(struct my_kretprobe_data),
 	.maxactive = 20,
 };
+*/
 
 /*
 static int do_execve_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
