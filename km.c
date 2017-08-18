@@ -1073,7 +1073,7 @@ int process_syscall(long syscall) {
 		goto exit_before_profile;
 	}
 	//pr_err("%s: syscall=%d\n", DEVICE_NAME, syscall);
-	//pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
+	pr_err("%s: Retrieved process successfully\n", DEVICE_NAME);
 	//pr_err("\n\n\n\n\n\n\n\%s: No really, the process was retrieved successfully\n*****************\n*****************\n*****************\n", DEVICE_NAME);
 	//pr_err("%s: The process has PID %ld and filename [%s]\n", DEVICE_NAME, process->process_id, process->filename);
 	
@@ -1261,7 +1261,7 @@ int process_syscall(long syscall) {
 	
 	if (process) process->count++;
 	if (process) pH_append_call(process->seq, syscall);
-	//pr_err("%s: Successfully appended call %ld\n", DEVICE_NAME, syscall);
+	pr_err("%s: Successfully appended call %ld\n", DEVICE_NAME, syscall);
 	
 	//pr_err("%s: &(profile->count) = %p\n", DEVICE_NAME, &(profile->count));
 	profile->count++;
@@ -1299,7 +1299,7 @@ int process_syscall(long syscall) {
 	add_to_my_syscall_llist(process, new_syscall);
 	*/
 	
-	//pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
+	pr_err("%s: Finished processing syscall %ld\n", DEVICE_NAME, syscall);
 	
 	spin_unlock(&master_lock);
 	ret = 0;
