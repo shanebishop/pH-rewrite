@@ -496,7 +496,12 @@ noinline char* peek_read_filename_queue(void) {
 // I saw an "unable to handle kernel paging request error" occur that came from this function before,
 // but the error actually happened in __kmalloc after a call to printk, so the problem may not stem
 // from this function but rather from somewhere else
-void add_to_read_filename_queue(char* filename) {
+noinline void add_to_read_filename_queue(char* filename) {
+	ASSERT(filename != NULL);
+	ASSERT(strlen(filename) > 1);
+	ASSERT(!(!filename || filename == NULL || strlen(filename) < 1 || 
+		!(*filename == '~' || *filename == '.' || *filename == '/')));
+	
 	pr_err("%s: In add_to_read_filename_queue\n", DEVICE_NAME);
 	read_filename* to_add = kmalloc(sizeof(read_filename), GFP_ATOMIC);
 	if (!to_add || to_add == NULL) {
@@ -505,7 +510,7 @@ void add_to_read_filename_queue(char* filename) {
 	}
 	pr_err("%s: Allocated memory for to_add\n", DEVICE_NAME);
 	
-	char* save_filename = kmalloc(strlen(filename), GFP_ATOMIC);
+	char* save_filename = kmalloc(strlen(filename)+1, GFP_ATOMIC);
 	if (!save_filename || save_filename == NULL) {
 		pr_err("%s: Out of memory in add_to_read_filename\n", DEVICE_NAME);
 		return;
