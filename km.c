@@ -1438,7 +1438,7 @@ static long jsys_execve(const char __user *filename,
 	//clean_processes();
 	//pr_err("%s: Back from clean_processes()\n", DEVICE_NAME);
 	
-	//pr_err("%s: Calling llist_retrieve_process from jsys_execve\n", DEVICE_NAME);
+	pr_err("%s: Calling llist_retrieve_process from jsys_execve\n", DEVICE_NAME);
 	//preempt_disable();
 	//spin_lock(&pH_task_struct_list_sem);
 	process = llist_retrieve_process(current_process_id);
@@ -1500,7 +1500,7 @@ static long jsys_execve(const char __user *filename,
 		pr_err("%s: Unable to allocate space for process->filename in jsys_execve\n", DEVICE_NAME);
 		goto exit;
 	}
-	//pr_err("%s: Successfully allocated space for process->filename\n", DEVICE_NAME);
+	pr_err("%s: Successfully allocated space for process->filename\n", DEVICE_NAME);
 	
 	strlcpy(process->filename, path_to_binary, strlen(path_to_binary)+1);
 	
