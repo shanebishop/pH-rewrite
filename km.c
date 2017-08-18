@@ -1479,6 +1479,10 @@ static long jsys_execve(const char __user *filename,
 	}
 	
 	strlcpy(process->filename, path_to_binary, strlen(path_to_binary)+1);
+	
+	kfree(path_to_binary);
+	path_to_binary = NULL;
+	
 	ASSERT(strlen(process->filename) == strlen(path_to_binary));
 	ASSERT(strcmp(process->filename, path_to_binary) == 0);
 	
