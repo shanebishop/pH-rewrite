@@ -487,7 +487,7 @@ pH_profile* grab_profile_from_read_queue(void) {
 }
 */
 
-noinline char* peek_read_filename_queue(void) {
+noinline const char* peek_read_filename_queue(void) {
 	if (read_filename_queue_front == NULL) return NULL;
 	
 	return read_filename_queue_front->filename;
@@ -496,7 +496,7 @@ noinline char* peek_read_filename_queue(void) {
 // I saw an "unable to handle kernel paging request error" occur that came from this function before,
 // but the error actually happened in __kmalloc after a call to printk, so the problem may not stem
 // from this function but rather from somewhere else
-noinline void add_to_read_filename_queue(char* filename) {
+noinline void add_to_read_filename_queue(const char* filename) {
 	ASSERT(filename != NULL);
 	ASSERT(strlen(filename) > 1);
 	ASSERT(!(!filename || filename == NULL || strlen(filename) < 1 || 
@@ -524,7 +524,7 @@ noinline void add_to_read_filename_queue(char* filename) {
 	ASSERT(!(!save_filename || save_filename == NULL || strlen(save_filename) < 1 || 
 		!(*save_filename == '~' || *save_filename == '.' || *save_filename == '/')));
 	
-	to_add->filename = filename;
+	to_add->filename = save_filename;
 	ASSERT(strlen(to_add->filename) > 1);
 	to_add->next = NULL;
 	pr_err("%s: Performed some setup in add_to_read_filename_queue\n", DEVICE_NAME);
@@ -600,7 +600,7 @@ noinline struct task_struct* peek_task_struct_queue(void) {
 
 // Makes a new pH_profile and stores it in profile
 // profile must be allocated before this function is called
-noinline int new_profile(pH_profile* profile, char* filename, bool make_temp_profile) {
+noinline int new_profile(pH_profile* profile, const char* filename, bool make_temp_profile) {
 	int i;
 
 	pr_err("%s: In new_profile\n", DEVICE_NAME);
@@ -1024,7 +1024,7 @@ void merge_temp_with_disk(pH_profile* temp, pH_profile* disk) {
 inline void pH_append_call(pH_seq*, int);
 inline void pH_train(pH_task_struct*);
 //void stack_print(pH_task_struct*);
-pH_profile* retrieve_pH_profile_by_filename(char*);
+pH_profile* retrieve_pH_profile_by_filename(const char*);
 void pH_free_profile(pH_profile*);
 
 // Processes a system call
@@ -1343,7 +1343,7 @@ void add_process_to_llist(pH_task_struct* t) {
 }
 
 // Returns a pH_profile, given a filename
-pH_profile* retrieve_pH_profile_by_filename(char* filename) {
+pH_profile* retrieve_pH_profile_by_filename(const char* filename) {
 	//pr_err("%s: In retrieve_pH_profile_by_filename\n", DEVICE_NAME);
 	
 	//ASSERT(spin_is_locked(&pH_profile_list_sem));
@@ -1552,7 +1552,7 @@ static long jsys_execve(const char __user *filename,
 	*/
 	
 	if (!profile || profile == NULL) {
-		pr_err("%s: Adding [%s] to filename queue...\n", DEVICE_NAME);
+		pr_err("%s: Adding [%s] to filename queue...\n", DEVICE_NAME, path_to_binary);
 		ASSERT(strlen(path_to_binary) > 1);
 		ASSERT(!(!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
 			!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/')));
@@ -1693,7 +1693,7 @@ struct my_kretprobe_data {
 };
 
 // Creates a new process and returns it
-pH_task_struct* handle_new_process_fork(char* path_to_binary, pH_profile* profile, int process_id) {
+pH_task_struct* handle_new_process_fork(const char* path_to_binary, pH_profile* profile, int process_id) {
 	ASSERT(profile != NULL);
 	
 	pH_refcount_inc(profile);
