@@ -1438,6 +1438,10 @@ static long jsys_execve(const char __user *filename,
 	//clean_processes();
 	//pr_err("%s: Back from clean_processes()\n", DEVICE_NAME);
 	
+	if (successful_jsys_execves == 0) {
+		ASSERT(pH_task_struct_list == NULL);
+	}
+	
 	pr_err("%s: Calling llist_retrieve_process from jsys_execve\n", DEVICE_NAME);
 	//preempt_disable();
 	//spin_lock(&pH_task_struct_list_sem);
