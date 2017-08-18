@@ -2100,7 +2100,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	process->should_sigcont_this = TRUE;
 	pr_err("%s: Set should_sigcont_this to TRUE\n", DEVICE_NAME);
 	
-	if (process->profile != NULL) {
+	if (process->profile != NULL && !(process->profile->is_temp_profile)) {
 		process->should_sigcont_this = FALSE;
 		pr_err("%s: Set should_sigcont_this to FALSE\n", DEVICE_NAME);
 		
