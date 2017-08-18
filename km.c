@@ -1545,7 +1545,10 @@ static long jsys_execve(const char __user *filename,
 	*/
 	
 	if (!profile || profile == NULL) {
+		pr_err("%s: Adding [%s] to filename queue...\n", DEVICE_NAME);
 		ASSERT(strlen(path_to_binary) > 1);
+		ASSERT(!(!path_to_binary || path_to_binary == NULL || strlen(path_to_binary) < 1 || 
+			!(*path_to_binary == '~' || *path_to_binary == '.' || *path_to_binary == '/')));
 		add_to_read_filename_queue(path_to_binary);
 		pr_err("%s: path_to_binary was added to the read filename queue\n", DEVICE_NAME);
 		strlcpy(output_string, nul_string, 254);
@@ -2144,7 +2147,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	if (profile != NULL) {
 		pr_err("%s: retrieve_pH_profile_by_filename returned a profile\n", DEVICE_NAME);
 		pr_err("%s: Calling remove_from_read_filename_queue in sys_execve_return_handler\n", DEVICE_NAME);
-		remove_from_read_filename_queue();
+		//remove_from_read_filename_queue(); // This should be covered by dev_write
 		
 		if (process->profile != NULL && process->profile->is_temp_profile) {
 			temp_profile = process->profile;
