@@ -1048,7 +1048,7 @@ int process_syscall(long syscall) {
 	
 	if (!pH_profile_list || pH_profile_list == NULL) return 0;
 
-	if (!spin_is_locked(&master_lock)) {
+	if (spin_trylock(&master_lock) == 0) {
 		spin_lock(&master_lock);
 		master_lock_was_locked = FALSE;
 	}
