@@ -2167,6 +2167,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		return 0;
 	}
 	
+	/* // Commented out while I wait to get dev_write() back
 	//spin_lock(&pH_profile_list_sem);
 	profile = retrieve_pH_profile_by_filename(process->filename);
 	//spin_unlock(&execve_count_lock);
@@ -2216,6 +2217,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		spin_unlock(&master_lock);
 		return 0;
 	}
+	*/
 	
 	//if (!profile || profile == NULL) {
 		ASSERT(strlen(process->filename) > 1);
@@ -3191,8 +3193,8 @@ int free_pH_task_structs(void) {
 }
 
 // Function responsible for module insertion
-// Instead of having a bunch of uncessary code for every failure, I will want to use a buch of goto
-// statements (see https://www.ccsl.carleton.ca/~falaca/comp3000/a4.html mydev_init() function end)
+// Cleanup goto statement use as I figure out which kprobes I want and what order I want to register
+// them in
 static int __init ebbchar_init(void) {
 	int ret, i, j;
 	
@@ -3201,27 +3203,24 @@ static int __init ebbchar_init(void) {
 	// Try to dynamically allocate a major number for the device
 	majorNumber = register_chrdev(0, DEVICE_NAME, &fops);
 	if (majorNumber < 0) {
-	  pr_err("%s: Failed to register a major number\n", DEVICE_NAME);
-	  return majorNumber;
+		pr_err("%s: Failed to register a major number\n", DEVICE_NAME);
+		return majorNumber;
 	}
 	pr_err("%s: registered correctly with major number %d\n", DEVICE_NAME, majorNumber);
 
 	// Register the device class
 	ebbcharClass = class_create(THIS_MODULE, CLASS_NAME);
 	if (IS_ERR(ebbcharClass)) {           // Check for error and clean up if there is
-	  unregister_chrdev(majorNumber, DEVICE_NAME);
-	  pr_err("%s: Failed to register device class\n", DEVICE_NAME);
-	  return PTR_ERR(ebbcharClass);
+		pr_err("%s: Failed to register device class\n", DEVICE_NAME);
+		goto failed_class_create;
 	}
 	pr_err("%s: device class registered correctly\n", DEVICE_NAME);
 
 	// Register the device driver
 	ebbcharDevice = device_create(ebbcharClass, NULL, MKDEV(majorNumber, 0), NULL, DEVICE_NAME);
-	if (IS_ERR(ebbcharDevice)) {          // Clean up if there is an error
-	  class_destroy(ebbcharClass);      
-	  unregister_chrdev(majorNumber, DEVICE_NAME);
-	  pr_err("%s: Failed to create the device\n", DEVICE_NAME);
-	  return PTR_ERR(ebbcharDevice);
+	if (IS_ERR(ebbcharDevice)) {          // Clean up if there is an error	  
+		pr_err("%s: Failed to create the device\n", DEVICE_NAME);
+		goto failed_device_create;
 	}
 	pr_err("%s: device class created correctly\n", DEVICE_NAME); // Device was initialized
 	mutex_init(&ebbchar_mutex); // Initialize the mutex dynamically
@@ -3231,43 +3230,8 @@ static int __init ebbchar_init(void) {
 	ret = register_jprobe(&handle_signal_jprobe);
 	if (ret < 0) {
 		pr_err("%s: register_jprobe failed (handle_signal_jprobe), returned %d\n", DEVICE_NAME, ret);
-		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
-	*/
-	
-	/*
-	if (kallsyms_lookup_name("sys_rt_sigreturn") != 0) {
-		pr_err("%s: Found sys_rt_sigreturn\n", DEVICE_NAME);
-	}
-	if (kallsyms_lookup_name("sys32_x32_rt_sigreturn") != 0) {
-		pr_err("%s: Found sys32_x32_rt_sigreturn\n", DEVICE_NAME);
-	}
-	if (kallsyms_lookup_name("sys32_sigreturn") != 0) {
-		pr_err("%s: Found sys32_sigreturn\n", DEVICE_NAME);
-	}
-	if (kallsyms_lookup_name("sys32_rt_sigreturn") != 0) {
-		pr_err("%s: Found sys32_rt_sigreturn\n", DEVICE_NAME);
-	}
-	if (kallsyms_lookup_name("ptregs_sys_rt_sigreturn") != 0) {
-		pr_err("%s: Found ptregs_sys_rt_sigreturn\n", DEVICE_NAME);
-	}
-	
-	if (kallsyms_lookup_name("sys_sigreturn") == 0) {
-		pr_err("%s: Failed to find symbol 'sys_sigreturn'\n", DEVICE_NAME);
-		
-		//sys_sigreturn_jprobe.kp.symbol_name = "sys_sigreturn";
-	}
-	pr_err("%s: Found symbol 'sys_sigreturn'\n", DEVICE_NAME);
 	*/
 	
 	/* // Maybe I am unable to probe do_execveat_common? Returns -22 on registration.
@@ -3275,19 +3239,7 @@ static int __init ebbchar_init(void) {
 	ret = register_kretprobe(&do_execveat_common_kretprobe);
 	if (ret < 0) {
 		pr_err("%s: register_kretprobe failed (do_execveat_common_kretprobe), returned %d\n", DEVICE_NAME, ret);
-		
-		//unregister_jprobe(&handle_signal_jprobe);
-		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	pr_err("%s: Successfully registered do_execveat_common_kretprobe\n", DEVICE_NAME);
 	*/
@@ -3297,19 +3249,7 @@ static int __init ebbchar_init(void) {
 	ret = register_kretprobe(&do_execve_kretprobe);
 	if (ret < 0) {
 		pr_err("%s: register_kretprobe failed (do_execve_kretprobe), returned %d\n", DEVICE_NAME, ret);
-		
-		//unregister_jprobe(&handle_signal_jprobe);
-		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	pr_err("%s: Successfully registered do_execve_kretprobe\n", DEVICE_NAME);
 	*/
@@ -3321,16 +3261,7 @@ static int __init ebbchar_init(void) {
 		
 		//unregister_jprobe(&handle_signal_jprobe);
 		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	pr_err("%s: Successfully registered sys_execve_kretprobe\n", DEVICE_NAME);
 	
@@ -3342,16 +3273,7 @@ static int __init ebbchar_init(void) {
 		
 		//unregister_jprobe(&handle_signal_jprobe);
 		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	pr_err("%s: Successfully registered free_pid_jprobe\n", DEVICE_NAME);
 	*/
@@ -3363,16 +3285,7 @@ static int __init ebbchar_init(void) {
 		
 		//unregister_jprobe(&handle_signal_jprobe);
 		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	pr_err("%s: Successfully registered sys_sigreturn_jprobe\n", DEVICE_NAME);
 	
@@ -3385,16 +3298,7 @@ static int __init ebbchar_init(void) {
 		//unregister_jprobe(&handle_signal_jprobe);
 		//unregister_jprobe(&sys_sigreturn_jprobe);
 		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	pr_err("%s: Successfully registered do_signal_jprobe\n", DEVICE_NAME);
 	
@@ -3407,16 +3311,7 @@ static int __init ebbchar_init(void) {
 		//unregister_jprobe(&handle_signal_jprobe);
 		//unregister_jprobe(&sys_sigreturn_jprobe);
 		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	pr_err("%s: Successfully registered wait_consider_task_jprobe\n", DEVICE_NAME);
 	
@@ -3429,16 +3324,7 @@ static int __init ebbchar_init(void) {
 		//unregister_jprobe(&sys_sigreturn_jprobe);
 		unregister_jprobe(&do_signal_jprobe);
 		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	pr_err("%s: Successfully registered sys_rt_sigreturn_kretprobe\n", DEVICE_NAME);
 	*/
@@ -3453,16 +3339,7 @@ static int __init ebbchar_init(void) {
 		//unregister_jprobe(&sys_sigreturn_jprobe);
 		unregister_jprobe(&do_signal_jprobe);
 		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	
 	/*
@@ -3477,16 +3354,7 @@ static int __init ebbchar_init(void) {
 		unregister_jprobe(&do_signal_jprobe);
 		unregister_kretprobe(&fork_kretprobe);
 		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	pr_err("%s: Registered exit_kretprobe\n", DEVICE_NAME);
 	*/
@@ -3501,19 +3369,9 @@ static int __init ebbchar_init(void) {
 		unregister_jprobe(&do_signal_jprobe);
 		unregister_kretprobe(&fork_kretprobe);
 		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	pr_err("%s: Registered do_group_exit_jprobe\n", DEVICE_NAME);
-	
 	
 	/* // Registration of sys_exit_jprobe fails for some reason - returns -17
 	sys_exit_jprobe.kp.addr = kallsyms_lookup_name("sys_exit");
@@ -3526,16 +3384,7 @@ static int __init ebbchar_init(void) {
 		unregister_jprobe(&do_signal_jprobe);
 		unregister_kretprobe(&fork_kretprobe);
 		
-		mutex_destroy(&ebbchar_mutex);
-		device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-		class_unregister(ebbcharClass);
-		class_destroy(ebbcharClass);
-		unregister_chrdev(majorNumber, DEVICE_NAME);
-		
-		pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-		pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-		
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	pr_err("%s: Registered sys_exit_jprobe\n", DEVICE_NAME);
 	*/
@@ -3558,16 +3407,7 @@ static int __init ebbchar_init(void) {
 				unregister_jprobe(&jprobes_array[j]);
 			}
 			
-			mutex_destroy(&ebbchar_mutex);
-			device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
-			class_unregister(ebbcharClass);
-			class_destroy(ebbcharClass);
-			unregister_chrdev(majorNumber, DEVICE_NAME);
-			
-			pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
-			pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
-			
-			return PTR_ERR(ebbcharDevice);
+			goto failed_kprobe_registration;
 		}
 		//pr_err("%s: %d: Successfully registered %s\n", DEVICE_NAME, i, jprobes_array[i].kp.symbol_name);
 	}
@@ -3578,7 +3418,7 @@ static int __init ebbchar_init(void) {
 	nul_string = kmalloc(sizeof(char) * 254, GFP_KERNEL);
 	if (!nul_string || nul_string == NULL) {
 		pr_err("%s: Unable to allocate space for nul_string in ebbchar_init\n", DEVICE_NAME);
-		return PTR_ERR(ebbcharDevice);
+		goto failed_kprobe_registration;
 	}
 	
 	for (i = 0; i < 254; i++) {
@@ -3593,12 +3433,17 @@ static int __init ebbchar_init(void) {
 
 	return 0;
 
+failed_kprobe_registration:
+	mutex_destroy(&ebbchar_mutex);
 failed_device_create:
-	device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
 	class_unregister(ebbcharClass);
+	class_destroy(ebbcharClass);
 failed_class_create:
 	unregister_chrdev(majorNumber, DEVICE_NAME);
-failed_register_chrdev:
+	
+	pr_err("%s: Module has (hopefully) been removed entirely\n", DEVICE_NAME);
+	pr_err("%s: ...But just in case, run this command: 'sudo rmmod km'\n", DEVICE_NAME);
+	
 	return PTR_ERR(ebbcharDevice);
 }
 
