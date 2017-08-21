@@ -1038,7 +1038,7 @@ int process_syscall(long syscall) {
 	bool master_lock_was_locked = FALSE;
 	
 	// Boolean checks
-	if (!done_waiting_for_user) return 0;
+	//if (!done_waiting_for_user) return 0;
 	
 	if (!module_inserted_successfully) return 0;
 	
@@ -1421,7 +1421,7 @@ static long jsys_execve(const char __user *filename,
 	bool lock_execve_lock = FALSE;
 
 	// Boolean checks
-	if (!done_waiting_for_user) goto exit;
+	//if (!done_waiting_for_user) goto exit;
 	
 	if (!module_inserted_successfully) goto exit;
 	
@@ -1816,7 +1816,7 @@ static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	pH_profile* profile = NULL;
 	
 	// Boolean check
-	if (!done_waiting_for_user) return 0;
+	//if (!done_waiting_for_user) return 0;
 	
 	if (!module_inserted_successfully) return 0;
 	
@@ -2087,7 +2087,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	int process_id;
 	task_struct_wrapper* to_add;
 	
-	if (!done_waiting_for_user) return 0;
+	//if (!done_waiting_for_user) return 0;
 	
 	if (!module_inserted_successfully) return 0;
 	
@@ -2701,7 +2701,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 static long jsys_exit(int error_code) {
 	pH_task_struct* process;
 	
-	if (!done_waiting_for_user) goto not_inserted;
+	//if (!done_waiting_for_user) goto not_inserted;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
@@ -2751,7 +2751,7 @@ static long jdo_group_exit(int error_code) {
 	struct task_struct* p;
 	struct task_struct* t;
 	
-	if (!done_waiting_for_user) goto not_inserted;
+	//if (!done_waiting_for_user) goto not_inserted;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
@@ -2857,7 +2857,7 @@ static void jfree_pid(struct pid* pid) {
 	int i = 0;
 	bool freed_anything = FALSE;
 	
-	if (!done_waiting_for_user) goto exit;
+	//if (!done_waiting_for_user) goto exit;
 	
 	if (!module_inserted_successfully) goto exit;
 	
@@ -3035,7 +3035,7 @@ pH_seq* stack_peek(pH_task_struct* process) {
 static void jhandle_signal(struct ksignal* ksig, struct pt_regs* regs) {
 	pH_task_struct* process;
 	
-	if (!done_waiting_for_user) goto not_inserted;
+	//if (!done_waiting_for_user) goto not_inserted;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
@@ -3068,7 +3068,7 @@ not_inserted:
 static void jdo_signal(struct pt_regs* regs) {
 	pH_task_struct* process;
 	
-	if (!done_waiting_for_user) goto not_inserted;
+	//if (!done_waiting_for_user) goto not_inserted;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
@@ -3128,7 +3128,7 @@ not_inserted:
 static long jsys_rt_sigreturn(void) {
 	pH_task_struct* process;
 	
-	if (!done_waiting_for_user) goto not_inserted;
+	//if (!done_waiting_for_user) goto not_inserted;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
@@ -3200,7 +3200,7 @@ static int __init ebbchar_init(void) {
 
 	// Try to dynamically allocate a major number for the device
 	majorNumber = register_chrdev(0, DEVICE_NAME, &fops);
-	if (majorNumber<0){
+	if (majorNumber < 0) {
 	  pr_err("%s: Failed to register a major number\n", DEVICE_NAME);
 	  return majorNumber;
 	}
@@ -3208,7 +3208,7 @@ static int __init ebbchar_init(void) {
 
 	// Register the device class
 	ebbcharClass = class_create(THIS_MODULE, CLASS_NAME);
-	if (IS_ERR(ebbcharClass)){           // Check for error and clean up if there is
+	if (IS_ERR(ebbcharClass)) {           // Check for error and clean up if there is
 	  unregister_chrdev(majorNumber, DEVICE_NAME);
 	  pr_err("%s: Failed to register device class\n", DEVICE_NAME);
 	  return PTR_ERR(ebbcharClass);
@@ -3217,7 +3217,7 @@ static int __init ebbchar_init(void) {
 
 	// Register the device driver
 	ebbcharDevice = device_create(ebbcharClass, NULL, MKDEV(majorNumber, 0), NULL, DEVICE_NAME);
-	if (IS_ERR(ebbcharDevice)){          // Clean up if there is an error
+	if (IS_ERR(ebbcharDevice)) {          // Clean up if there is an error
 	  class_destroy(ebbcharClass);      
 	  unregister_chrdev(majorNumber, DEVICE_NAME);
 	  pr_err("%s: Failed to create the device\n", DEVICE_NAME);
@@ -3592,6 +3592,14 @@ static int __init ebbchar_init(void) {
 	pH_aremonitoring = 1;
 
 	return 0;
+
+failed_device_create:
+	device_destroy(ebbcharClass, MKDEV(majorNumber, 0));
+	class_unregister(ebbcharClass);
+failed_class_create:
+	unregister_chrdev(majorNumber, DEVICE_NAME);
+failed_register_chrdev:
+	return PTR_ERR(ebbcharDevice);
 }
 
 // Perhaps the best way to remove the module is just to reboot?
@@ -3665,6 +3673,8 @@ static void __exit ebbchar_exit(void) {
 
 // This will not work if I open this device more than once
 static int dev_open(struct inode *inodep, struct file *filep) {
+	return -EBUSY; // Early return
+	
 	if (!mutex_trylock(&ebbchar_mutex)) {
 		pr_err("%s: Device in use by another process\n", DEVICE_NAME);
 		return -EBUSY;
@@ -3690,6 +3700,8 @@ static int dev_open(struct inode *inodep, struct file *filep) {
 static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *offset) {
 	pH_disk_profile* disk_profile = NULL;
 	int error_count = 0;
+	
+	return -EBUSY; // Early return
 	
 	spin_lock(&master_lock);
 	
@@ -3836,6 +3848,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 	struct task_struct* to_sigcont;
 	pH_profile* profile = NULL;
 	pH_task_struct* process = NULL;
+	
+	return -EBUSY; // Early return
 	
 	spin_lock(&master_lock);
 	
@@ -4064,6 +4078,8 @@ static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t
 // This shares some code with ebbchar_exit, so perhaps I will want to use a helper function for
 // both of them to limit duplicated code
 static int dev_release(struct inode *inodep, struct file *filep) {
+	return -EBUSY; // Early return
+	
 	spin_lock(&master_lock);
 	
 	// Set all booleans to FALSE
@@ -4311,25 +4327,25 @@ inline void pH_train(pH_task_struct *s)
 
 void pH_profile_data_mem2disk(pH_profile_data *mem, pH_disk_profile_data *disk)
 {
-        //int i, j;
+    //int i, j;
 
-        disk->sequences = mem->sequences;
-        disk->last_mod_count = mem->last_mod_count;
-        disk->train_count = mem->train_count;
+    disk->sequences = mem->sequences;
+    disk->last_mod_count = mem->last_mod_count;
+    disk->train_count = mem->train_count;
 
-		/*
-        for (i = 0; i < PH_NUM_SYSCALLS; i++) {
-                if (mem->entry[i] == NULL) {
-                        disk->empty[i] = 1;
-                        for (j = 0; j < PH_NUM_SYSCALLS; j++) {
-                                disk->entry[i][j] = 0;
-                        }
-                } else {
-                        disk->empty[i] = 0;
-                        //memcpy(disk->entry[i], mem->entry[i], PH_NUM_SYSCALLS);
-                }
-        }
-        */
+	/*
+    for (i = 0; i < PH_NUM_SYSCALLS; i++) {
+            if (mem->entry[i] == NULL) {
+                    disk->empty[i] = 1;
+                    for (j = 0; j < PH_NUM_SYSCALLS; j++) {
+                            disk->entry[i][j] = 0;
+                    }
+            } else {
+                    disk->empty[i] = 0;
+                    //memcpy(disk->entry[i], mem->entry[i], PH_NUM_SYSCALLS);
+            }
+    }
+    */
 }
 
 // I will eventually want to uncomment the commented lines below and run them without
@@ -4364,11 +4380,11 @@ int pH_profile_data_disk2mem(pH_disk_profile_data *disk, pH_profile_data *mem)
 
     for (i = 0; i < PH_NUM_SYSCALLS; i++) {
         if (disk->empty[i]) {
-                mem->entry[i] = NULL;
+            mem->entry[i] = NULL;
         } else {
-                if (pH_add_seq_storage(mem, i))
-                        return -1;
-                memcpy(mem->entry[i], disk->entry[i], PH_NUM_SYSCALLS);
+            if (pH_add_seq_storage(mem, i))
+                return -1;
+            memcpy(mem->entry[i], disk->entry[i], PH_NUM_SYSCALLS);
         }
     }
     
@@ -4386,11 +4402,11 @@ int pH_profile_disk2mem(pH_disk_profile *disk_profile, pH_profile *profile)
 
     if (pH_profile_data_disk2mem(&(disk_profile->train),
                                  &(profile->train)))
-            return -1;
+        return -1;
 
     if (pH_profile_data_disk2mem(&(disk_profile->test),
                                  &(profile->test)))
-            return -1;
+        return -1;
 
     return 0;
 }
