@@ -1035,7 +1035,7 @@ int process_syscall(long syscall) {
 	pH_profile* profile;
 	pH_profile* temp_profile;
 	int ret = -1;
-	bool master_lock_was_locked = TRUE;
+	bool master_lock_was_locked = FALSE;
 	
 	// Boolean checks
 	if (!done_waiting_for_user) return 0;
@@ -1050,7 +1050,7 @@ int process_syscall(long syscall) {
 
 	if (spin_trylock(&master_lock) == 0) {
 		spin_lock(&master_lock);
-		master_lock_was_locked = FALSE;
+		master_lock_was_locked = TRUE;
 	}
 	
 	ASSERT(spin_is_locked(&master_lock));
