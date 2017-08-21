@@ -941,7 +941,7 @@ noinline int send_signal(int signal_to_send) {
 	t = get_userspace_task_struct();
 	if (!t) {
 		pr_err("%s: No such PID", DEVICE_NAME);
-		return -ENODEV;
+		return -ESRCH;
 	}
 	
 	ret = send_sig(signal_to_send, t, SIGNAL_PRIVILEGE);
