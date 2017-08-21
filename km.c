@@ -2147,7 +2147,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		//spin_unlock(&execve_count_lock);
 		pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 		process_syscall(59);
-		if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
+		//if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
 		pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 		
 		ret = send_sig(SIGCONT, current, SIGNAL_PRIVILEGE);
@@ -2210,7 +2210,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 		
 		pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 		process_syscall(59);
-		if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
+		//if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
 		pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 		
 		spin_unlock(&master_lock);
@@ -2244,7 +2244,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	
 	pr_err("%s: Calling process_syscall...\n", DEVICE_NAME);
 	process_syscall(59);
-	if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
+	//if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
 	pr_err("%s: Back in sys_execve_return_handler after process_syscall\n", DEVICE_NAME);
 	
 	/* // Should this be a comment?
@@ -3139,7 +3139,7 @@ static long jsys_rt_sigreturn(void) {
 	//pr_err("%s: In jsys_rt_sigreturn\n", DEVICE_NAME);
 	
 	process_syscall(383);
-	if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
+	//if (!spin_is_locked(&master_lock)) spin_lock(&master_lock);
 	//pr_err("%s: Back in jsys_rt_sigreturn after processing syscall\n", DEVICE_NAME);
 	
 	//preempt_disable();
