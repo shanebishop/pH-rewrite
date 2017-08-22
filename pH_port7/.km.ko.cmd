@@ -1,0 +1,1 @@
+cmd_/home/shane/pH-rewrite/pH_port7/km.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/shane/pH-rewrite/pH_port7/km.ko /home/shane/pH-rewrite/pH_port7/km.o /home/shane/pH-rewrite/pH_port7/km.mod.o ;  true
