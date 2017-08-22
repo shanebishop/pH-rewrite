@@ -1551,7 +1551,7 @@ static struct kretprobe do_execve_kretprobe = {
 static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	spin_lock(&read_filename_queue_lock);
 	remove_from_read_filename_queue();
-	spin_lock(&read_filename_queue_lock);
+	spin_unlock(&read_filename_queue_lock);
 	ASSERT(read_filename_queue_front == NULL);
 	process_syscall(59);
 	return 0;
