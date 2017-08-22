@@ -280,6 +280,7 @@ int successful_jsys_execves = 0;            // Number of successful jsys_execves
 struct task_struct* last_task_struct_in_sigreturn = NULL;
 read_filename* read_filename_queue_front = NULL;
 read_filename* read_filename_queue_rear = NULL;
+spinlock_t read_filename_queue_lock;
 
 // Returns true if the process is being monitored, false otherwise
 inline bool pH_monitoring(pH_task_struct* process) {
@@ -398,6 +399,8 @@ void add_to_profile_llist(pH_profile* p) {
 }
 
 noinline const char* peek_read_filename_queue(void) {
+	ASSERT(spin_is_locked(&read_filename_queue_lock));
+	
 	if (read_filename_queue_front == NULL) return NULL;
 	
 	return read_filename_queue_front->filename;
@@ -407,6 +410,7 @@ noinline const char* peek_read_filename_queue(void) {
 // but the error actually happened in __kmalloc after a call to printk, so the problem may not stem
 // from this function but rather from somewhere else
 noinline void add_to_read_filename_queue(const char* filename) {
+	ASSERT(spin_is_locked(&read_filename_queue_lock));
 	ASSERT(filename != NULL);
 	ASSERT(strlen(filename) > 1);
 	ASSERT(!(!filename || filename == NULL || strlen(filename) < 1 || 
@@ -460,6 +464,8 @@ noinline void add_to_read_filename_queue(const char* filename) {
 
 noinline void remove_from_read_filename_queue(void) {
 	read_filename* to_return;
+	
+	ASSERT(spin_is_locked(&read_filename_queue_lock));
 	
 	if (read_filename_queue_front == NULL) return;
 	
@@ -1167,7 +1173,9 @@ static long jsys_execve(const char __user *filename,
 	//pr_err("%s: Unlocking profile list in jsys_execve on line 1072\n", DEVICE_NAME);
 	//pr_err("%s: Profile found: %s\n", DEVICE_NAME, profile != NULL ? "yes" : "no");
 	
+	spin_lock(&read_filename_queue_lock);
 	add_to_read_filename_queue(path_to_binary);
+	spin_unlock(&read_filename_queue_lock);
 	
 	// If there is no corresponding profile, make a new one - this should actually start a read
 	// request, once I have got to implementing that
@@ -1541,7 +1549,9 @@ static struct kretprobe do_execve_kretprobe = {
 */
 
 static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
+	spin_lock(&read_filename_queue_lock);
 	remove_from_read_filename_queue();
+	spin_lock(&read_filename_queue_lock);
 	ASSERT(read_filename_queue_front == NULL);
 	process_syscall(59);
 	return 0;
@@ -2770,6 +2780,8 @@ static int __init ebbchar_init(void) {
 		//pr_err("%s: %d: Successfully registered %s\n", DEVICE_NAME, i, jprobes_array[i].kp.symbol_name);
 	}
 	pr_err("%s: Registered all syscall probes\n", DEVICE_NAME);
+	
+	spin_lock_init(&read_filename_queue_lock);
 	
 	pr_err("%s: Successfully initialized %s\n", DEVICE_NAME, DEVICE_NAME);
 	
