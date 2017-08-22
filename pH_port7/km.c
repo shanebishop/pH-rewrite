@@ -1555,7 +1555,7 @@ static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_re
 	spin_lock(&read_filename_queue_lock);
 	remove_from_read_filename_queue();
 	spin_unlock(&read_filename_queue_lock);
-	ASSERT(read_filename_queue_front == NULL);
+	//ASSERT(read_filename_queue_front == NULL); // This assertion isn't necessarily true
 	process_syscall(59);
 	return 0;
 }
