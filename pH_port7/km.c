@@ -1046,7 +1046,7 @@ int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id
 	add_process_to_llist(this_process); // Add this process to the list of processes
 	spin_unlock(&pH_task_struct_list_sem);
 	//preempt_enable();
-	//pr_err("%s: Added this process to llist\n", DEVICE_NAME);
+	pr_err("%s: Added this process to llist\n", DEVICE_NAME);
 	
 	return 0;
 
@@ -1497,6 +1497,8 @@ static int do_execveat_common_handler(struct kretprobe_instance* ri, struct pt_r
 	
 	if (!module_inserted_successfully) return 0;
 	
+	pr_err("%s: In do_execveat_common_handler\n", DEVICE_NAME);
+	
 	retval = regs_return_value(regs);
 	
 	if (retval < 0) {
@@ -1549,6 +1551,7 @@ static struct kretprobe do_execve_kretprobe = {
 */
 
 static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
+	pr_err("%s: In sys_execve_return_handler\n", DEVICE_NAME);
 	spin_lock(&read_filename_queue_lock);
 	remove_from_read_filename_queue();
 	spin_unlock(&read_filename_queue_lock);
