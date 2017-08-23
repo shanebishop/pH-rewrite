@@ -440,7 +440,7 @@ void add_to_profile_queue(pH_disk_profile* disk_profile) {
 
 // Calling functions MUST deallocate memory of return value
 pH_disk_profile* remove_from_profile_queue(void) {
-	pH_disk_profile* to_return;
+	pH_disk_profile* to_return = NULL;
 	
 	pr_err("%s: In remove_from_profile_queue\n", DEVICE_NAME);
 	
@@ -549,7 +549,7 @@ noinline void add_to_read_filename_queue(const char* filename) {
 }
 
 noinline void remove_from_read_filename_queue(void) {
-	read_filename* to_return;
+	read_filename* to_return = NULL;
 	
 	if (read_filename_queue_front == NULL) return;
 	
@@ -799,8 +799,8 @@ void stack_push(pH_task_struct*, pH_seq*);
 
 // Initializes a new pH_seq and then adds it to the stack of pH_seqs
 int make_and_push_new_pH_seq(pH_task_struct* process) {
-	pH_profile* profile;
-	pH_seq* new_sequence;
+	pH_profile* profile = NULL;
+	pH_seq* new_sequence = NULL;
 	
 	ASSERT(process != NULL);
 	
@@ -1415,7 +1415,7 @@ static long jsys_execve(const char __user *filename,
 	int current_process_id;
 	int list_length;
 	pH_task_struct* process = NULL;
-	pH_profile* profile;
+	pH_profile* profile = NULL;
 	int ret = 0;
 	bool already_had_process = FALSE;
 	bool lock_execve_lock = FALSE;
@@ -1710,7 +1710,7 @@ pH_task_struct* handle_new_process_fork(const char* path_to_binary, pH_profile* 
 	
 	pH_refcount_inc(profile);
 	
-	pH_task_struct* this_process;
+	pH_task_struct* this_process = NULL;
 	
 	spin_lock(&master_lock);
 	
@@ -1780,7 +1780,7 @@ no_memory:
 
 // For this to work, I might need to make the stack of pH_seq's doubly-linked
 void copy_task_struct_data(pH_task_struct* old, pH_task_struct* new) {
-	pH_seq* iterator;
+	pH_seq* iterator = NULL;
 	int i;
 	
 	ASSERT(old != NULL);
@@ -2080,12 +2080,12 @@ static struct kretprobe do_execve_kretprobe = {
 */
 
 static int sys_execve_return_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
-	pH_task_struct* process;
-	pH_profile* profile;
-	pH_profile* temp_profile;
+	pH_task_struct* process = NULL;
+	pH_profile* profile = NULL;
+	pH_profile* temp_profile = NULL;
 	int ret;
 	int process_id;
-	task_struct_wrapper* to_add;
+	task_struct_wrapper* to_add = NULL;
 	
 	//if (!done_waiting_for_user) return 0;
 	
@@ -2401,7 +2401,7 @@ void pH_profile_mem2disk(pH_profile*, pH_disk_profile*);
 // Refcounting is not required for this function
 int pH_write_profile(pH_profile* profile) {
 	int ret;
-	pH_disk_profile* disk_profile;
+	pH_disk_profile* disk_profile = NULL;
 	
 	ASSERT(profile != NULL);
 	ASSERT(!pH_profile_in_use(profile));
@@ -2626,7 +2626,7 @@ int free_profiles(void) {
 
 // Destructor for pH_task_structs
 void free_pH_task_struct(pH_task_struct* process) {
-	pH_profile* profile;
+	pH_profile* profile = NULL;
 	int i = 0;
 	
 	ASSERT(process != NULL);
@@ -2701,7 +2701,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 }
 
 static long jsys_exit(int error_code) {
-	pH_task_struct* process;
+	pH_task_struct* process = NULL;
 	
 	//if (!done_waiting_for_user) goto not_inserted;
 	
@@ -2749,9 +2749,9 @@ struct jprobe sys_exit_jprobe = {
 };
 
 static long jdo_group_exit(int error_code) {
-	pH_task_struct* process;
-	struct task_struct* p;
-	struct task_struct* t;
+	pH_task_struct* process = NULL;
+	struct task_struct* p = NULL;
+	struct task_struct* t = NULL;
 	
 	//if (!done_waiting_for_user) goto not_inserted;
 	
@@ -2855,7 +2855,7 @@ struct jprobe wait_consider_task_jprobe = {
 */
 
 static void jfree_pid(struct pid* pid) {
-	pH_task_struct* iterator;
+	pH_task_struct* iterator = NULL;
 	int i = 0;
 	bool freed_anything = FALSE;
 	
@@ -2996,7 +2996,7 @@ void stack_push(pH_task_struct* process, pH_seq* new_node) {
 // require memory is allocated for temp, and then that all of top's data is copied to temp, and
 // then that temp is returned WITHOUT being freed.
 void stack_pop(pH_task_struct* process) {
-	pH_seq* temp;
+	pH_seq* temp = NULL;
 	//pH_seq* top = process->seq;
 	
 	if (!process || process == NULL) {
@@ -3035,7 +3035,7 @@ pH_seq* stack_peek(pH_task_struct* process) {
 // This is for when a process receives a signal, NOT for when it resumes execution following
 // the signal. I will need to implement a second jprobe handler for resuming execution.
 static void jhandle_signal(struct ksignal* ksig, struct pt_regs* regs) {
-	pH_task_struct* process;
+	pH_task_struct* process = NULL;
 	
 	//if (!done_waiting_for_user) goto not_inserted;
 	
@@ -3068,7 +3068,7 @@ not_inserted:
 }
 
 static void jdo_signal(struct pt_regs* regs) {
-	pH_task_struct* process;
+	pH_task_struct* process = NULL;
 	
 	//if (!done_waiting_for_user) goto not_inserted;
 	
@@ -3128,7 +3128,7 @@ not_inserted:
 */
 
 static long jsys_rt_sigreturn(void) {
-	pH_task_struct* process;
+	pH_task_struct* process = NULL;
 	
 	//if (!done_waiting_for_user) goto not_inserted;
 	
@@ -3687,10 +3687,10 @@ int pH_profile_disk2mem(pH_disk_profile*, pH_profile*);
 
 // Since the pointers are coming from userspace, should I use copy_from_user?
 static ssize_t dev_write(struct file *filep, const char *buf, size_t len, loff_t *offset) {
-	const char* buffer;
+	const char* buffer = NULL;
 	int ret;
 	int pid_to_be_sigconted;
-	struct task_struct* to_sigcont;
+	struct task_struct* to_sigcont = NULL;
 	pH_profile* profile = NULL;
 	pH_task_struct* process = NULL;
 	
