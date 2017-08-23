@@ -526,8 +526,8 @@ void stack_push(pH_task_struct*, pH_seq*);
 
 // Initializes a new pH_seq and then adds it to the stack of pH_seqs
 int make_and_push_new_pH_seq(pH_task_struct* process) {
-	pH_profile* profile;
-	pH_seq* new_sequence;
+	pH_profile* profile = NULL;
+	pH_seq* new_sequence = NULL;
 	
 	// Checks for NULL process
 	if (!process || process == NULL) {
@@ -651,9 +651,9 @@ inline void pH_train(pH_task_struct*);
 
 // Processes a system call
 int process_syscall(long syscall) {
-	pH_task_struct* process;
-	my_syscall* new_syscall;
-	pH_profile* profile;
+	pH_task_struct* process = NULL;
+	my_syscall* new_syscall = NULL;
+	pH_profile* profile = NULL;
 	int ret;
 	
 	// Boolean checks
@@ -847,11 +847,11 @@ void add_process_to_llist(pH_task_struct* t) {
 }
 
 // Returns a pH_profile, given a filename
-pH_profile* retrieve_pH_profile_by_filename(char* filename) {
+pH_profile* retrieve_pH_profile_by_filename(const char* filename) {
 	ASSERT(spin_is_locked(&pH_profile_list_sem));
 	//ASSERT(!spin_is_locked(&pH_task_struct_list_sem));
 	
-	pH_task_struct* process_list_iterator;
+	pH_task_struct* process_list_iterator = NULL;
 	pH_profile* profile_list_iterator = pH_profile_list;
 	
 	if (pH_profile_list == NULL) {
@@ -892,10 +892,10 @@ pH_profile* retrieve_pH_profile_by_filename(char* filename) {
 }
 
 // Helper function for jsys_execve and fork_handler, as both instances require similar code
-int handle_new_process(char* path_to_binary, pH_profile* profile, int process_id) {
+int handle_new_process(const char* path_to_binary, pH_profile* profile, int process_id) {
 	if (profile != NULL) pH_refcount_inc(profile);
 	
-	pH_task_struct* this_process;
+	pH_task_struct* this_process = NULL;
 	
 	//pr_err("%s: In handle_new_process for %d %s\n", DEVICE_NAME, process_id, path_to_binary);
 	
@@ -983,11 +983,11 @@ static long jsys_execve(const char __user *filename,
 	const char __user *const __user *argv,
 	const char __user *const __user *envp)
 {
-	char* path_to_binary;
+	char* path_to_binary = NULL;
 	int current_process_id;
 	int list_length;
-	pH_task_struct* process;
-	pH_profile* profile;
+	pH_task_struct* process = NULL;
+	pH_profile* profile = NULL;
 	bool already_had_process = FALSE;
 
 	// Boolean checks
@@ -1216,9 +1216,9 @@ struct my_kretprobe_data {
 // to the binary file, which I currently only know how to retrieve from sys_execve calls.
 static int fork_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	int retval;
-	pH_task_struct* parent_process;
-	char* path_to_binary;
-	pH_profile* profile;
+	pH_task_struct* parent_process = NULL;
+	char* path_to_binary = NULL;
+	pH_profile* profile = NULL;
 	
 	// Boolean check
 	if (!module_inserted_successfully) return 0;
@@ -1402,7 +1402,7 @@ static struct kretprobe sys_rt_sigreturn_kretprobe = {
 
 static int do_execveat_common_handler(struct kretprobe_instance* ri, struct pt_regs* regs) {
 	int retval;
-	pH_task_struct* process;
+	pH_task_struct* process = NULL;
 	
 	if (!module_inserted_successfully) return 0;
 	
@@ -1780,7 +1780,7 @@ int free_profiles(void) {
 
 // Destructor for pH_task_structs
 void free_pH_task_struct(pH_task_struct* process) {
-	pH_profile* profile;
+	pH_profile* profile = NULL;
 	int i = 0;
 	
 	ASSERT(process != NULL);
@@ -1853,7 +1853,7 @@ void free_pH_task_struct(pH_task_struct* process) {
 }
 
 static long jsys_exit(int error_code) {
-	pH_task_struct* process;
+	pH_task_struct* process = NULL;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
@@ -1893,9 +1893,9 @@ struct jprobe sys_exit_jprobe = {
 };
 
 static long jdo_group_exit(int error_code) {
-	pH_task_struct* process;
-	struct task_struct* p;
-	struct task_struct* t;
+	pH_task_struct* process = NULL;
+	struct task_struct* p = NULL;
+	struct task_struct* t = NULL;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
@@ -1992,7 +1992,7 @@ struct jprobe wait_consider_task_jprobe = {
 */
 
 static void jfree_pid(struct pid* pid) {
-	pH_task_struct* iterator;
+	pH_task_struct* iterator = NULL;
 	int i = 0;
 	bool freed_anything = FALSE;
 	
@@ -2135,7 +2135,7 @@ void stack_push(pH_task_struct* process, pH_seq* new_node) {
 // require memory is allocated for temp, and then that all of top's data is copied to temp, and
 // then that temp is returned WITHOUT being freed.
 void stack_pop(pH_task_struct* process) {
-	pH_seq* temp;
+	pH_seq* temp = NULL;
 	//pH_seq* top = process->seq;
 	
 	//pr_err("%s: In stack_pop\n", DEVICE_NAME);
@@ -2168,7 +2168,7 @@ pH_seq* stack_peek(pH_task_struct* process) {
 // This is for when a process receives a signal, NOT for when it resumes execution following
 // the signal. I will need to implement a second jprobe handler for resuming execution.
 static void jhandle_signal(struct ksignal* ksig, struct pt_regs* regs) {
-	pH_task_struct* process;
+	pH_task_struct* process = NULL;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
@@ -2195,7 +2195,7 @@ not_inserted:
 }
 
 static void jdo_signal(struct pt_regs* regs) {
-	pH_task_struct* process;
+	pH_task_struct* process = NULL;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
@@ -2249,7 +2249,7 @@ not_inserted:
 */
 
 static long jsys_rt_sigreturn(void) {
-	pH_task_struct* process;
+	pH_task_struct* process = NULL;
 	
 	if (!module_inserted_successfully) goto not_inserted;
 	
